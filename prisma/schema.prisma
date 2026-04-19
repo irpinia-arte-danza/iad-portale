@@ -1,0 +1,1039 @@
+// IAD Portale - Prisma schema
+// Gestionale A.S.D. IAD Irpinia Arte Danza
+// Versione: 2.0 (Kickoff con tutte le feature integrate)
+//
+// Convenzioni:
+// - Modelli in inglese (PascalCase)
+// - Campi in camelCase
+// - Tabelle DB in snake_case plurale (via @@map)
+// - Timestamp UTC, display Europe/Rome
+// - Soft delete dove rilevante (deletedAt)
+// - Importi in centesimi (Int) per evitare problemi di floating point
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================================
+// AUTH & USERS
+// ============================================================================
+
+enum UserRole {
+  ADMIN
+  PARENT
+  TEACHER
+}
+
+model User {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  role      UserRole @default(PARENT)
+  firstName String?  @map("first_name")
+  lastName  String?  @map("last_name")
+  phone     String?
+  isActive  Boolean  @default(true) @map("is_active")
+
+  // Preferenze UI
+  themePreference String? @map("theme_preference") // "light" | "dark" | "system"
+
+  parentProfile  Parent?
+  teacherProfile Teacher?
+  auditLogs      AuditLog[]
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// ============================================================================
+// TEMPORAL KEYS: Academic Year + Fiscal Year
+// ============================================================================
+// Ogni entità finanziaria referenzia ENTRAMBI per permettere viste
+// parallele (iscrizioni su anno accademico, contabilità su anno solare)
+
+model AcademicYear {
+  id        String   @id @default(uuid()) @db.Uuid
+  label     String   @unique // "2025-2026"
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+  isCurrent Boolean  @default(false) @map("is_current")
+
+  // Quote standard per quest'anno
+  associationFeeCents Int @map("association_fee_cents")
+  // Giorno del mese per scadenza rinnovo (default 10, configurabile)
+  monthlyRenewalDay   Int @default(10) @map("monthly_renewal_day")
+
+  // Relazioni
+  enrollments CourseEnrollment[]
+  lessons     Lesson[]
+  payments    Payment[]
+  expenses    Expense[]
+  stages      Stage[]
+  showcase    Showcase?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("academic_years")
+}
+
+model FiscalYear {
+  id        String   @id @default(uuid()) @db.Uuid
+  year      Int      @unique // 2026
+  startDate DateTime @map("start_date") @db.Date // 2026-01-01
+  endDate   DateTime @map("end_date") @db.Date   // 2026-12-31
+  isCurrent Boolean  @default(false) @map("is_current")
+  isClosed  Boolean  @default(false) @map("is_closed") // dopo chiusura bilancio
+
+  payments            Payment[]
+  expenses            Expense[]
+  teacherCompensations TeacherCompensation[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("fiscal_years")
+}
+
+// ============================================================================
+// ATHLETES
+// ============================================================================
+
+enum AthleteStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  WITHDRAWN
+}
+
+enum Gender {
+  F
+  M
+  OTHER
+}
+
+enum AcquisitionSource {
+  WORD_OF_MOUTH
+  FLYERS
+  INSTAGRAM
+  FACEBOOK
+  RETURNING
+  OTHER
+}
+
+model Athlete {
+  id String @id @default(uuid()) @db.Uuid
+
+  firstName       String   @map("first_name")
+  lastName        String   @map("last_name")
+  fiscalCode      String   @unique @map("fiscal_code")
+  dateOfBirth     DateTime @map("date_of_birth") @db.Date
+  placeOfBirth    String   @map("place_of_birth")
+  provinceOfBirth String   @map("province_of_birth") @db.Char(2)
+  gender          Gender   @default(F)
+
+  residenceStreet   String @map("residence_street")
+  residenceNumber   String @map("residence_number")
+  residenceCity     String @map("residence_city")
+  residenceProvince String @map("residence_province") @db.Char(2)
+  residenceCap      String @map("residence_cap") @db.VarChar(5)
+
+  email String?
+  phone String?
+
+  photoUrl String? @map("photo_url")
+
+  medicalNotes    String? @map("medical_notes")
+  instructorNotes String? @map("instructor_notes")
+  size            String?
+
+  status            AthleteStatus      @default(TRIAL)
+  acquisitionSource AcquisitionSource? @map("acquisition_source")
+  enrollmentDate    DateTime?          @map("enrollment_date") @db.Date
+
+  parentRelations        AthleteParent[]
+  enrollments            CourseEnrollment[]
+  attendances            Attendance[]
+  payments               Payment[]
+  medicalCertificates    MedicalCertificate[]
+  insurances             Insurance[]
+  consents               Consent[]
+  documents              Document[]
+  affiliations           Affiliation[]
+  showcaseParticipations ShowcaseParticipation[]
+  stageEnrollments       StageEnrollment[]
+  statusHistory          AthleteStatusHistory[]
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([lastName, firstName])
+  @@index([status])
+  @@index([fiscalCode])
+  @@map("athletes")
+}
+
+model AthleteStatusHistory {
+  id        String        @id @default(uuid()) @db.Uuid
+  athleteId String        @map("athlete_id") @db.Uuid
+  athlete   Athlete       @relation(fields: [athleteId], references: [id])
+  oldStatus AthleteStatus @map("old_status")
+  newStatus AthleteStatus @map("new_status")
+  reason    String?
+  changedBy String?       @map("changed_by") @db.Uuid
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([athleteId])
+  @@map("athlete_status_history")
+}
+
+// ============================================================================
+// PARENTS
+// ============================================================================
+
+model Parent {
+  id     String  @id @default(uuid()) @db.Uuid
+  userId String? @unique @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id])
+
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  fiscalCode   String   @unique @map("fiscal_code")
+  dateOfBirth  DateTime @map("date_of_birth") @db.Date
+  placeOfBirth String?  @map("place_of_birth")
+
+  residenceStreet   String @map("residence_street")
+  residenceNumber   String @map("residence_number")
+  residenceCity     String @map("residence_city")
+  residenceProvince String @map("residence_province") @db.Char(2)
+  residenceCap      String @map("residence_cap") @db.VarChar(5)
+
+  email String
+  phone String
+
+  // Override per-genitore sui solleciti automatici
+  remindersEnabled Boolean @default(true) @map("reminders_enabled")
+
+  athleteRelations AthleteParent[]
+  payments         Payment[]
+  consents         Consent[]
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([email])
+  @@index([lastName, firstName])
+  @@map("parents")
+}
+
+model AthleteParent {
+  id        String @id @default(uuid()) @db.Uuid
+  athleteId String @map("athlete_id") @db.Uuid
+  parentId  String @map("parent_id") @db.Uuid
+
+  relationship         String
+  isPrimaryPayer       Boolean @default(false) @map("is_primary_payer")
+  isPickupAuthorized   Boolean @default(true) @map("is_pickup_authorized")
+  hasParentalAuthority Boolean @default(true) @map("has_parental_authority")
+
+  athlete Athlete @relation(fields: [athleteId], references: [id])
+  parent  Parent  @relation(fields: [parentId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([athleteId, parentId])
+  @@index([athleteId])
+  @@index([parentId])
+  @@map("athlete_parents")
+}
+
+// ============================================================================
+// TEACHERS (attive dall'MVP)
+// ============================================================================
+
+model Teacher {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
+
+  firstName  String  @map("first_name")
+  lastName   String  @map("last_name")
+  fiscalCode String  @unique @map("fiscal_code")
+  email      String
+  phone      String?
+
+  qualifications String?
+  isActive       Boolean @default(true) @map("is_active")
+
+  courses                  Course[]
+  compensations            TeacherCompensation[]
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("teachers")
+}
+
+// ============================================================================
+// COURSES
+// ============================================================================
+
+enum CourseType {
+  GIOCO_DANZA
+  PROPEDEUTICA
+  DANZA_CLASSICA
+  DANZA_MODERNA
+  DANZA_CONTEMPORANEA
+  OTHER
+}
+
+model Course {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String
+  type        CourseType
+  description String?
+
+  minAge Int?    @map("min_age")
+  maxAge Int?    @map("max_age")
+  level  String?
+
+  capacity Int @default(20)
+
+  monthlyFeeCents   Int  @map("monthly_fee_cents")
+  trimesterFeeCents Int? @map("trimester_fee_cents")
+
+  teacherId String?  @map("teacher_id") @db.Uuid
+  teacher   Teacher? @relation(fields: [teacherId], references: [id])
+
+  isActive Boolean @default(true) @map("is_active")
+
+  schedules   CourseSchedule[]
+  enrollments CourseEnrollment[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("courses")
+}
+
+model CourseSchedule {
+  id       String @id @default(uuid()) @db.Uuid
+  courseId String @map("course_id") @db.Uuid
+  course   Course @relation(fields: [courseId], references: [id])
+
+  dayOfWeek Int    @map("day_of_week")
+  startTime String @map("start_time")
+  endTime   String @map("end_time")
+
+  location String?
+
+  validFrom DateTime  @map("valid_from") @db.Date
+  validTo   DateTime? @map("valid_to") @db.Date
+
+  lessons Lesson[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("course_schedules")
+}
+
+model CourseEnrollment {
+  id             String @id @default(uuid()) @db.Uuid
+  athleteId      String @map("athlete_id") @db.Uuid
+  courseId       String @map("course_id") @db.Uuid
+  academicYearId String @map("academic_year_id") @db.Uuid
+
+  enrollmentDate DateTime  @default(now()) @map("enrollment_date") @db.Date
+  withdrawalDate DateTime? @map("withdrawal_date") @db.Date
+
+  athlete      Athlete      @relation(fields: [athleteId], references: [id])
+  course       Course       @relation(fields: [courseId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@unique([athleteId, courseId, academicYearId])
+  @@index([courseId, academicYearId])
+  @@map("course_enrollments")
+}
+
+// ============================================================================
+// LESSONS & ATTENDANCE
+// ============================================================================
+
+enum LessonStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model Lesson {
+  id             String @id @default(uuid()) @db.Uuid
+  scheduleId     String @map("schedule_id") @db.Uuid
+  academicYearId String @map("academic_year_id") @db.Uuid
+
+  date      DateTime     @db.Date
+  startTime String       @map("start_time")
+  endTime   String       @map("end_time")
+  status    LessonStatus @default(SCHEDULED)
+  notes     String?
+
+  schedule     CourseSchedule @relation(fields: [scheduleId], references: [id])
+  academicYear AcademicYear   @relation(fields: [academicYearId], references: [id])
+  attendances  Attendance[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([date, status])
+  @@map("lessons")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+model Attendance {
+  id        String @id @default(uuid()) @db.Uuid
+  lessonId  String @map("lesson_id") @db.Uuid
+  athleteId String @map("athlete_id") @db.Uuid
+
+  status   AttendanceStatus
+  notes    String?
+  markedBy String?          @map("marked_by") @db.Uuid
+  markedAt DateTime         @default(now()) @map("marked_at") @db.Timestamptz(6)
+
+  lesson  Lesson  @relation(fields: [lessonId], references: [id])
+  athlete Athlete @relation(fields: [athleteId], references: [id])
+
+  @@unique([lessonId, athleteId])
+  @@index([athleteId])
+  @@map("attendances")
+}
+
+// ============================================================================
+// STAGES (eventi occasionali, genitori si iscrivono)
+// ============================================================================
+
+model Stage {
+  id             String @id @default(uuid()) @db.Uuid
+  academicYearId String @map("academic_year_id") @db.Uuid
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  title       String
+  description String?
+  date        DateTime @db.Date
+  startTime   String   @map("start_time")
+  endTime     String   @map("end_time")
+  location    String?
+
+  capacity    Int
+  feeCents    Int      @map("fee_cents")
+
+  registrationOpen Boolean @default(true) @map("registration_open")
+  registrationDeadline DateTime? @map("registration_deadline") @db.Date
+
+  enrollments StageEnrollment[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([date])
+  @@map("stages")
+}
+
+model StageEnrollment {
+  id        String @id @default(uuid()) @db.Uuid
+  stageId   String @map("stage_id") @db.Uuid
+  athleteId String @map("athlete_id") @db.Uuid
+
+  enrolledAt DateTime  @default(now()) @map("enrolled_at") @db.Timestamptz(6)
+  enrolledBy String?   @map("enrolled_by") @db.Uuid // genitore o admin
+  paid       Boolean   @default(false)
+  paymentId  String?   @unique @map("payment_id") @db.Uuid
+
+  notes String?
+
+  stage   Stage   @relation(fields: [stageId], references: [id])
+  athlete Athlete @relation(fields: [athleteId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@unique([stageId, athleteId])
+  @@map("stage_enrollments")
+}
+
+// ============================================================================
+// SHOWCASE (saggio annuale)
+// ============================================================================
+
+model Showcase {
+  id             String       @id @default(uuid()) @db.Uuid
+  academicYearId String       @unique @map("academic_year_id") @db.Uuid
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  title             String
+  description       String?
+  date              DateTime  @db.Date
+  location          String?
+  rehearsalDate     DateTime? @map("rehearsal_date") @db.Date
+
+  firstInstallmentCents  Int      @map("first_installment_cents")
+  secondInstallmentCents Int      @map("second_installment_cents")
+  firstDeadline          DateTime @map("first_deadline") @db.Date
+  secondDeadline         DateTime @map("second_deadline") @db.Date
+
+  participations ShowcaseParticipation[]
+  costumes       Costume[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("showcases")
+}
+
+model ShowcaseParticipation {
+  id         String @id @default(uuid()) @db.Uuid
+  showcaseId String @map("showcase_id") @db.Uuid
+  athleteId  String @map("athlete_id") @db.Uuid
+
+  confirmed   Boolean   @default(false)
+  confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  choreography String?
+  notes        String?
+
+  showcase Showcase @relation(fields: [showcaseId], references: [id])
+  athlete  Athlete  @relation(fields: [athleteId], references: [id])
+
+  costumeAssignments CostumeAssignment[]
+
+  @@unique([showcaseId, athleteId])
+  @@map("showcase_participations")
+}
+
+model Costume {
+  id         String   @id @default(uuid()) @db.Uuid
+  showcaseId String   @map("showcase_id") @db.Uuid
+  showcase   Showcase @relation(fields: [showcaseId], references: [id])
+
+  name        String
+  description String?
+  costCents   Int     @map("cost_cents")
+
+  assignments CostumeAssignment[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("costumes")
+}
+
+model CostumeAssignment {
+  id              String @id @default(uuid()) @db.Uuid
+  costumeId       String @map("costume_id") @db.Uuid
+  participationId String @map("participation_id") @db.Uuid
+
+  paid      Boolean  @default(false)
+  paymentId String?  @unique @map("payment_id") @db.Uuid
+
+  costume       Costume               @relation(fields: [costumeId], references: [id])
+  participation ShowcaseParticipation @relation(fields: [participationId], references: [id])
+  payment       Payment?              @relation(fields: [paymentId], references: [id])
+
+  @@unique([costumeId, participationId])
+  @@map("costume_assignments")
+}
+
+// ============================================================================
+// PAYMENTS (entrate) — con doppia chiave temporale
+// ============================================================================
+
+enum FeeType {
+  ASSOCIATION
+  MONTHLY
+  TRIMESTER
+  STAGE
+  SHOWCASE_1
+  SHOWCASE_2
+  COSTUME
+  TRIAL_LESSON
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  POS
+  SUMUP_LINK // V2
+  OTHER
+}
+
+enum PaymentStatus {
+  PAID
+  REVERSED
+}
+
+model Payment {
+  id             String @id @default(uuid()) @db.Uuid
+  athleteId      String @map("athlete_id") @db.Uuid
+  parentId       String? @map("parent_id") @db.Uuid
+  academicYearId String @map("academic_year_id") @db.Uuid
+  fiscalYearId   String @map("fiscal_year_id") @db.Uuid // doppia chiave temporale
+
+  feeType     FeeType       @map("fee_type")
+  amountCents Int           @map("amount_cents")
+  method      PaymentMethod
+  status      PaymentStatus @default(PAID)
+
+  periodStart DateTime? @map("period_start") @db.Date
+  periodEnd   DateTime? @map("period_end") @db.Date
+
+  paymentDate DateTime @map("payment_date") @db.Date
+
+  notes          String?
+  reversalReason String? @map("reversal_reason")
+
+  // Ricevuta collegata
+  receipt Receipt?
+  // Back-refs da stage/costume enrollments
+  stageEnrollment   StageEnrollment?
+  costumeAssignment CostumeAssignment?
+
+  athlete      Athlete      @relation(fields: [athleteId], references: [id])
+  parent       Parent?      @relation(fields: [parentId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  fiscalYear   FiscalYear   @relation(fields: [fiscalYearId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([athleteId, paymentDate])
+  @@index([academicYearId, status])
+  @@index([fiscalYearId, status])
+  @@map("payments")
+}
+
+// ============================================================================
+// EXPENSES (uscite) — affitto, F24, compensi, costumi, ecc.
+// ============================================================================
+
+enum ExpenseType {
+  RENT                // Affitto palestra
+  TAX_F24             // F24 (IVA, INPS, ecc.)
+  UTILITY             // Utenze
+  COMPENSATION        // Compenso Giuseppina/insegnanti
+  COSTUME_PURCHASE    // Acquisto costumi per saggio
+  MATERIAL            // Materiale tecnico
+  INSURANCE           // Premio assicurativo
+  AFFILIATION         // Affiliazione Endas/CSEN
+  OTHER
+}
+
+model Expense {
+  id             String     @id @default(uuid()) @db.Uuid
+  fiscalYearId   String     @map("fiscal_year_id") @db.Uuid
+  academicYearId String?    @map("academic_year_id") @db.Uuid // opzionale (es. affitto estate)
+
+  type        ExpenseType
+  amountCents Int         @map("amount_cents")
+  method      PaymentMethod
+  expenseDate DateTime    @map("expense_date") @db.Date
+
+  description String
+  recipient   String? // "Compenso Giuseppina Ciociola", "Affitto Palestra Basile"
+  documentUrl String? @map("document_url") // scansione fattura/ricevuta
+
+  // Se è un compenso sportivo, link al record specifico
+  compensationId String? @unique @map("compensation_id") @db.Uuid
+  compensation   TeacherCompensation? @relation(fields: [compensationId], references: [id])
+
+  fiscalYear   FiscalYear   @relation(fields: [fiscalYearId], references: [id])
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
+
+  notes String?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([fiscalYearId, type])
+  @@index([expenseDate])
+  @@map("expenses")
+}
+
+// ============================================================================
+// TEACHER COMPENSATIONS (sportivo dilettantistico, soglia €15.000)
+// ============================================================================
+
+model TeacherCompensation {
+  id           String     @id @default(uuid()) @db.Uuid
+  teacherId    String     @map("teacher_id") @db.Uuid
+  fiscalYearId String     @map("fiscal_year_id") @db.Uuid
+
+  amountCents Int        @map("amount_cents")
+  paymentDate DateTime   @map("payment_date") @db.Date
+  method      PaymentMethod
+
+  // Numero ricevuta per prestazione (es. "IAD/2025-26/4")
+  receiptNumber String? @unique @map("receipt_number")
+
+  description String?
+  notes       String?
+
+  teacher    Teacher    @relation(fields: [teacherId], references: [id])
+  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id])
+  expense    Expense?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([teacherId, fiscalYearId])
+  @@map("teacher_compensations")
+}
+
+// ============================================================================
+// RECEIPTS (ricevute PDF numerate)
+// ============================================================================
+
+enum ReceiptCategory {
+  REGULAR    // quote mensili → "IAD/2025-26/196"
+  SHOWCASE   // saggio → "IAD/2025-26/45/S"
+  COSTUME    // costume → "IAD/2025-26/4/C"
+  COMPENSATION // prestazione occasionale → "IAD/2025-26/4"
+  BLANK      // ricevuta in bianco (template)
+}
+
+model Receipt {
+  id              String          @id @default(uuid()) @db.Uuid
+  paymentId       String?         @unique @map("payment_id") @db.Uuid
+  payment         Payment?        @relation(fields: [paymentId], references: [id])
+
+  category        ReceiptCategory
+  receiptNumber   String          @unique @map("receipt_number") // "IAD/2025-26/001"
+  issueDate       DateTime        @map("issue_date") @db.Date
+
+  // Per ricevute "in bianco" o scollegate da un Payment
+  payerName       String?   @map("payer_name")
+  payerFiscalCode String?   @map("payer_fiscal_code")
+  description     String?
+  amountCents     Int?      @map("amount_cents")
+
+  pdfUrl String? @map("pdf_url")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([receiptNumber])
+  @@index([category, issueDate])
+  @@map("receipts")
+}
+
+// ============================================================================
+// COMPLIANCE: certificates, insurance, consents, documents
+// ============================================================================
+
+model MedicalCertificate {
+  id         String   @id @default(uuid()) @db.Uuid
+  athleteId  String   @map("athlete_id") @db.Uuid
+  athlete    Athlete  @relation(fields: [athleteId], references: [id])
+  issueDate  DateTime @map("issue_date") @db.Date
+  expiryDate DateTime @map("expiry_date") @db.Date
+  doctorName String?  @map("doctor_name")
+  type       String   @default("non-agonistica")
+  fileUrl    String?  @map("file_url")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([athleteId, expiryDate])
+  @@map("medical_certificates")
+}
+
+model Insurance {
+  id           String   @id @default(uuid()) @db.Uuid
+  athleteId    String   @map("athlete_id") @db.Uuid
+  athlete      Athlete  @relation(fields: [athleteId], references: [id])
+  policyName   String   @map("policy_name")
+  policyNumber String?  @map("policy_number")
+  startDate    DateTime @map("start_date") @db.Date
+  endDate      DateTime @map("end_date") @db.Date
+  isSuspended  Boolean  @default(false) @map("is_suspended")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([athleteId])
+  @@map("insurances")
+}
+
+// ============================================================================
+// AFFILIATIONS (Endas / CSEN) — tesseramenti
+// ============================================================================
+
+enum AffiliationEntity {
+  ENDAS
+  CSEN
+}
+
+enum AffiliationStatus {
+  PENDING   // da inviare al referente
+  SENT      // inviato (PDF esportato)
+  CONFIRMED // confermato (numero tessera ricevuto)
+  EXPIRED
+}
+
+model Affiliation {
+  id         String            @id @default(uuid()) @db.Uuid
+  athleteId  String            @map("athlete_id") @db.Uuid
+  athlete    Athlete           @relation(fields: [athleteId], references: [id])
+
+  entity        AffiliationEntity
+  status        AffiliationStatus @default(PENDING)
+  cardNumber    String?           @map("card_number")
+  cardYear      Int               @map("card_year") // 2026
+  sentAt        DateTime?         @map("sent_at") @db.Timestamptz(6)
+  confirmedAt   DateTime?         @map("confirmed_at") @db.Timestamptz(6)
+  expiryDate    DateTime?         @map("expiry_date") @db.Date
+
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([athleteId, entity, cardYear])
+  @@index([status])
+  @@map("affiliations")
+}
+
+// ============================================================================
+// CONSENTS (GDPR + regolamento versionati)
+// ============================================================================
+
+enum ConsentType {
+  REGULATION
+  WITHDRAWAL_TERMS
+  IMAGE_RELEASE
+  PAYMENT_TERMS
+  GDPR
+}
+
+enum ConsentMethod {
+  ONLINE
+  PAPER
+}
+
+model Consent {
+  id        String  @id @default(uuid()) @db.Uuid
+  athleteId String? @map("athlete_id") @db.Uuid
+  parentId  String? @map("parent_id") @db.Uuid
+
+  type            ConsentType
+  accepted        Boolean
+  documentVersion String        @map("document_version")
+  method          ConsentMethod
+  acceptedAt      DateTime      @map("accepted_at") @db.Timestamptz(6)
+  ipAddress       String?       @map("ip_address")
+  userAgent       String?       @map("user_agent")
+
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokeReason String?   @map("revoke_reason")
+
+  athlete Athlete? @relation(fields: [athleteId], references: [id])
+  parent  Parent?  @relation(fields: [parentId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([athleteId, type])
+  @@index([parentId, type])
+  @@map("consents")
+}
+
+model LegalDocument {
+  id            String      @id @default(uuid()) @db.Uuid
+  type          ConsentType
+  version       String
+  title         String
+  content       String      @db.Text
+  pdfUrl        String?     @map("pdf_url")
+  effectiveFrom DateTime    @map("effective_from") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([type, version])
+  @@map("legal_documents")
+}
+
+enum DocumentType {
+  ENROLLMENT_FORM
+  TRIAL_FORM
+  MEDICAL_CERTIFICATE_SCAN
+  IDENTITY_DOCUMENT
+  OTHER_SCAN
+}
+
+model Document {
+  id        String       @id @default(uuid()) @db.Uuid
+  athleteId String       @map("athlete_id") @db.Uuid
+  athlete   Athlete      @relation(fields: [athleteId], references: [id])
+  type      DocumentType
+  title     String
+  fileUrl   String       @map("file_url")
+  mimeType  String?      @map("mime_type")
+  sizeBytes Int?         @map("size_bytes")
+  uploadedBy String?     @map("uploaded_by") @db.Uuid
+  notes     String?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([athleteId, type])
+  @@map("documents")
+}
+
+// ============================================================================
+// EMAILS & REMINDERS (configurabili)
+// ============================================================================
+
+enum EmailType {
+  WELCOME_PARENT
+  PAYMENT_REMINDER_1  // primo sollecito
+  PAYMENT_REMINDER_2  // secondo sollecito
+  PAYMENT_REMINDER_MANUAL // inviato manualmente dal bottone
+  PAYMENT_RECEIVED
+  RECEIPT
+  MEDICAL_CERTIFICATE_EXPIRING
+  SUSPENSION_NOTICE
+  STAGE_CONFIRMATION
+  SHOWCASE_REMINDER
+  BROADCAST
+  PASSWORD_RESET
+  CONSENT_REREQUEST
+  OTHER
+}
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  FAILED
+  BOUNCED
+}
+
+model EmailLog {
+  id           String      @id @default(uuid()) @db.Uuid
+  type         EmailType
+  toEmail      String      @map("to_email")
+  subject      String
+  status       EmailStatus @default(QUEUED)
+  errorMessage String?     @map("error_message")
+  resendId     String?     @map("resend_id")
+  sentAt       DateTime?   @map("sent_at") @db.Timestamptz(6)
+  triggeredBy  String?     @map("triggered_by") @db.Uuid // user id se manuale
+
+  athleteId String? @map("athlete_id") @db.Uuid
+  parentId  String? @map("parent_id") @db.Uuid
+  paymentId String? @map("payment_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([toEmail, createdAt])
+  @@index([type, status])
+  @@map("email_logs")
+}
+
+// Configurazione solleciti automatici (singleton — 1 solo record)
+model ReminderConfig {
+  id Int @id @default(1)
+
+  enabled Boolean @default(true)
+
+  // Giorni dopo la scadenza per invio solleciti
+  firstReminderDaysAfter  Int @default(3)  @map("first_reminder_days_after")
+  secondReminderDaysAfter Int @default(10) @map("second_reminder_days_after")
+
+  // Suspend access threshold (giorni di morosità)
+  suspensionDaysAfter Int @default(20) @map("suspension_days_after")
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("reminder_config")
+}
+
+// ============================================================================
+// BRAND SETTINGS (logo caricabile, dati ASD)
+// ============================================================================
+
+// Singleton (1 solo record) con i dati del brand
+model BrandSettings {
+  id Int @id @default(1)
+
+  // Logo e immagini
+  logoUrl      String? @map("logo_url")      // principale (header, email)
+  logoDarkUrl  String? @map("logo_dark_url") // variante per dark mode
+  faviconUrl   String? @map("favicon_url")
+
+  // Colori brand
+  primaryColor   String @default("#006FEE") @map("primary_color")   // accent
+  secondaryColor String @default("#7828C8") @map("secondary_color")
+
+  // Dati ASD
+  asdName       String @default("A.S.D. IAD Irpinia Arte Danza") @map("asd_name")
+  asdAddress    String @default("Via Cervinaro, 14 - 83048 Montella (AV)") @map("asd_address")
+  asdFiscalCode String @default("90029290641") @map("asd_fiscal_code")
+  asdEmail      String @default("info@irpiniaartedanza.it") @map("asd_email")
+  asdPhone      String? @map("asd_phone")
+  asdWebsite    String? @map("asd_website")
+  asdIban       String? @map("asd_iban")
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("brand_settings")
+}
+
+// ============================================================================
+// AUDIT & SECURITY
+// ============================================================================
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  SOFT_DELETE
+  RESTORE
+  LOGIN
+  LOGOUT
+  EXPORT
+  REVERSE_PAYMENT
+  CONSENT_REVOKED
+  SUSPENSION
+  BRAND_UPDATE
+  REMINDER_SENT
+  BULK_EMAIL
+}
+
+model AuditLog {
+  id         String      @id @default(uuid()) @db.Uuid
+  userId     String?     @map("user_id") @db.Uuid
+  user       User?       @relation(fields: [userId], references: [id])
+  action     AuditAction
+  entityType String      @map("entity_type")
+  entityId   String?     @map("entity_id")
+  changes    Json?
+  ipAddress  String?     @map("ip_address")
+  userAgent  String?     @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
