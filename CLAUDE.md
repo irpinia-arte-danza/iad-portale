@@ -641,6 +641,12 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
     **17.7 Next.js 16 proxy.ts export naming**: il runtime Next.js 16.2.4 (`node_modules/next/dist/build/analysis/get-page-static-info.js`) accetta come nome funzione sia `export async function middleware(...)` sia `export async function proxy(...)` (entrambi riconosciuti, riga 260-273), ma legge il matcher SOLO dall'export `config`, NON da `proxyConfig` (riga 457, 562). La skill Vercel `routing-middleware` documenta `proxyConfig` come convenzione futura, ma usarla oggi rompe silenziosamente il matcher: il proxy gira su TUTTE le request (inclusi `/_next/static/chunks/*.css`) e le pagine perdono gli stili (redirect CSS → `/login`). Pattern corretto: `export async function proxy(request) {...}` + `export const config = { matcher: [...] }`. Debug tip: se CSS/JS di Next.js vengono intercettati dal proxy, verificare SEMPRE il nome dell'export config prima di sospettare regex matcher.
 
+    **17.8 Shadcn Sidebar richiede TooltipProvider globale**: shadcn `<Sidebar>` usa internamente `<Tooltip>` per i menu item in modalità `collapsible="icon"` (vedi `SidebarMenuButton` in `src/components/ui/sidebar.tsx`). Richiede quindi `<TooltipProvider>` mounted in un ancestor (tipicamente root layout). Sintomo se mancante: Runtime Error `"Tooltip must be used within TooltipProvider"`, cascade su ThemeProvider/altri provider (React error boundary pulls everything down). Fix: `import { TooltipProvider } from "@/components/ui/tooltip"` in `src/app/layout.tsx`, wrap `{children}` dentro `ThemeProvider`. Scoperto: 20 aprile 2026, Sprint 0 Fase 3D.2.
+
+    **17.9 Next.js Dev Mode logga Server Action bodies**: Next.js 16 in dev mode logga automaticamente ogni Server Action call con il body (password incluse). Comportamento framework-level, NON codice nostro. In production Vercel questo logging NON avviene (Function Logs mostrano solo HTTP method + path + status, non il body). Attention: mai scrivere `console.log(values)` o `console.log(error)` in action files, altrimenti anche prod logga. Pattern sicuro: `console.log({ email: values.email })` invece di `console.log(values)`. Future refactor (Sprint 1+): valutare switch a Supabase client-side auth (`supabase.auth.signInWithPassword()` chiamata direttamente dal client) per evitare che password transiti mai attraverso il nostro server, anche in dev. Scoperto: 20 aprile 2026, Sprint 0 Fase 3E.
+
+    **17.10 Vercel env var TZ è reserved**: Vercel non permette di settare `TZ` come env var custom perché è variabile di sistema (gestita da Vercel runtime). Aggiungerla produce errore `"The name of your Environment Variable is reserved"` e blocca il deploy. Fix Sprint 0: non settiamo `TZ` su Vercel. Il runtime gira in UTC di default. Per timezone-aware formatting usare: `date.toLocaleString("it-IT", { timeZone: "Europe/Rome" })` (o equivalente `formatInTimeZone` di `date-fns-tz` già previsto dallo stack). Future: se serve TZ globale, usare env var custom tipo `APP_TZ` + code che lo legge come fallback. Scoperto: 20 aprile 2026, Sprint 0 Fase 3E.2.
+
 ---
 
 ## 📚 Documenti di riferimento
@@ -657,4 +663,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-20 · Versione 2.5 — Aggiunto gotcha 17.7 su Next.js 16 proxy.ts export naming (runtime legge `config`, non `proxyConfig`)_
+_Ultimo aggiornamento: 2026-04-20 · Versione 2.6 — Aggiunti gotcha 17.8 (TooltipProvider globale per shadcn Sidebar), 17.9 (Next.js dev mode logga Server Action bodies), 17.10 (Vercel env var TZ reserved)_
