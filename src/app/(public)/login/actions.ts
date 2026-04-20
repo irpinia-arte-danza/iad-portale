@@ -75,3 +75,9 @@ export async function login(
 
   redirect(getDashboardPath(prismaUser.role));
 }
+
+export async function logout() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/login");
+}
