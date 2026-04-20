@@ -92,12 +92,12 @@ model FiscalYear {
   id        String   @id @default(uuid()) @db.Uuid
   year      Int      @unique // 2026
   startDate DateTime @map("start_date") @db.Date // 2026-01-01
-  endDate   DateTime @map("end_date") @db.Date   // 2026-12-31
+  endDate   DateTime @map("end_date") @db.Date // 2026-12-31
   isCurrent Boolean  @default(false) @map("is_current")
   isClosed  Boolean  @default(false) @map("is_closed") // dopo chiusura bilancio
 
-  payments            Payment[]
-  expenses            Expense[]
+  payments             Payment[]
+  expenses             Expense[]
   teacherCompensations TeacherCompensation[]
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -129,6 +129,14 @@ enum AcquisitionSource {
   INSTAGRAM
   FACEBOOK
   RETURNING
+  OTHER
+}
+
+enum ParentRelationship {
+  MOTHER
+  FATHER
+  GRANDPARENT
+  TUTOR
   OTHER
 }
 
@@ -224,7 +232,8 @@ model Parent {
   phone String
 
   // Override per-genitore sui solleciti automatici
-  remindersEnabled Boolean @default(true) @map("reminders_enabled")
+  remindersEnabled            Boolean @default(true) @map("reminders_enabled")
+  receivesEmailCommunications Boolean @default(true) @map("receives_email_communications")
 
   athleteRelations AthleteParent[]
   payments         Payment[]
@@ -244,10 +253,11 @@ model AthleteParent {
   athleteId String @map("athlete_id") @db.Uuid
   parentId  String @map("parent_id") @db.Uuid
 
-  relationship         String
-  isPrimaryPayer       Boolean @default(false) @map("is_primary_payer")
-  isPickupAuthorized   Boolean @default(true) @map("is_pickup_authorized")
-  hasParentalAuthority Boolean @default(true) @map("has_parental_authority")
+  relationship         ParentRelationship
+  isPrimaryPayer       Boolean            @default(false) @map("is_primary_payer")
+  isPrimaryContact     Boolean            @default(false) @map("is_primary_contact")
+  isPickupAuthorized   Boolean            @default(true) @map("is_pickup_authorized")
+  hasParentalAuthority Boolean            @default(true) @map("has_parental_authority")
 
   athlete Athlete @relation(fields: [athleteId], references: [id])
   parent  Parent  @relation(fields: [parentId], references: [id])
@@ -278,8 +288,8 @@ model Teacher {
   qualifications String?
   isActive       Boolean @default(true) @map("is_active")
 
-  courses                  Course[]
-  compensations            TeacherCompensation[]
+  courses       Course[]
+  compensations TeacherCompensation[]
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -429,8 +439,8 @@ model Attendance {
 // ============================================================================
 
 model Stage {
-  id             String @id @default(uuid()) @db.Uuid
-  academicYearId String @map("academic_year_id") @db.Uuid
+  id             String       @id @default(uuid()) @db.Uuid
+  academicYearId String       @map("academic_year_id") @db.Uuid
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
 
   title       String
@@ -440,10 +450,10 @@ model Stage {
   endTime     String   @map("end_time")
   location    String?
 
-  capacity    Int
-  feeCents    Int      @map("fee_cents")
+  capacity Int
+  feeCents Int @map("fee_cents")
 
-  registrationOpen Boolean @default(true) @map("registration_open")
+  registrationOpen     Boolean   @default(true) @map("registration_open")
   registrationDeadline DateTime? @map("registration_deadline") @db.Date
 
   enrollments StageEnrollment[]
@@ -460,15 +470,15 @@ model StageEnrollment {
   stageId   String @map("stage_id") @db.Uuid
   athleteId String @map("athlete_id") @db.Uuid
 
-  enrolledAt DateTime  @default(now()) @map("enrolled_at") @db.Timestamptz(6)
-  enrolledBy String?   @map("enrolled_by") @db.Uuid // genitore o admin
-  paid       Boolean   @default(false)
-  paymentId  String?   @unique @map("payment_id") @db.Uuid
+  enrolledAt DateTime @default(now()) @map("enrolled_at") @db.Timestamptz(6)
+  enrolledBy String?  @map("enrolled_by") @db.Uuid // genitore o admin
+  paid       Boolean  @default(false)
+  paymentId  String?  @unique @map("payment_id") @db.Uuid
 
   notes String?
 
-  stage   Stage   @relation(fields: [stageId], references: [id])
-  athlete Athlete @relation(fields: [athleteId], references: [id])
+  stage   Stage    @relation(fields: [stageId], references: [id])
+  athlete Athlete  @relation(fields: [athleteId], references: [id])
   payment Payment? @relation(fields: [paymentId], references: [id])
 
   @@unique([stageId, athleteId])
@@ -484,11 +494,11 @@ model Showcase {
   academicYearId String       @unique @map("academic_year_id") @db.Uuid
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
 
-  title             String
-  description       String?
-  date              DateTime  @db.Date
-  location          String?
-  rehearsalDate     DateTime? @map("rehearsal_date") @db.Date
+  title         String
+  description   String?
+  date          DateTime  @db.Date
+  location      String?
+  rehearsalDate DateTime? @map("rehearsal_date") @db.Date
 
   firstInstallmentCents  Int      @map("first_installment_cents")
   secondInstallmentCents Int      @map("second_installment_cents")
@@ -509,8 +519,8 @@ model ShowcaseParticipation {
   showcaseId String @map("showcase_id") @db.Uuid
   athleteId  String @map("athlete_id") @db.Uuid
 
-  confirmed   Boolean   @default(false)
-  confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  confirmed    Boolean   @default(false)
+  confirmedAt  DateTime? @map("confirmed_at") @db.Timestamptz(6)
   choreography String?
   notes        String?
 
@@ -544,8 +554,8 @@ model CostumeAssignment {
   costumeId       String @map("costume_id") @db.Uuid
   participationId String @map("participation_id") @db.Uuid
 
-  paid      Boolean  @default(false)
-  paymentId String?  @unique @map("payment_id") @db.Uuid
+  paid      Boolean @default(false)
+  paymentId String? @unique @map("payment_id") @db.Uuid
 
   costume       Costume               @relation(fields: [costumeId], references: [id])
   participation ShowcaseParticipation @relation(fields: [participationId], references: [id])
@@ -585,11 +595,11 @@ enum PaymentStatus {
 }
 
 model Payment {
-  id             String @id @default(uuid()) @db.Uuid
-  athleteId      String @map("athlete_id") @db.Uuid
+  id             String  @id @default(uuid()) @db.Uuid
+  athleteId      String  @map("athlete_id") @db.Uuid
   parentId       String? @map("parent_id") @db.Uuid
-  academicYearId String @map("academic_year_id") @db.Uuid
-  fiscalYearId   String @map("fiscal_year_id") @db.Uuid // doppia chiave temporale
+  academicYearId String  @map("academic_year_id") @db.Uuid
+  fiscalYearId   String  @map("fiscal_year_id") @db.Uuid // doppia chiave temporale
 
   feeType     FeeType       @map("fee_type")
   amountCents Int           @map("amount_cents")
@@ -605,7 +615,7 @@ model Payment {
   reversalReason String? @map("reversal_reason")
 
   // Ricevuta collegata
-  receipt Receipt?
+  receipt           Receipt?
   // Back-refs da stage/costume enrollments
   stageEnrollment   StageEnrollment?
   costumeAssignment CostumeAssignment?
@@ -629,36 +639,36 @@ model Payment {
 // ============================================================================
 
 enum ExpenseType {
-  RENT                // Affitto palestra
-  TAX_F24             // F24 (IVA, INPS, ecc.)
-  UTILITY             // Utenze
-  COMPENSATION        // Compenso Giuseppina/insegnanti
-  COSTUME_PURCHASE    // Acquisto costumi per saggio
-  MATERIAL            // Materiale tecnico
-  INSURANCE           // Premio assicurativo
-  AFFILIATION         // Affiliazione Endas/CSEN
+  RENT // Affitto palestra
+  TAX_F24 // F24 (IVA, INPS, ecc.)
+  UTILITY // Utenze
+  COMPENSATION // Compenso Giuseppina/insegnanti
+  COSTUME_PURCHASE // Acquisto costumi per saggio
+  MATERIAL // Materiale tecnico
+  INSURANCE // Premio assicurativo
+  AFFILIATION // Affiliazione Endas/CSEN
   OTHER
 }
 
 model Expense {
-  id             String     @id @default(uuid()) @db.Uuid
-  fiscalYearId   String     @map("fiscal_year_id") @db.Uuid
-  academicYearId String?    @map("academic_year_id") @db.Uuid // opzionale (es. affitto estate)
+  id             String  @id @default(uuid()) @db.Uuid
+  fiscalYearId   String  @map("fiscal_year_id") @db.Uuid
+  academicYearId String? @map("academic_year_id") @db.Uuid // opzionale (es. affitto estate)
 
   type        ExpenseType
-  amountCents Int         @map("amount_cents")
+  amountCents Int           @map("amount_cents")
   method      PaymentMethod
-  expenseDate DateTime    @map("expense_date") @db.Date
+  expenseDate DateTime      @map("expense_date") @db.Date
 
   description String
   recipient   String? // "Compenso Giuseppina Ciociola", "Affitto Palestra Basile"
   documentUrl String? @map("document_url") // scansione fattura/ricevuta
 
   // Se è un compenso sportivo, link al record specifico
-  compensationId String? @unique @map("compensation_id") @db.Uuid
+  compensationId String?              @unique @map("compensation_id") @db.Uuid
   compensation   TeacherCompensation? @relation(fields: [compensationId], references: [id])
 
-  fiscalYear   FiscalYear   @relation(fields: [fiscalYearId], references: [id])
+  fiscalYear   FiscalYear    @relation(fields: [fiscalYearId], references: [id])
   academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
 
   notes String?
@@ -677,12 +687,12 @@ model Expense {
 // ============================================================================
 
 model TeacherCompensation {
-  id           String     @id @default(uuid()) @db.Uuid
-  teacherId    String     @map("teacher_id") @db.Uuid
-  fiscalYearId String     @map("fiscal_year_id") @db.Uuid
+  id           String @id @default(uuid()) @db.Uuid
+  teacherId    String @map("teacher_id") @db.Uuid
+  fiscalYearId String @map("fiscal_year_id") @db.Uuid
 
-  amountCents Int        @map("amount_cents")
-  paymentDate DateTime   @map("payment_date") @db.Date
+  amountCents Int           @map("amount_cents")
+  paymentDate DateTime      @map("payment_date") @db.Date
   method      PaymentMethod
 
   // Numero ricevuta per prestazione (es. "IAD/2025-26/4")
@@ -707,27 +717,27 @@ model TeacherCompensation {
 // ============================================================================
 
 enum ReceiptCategory {
-  REGULAR    // quote mensili → "IAD/2025-26/196"
-  SHOWCASE   // saggio → "IAD/2025-26/45/S"
-  COSTUME    // costume → "IAD/2025-26/4/C"
+  REGULAR // quote mensili → "IAD/2025-26/196"
+  SHOWCASE // saggio → "IAD/2025-26/45/S"
+  COSTUME // costume → "IAD/2025-26/4/C"
   COMPENSATION // prestazione occasionale → "IAD/2025-26/4"
-  BLANK      // ricevuta in bianco (template)
+  BLANK // ricevuta in bianco (template)
 }
 
 model Receipt {
-  id              String          @id @default(uuid()) @db.Uuid
-  paymentId       String?         @unique @map("payment_id") @db.Uuid
-  payment         Payment?        @relation(fields: [paymentId], references: [id])
+  id        String   @id @default(uuid()) @db.Uuid
+  paymentId String?  @unique @map("payment_id") @db.Uuid
+  payment   Payment? @relation(fields: [paymentId], references: [id])
 
-  category        ReceiptCategory
-  receiptNumber   String          @unique @map("receipt_number") // "IAD/2025-26/001"
-  issueDate       DateTime        @map("issue_date") @db.Date
+  category      ReceiptCategory
+  receiptNumber String          @unique @map("receipt_number") // "IAD/2025-26/001"
+  issueDate     DateTime        @map("issue_date") @db.Date
 
   // Per ricevute "in bianco" o scollegate da un Payment
-  payerName       String?   @map("payer_name")
-  payerFiscalCode String?   @map("payer_fiscal_code")
+  payerName       String? @map("payer_name")
+  payerFiscalCode String? @map("payer_fiscal_code")
   description     String?
-  amountCents     Int?      @map("amount_cents")
+  amountCents     Int?    @map("amount_cents")
 
   pdfUrl String? @map("pdf_url")
 
@@ -786,24 +796,24 @@ enum AffiliationEntity {
 }
 
 enum AffiliationStatus {
-  PENDING   // da inviare al referente
-  SENT      // inviato (PDF esportato)
+  PENDING // da inviare al referente
+  SENT // inviato (PDF esportato)
   CONFIRMED // confermato (numero tessera ricevuto)
   EXPIRED
 }
 
 model Affiliation {
-  id         String            @id @default(uuid()) @db.Uuid
-  athleteId  String            @map("athlete_id") @db.Uuid
-  athlete    Athlete           @relation(fields: [athleteId], references: [id])
+  id        String  @id @default(uuid()) @db.Uuid
+  athleteId String  @map("athlete_id") @db.Uuid
+  athlete   Athlete @relation(fields: [athleteId], references: [id])
 
-  entity        AffiliationEntity
-  status        AffiliationStatus @default(PENDING)
-  cardNumber    String?           @map("card_number")
-  cardYear      Int               @map("card_year") // 2026
-  sentAt        DateTime?         @map("sent_at") @db.Timestamptz(6)
-  confirmedAt   DateTime?         @map("confirmed_at") @db.Timestamptz(6)
-  expiryDate    DateTime?         @map("expiry_date") @db.Date
+  entity      AffiliationEntity
+  status      AffiliationStatus @default(PENDING)
+  cardNumber  String?           @map("card_number")
+  cardYear    Int               @map("card_year") // 2026
+  sentAt      DateTime?         @map("sent_at") @db.Timestamptz(6)
+  confirmedAt DateTime?         @map("confirmed_at") @db.Timestamptz(6)
+  expiryDate  DateTime?         @map("expiry_date") @db.Date
 
   notes String?
 
@@ -882,16 +892,16 @@ enum DocumentType {
 }
 
 model Document {
-  id        String       @id @default(uuid()) @db.Uuid
-  athleteId String       @map("athlete_id") @db.Uuid
-  athlete   Athlete      @relation(fields: [athleteId], references: [id])
-  type      DocumentType
-  title     String
-  fileUrl   String       @map("file_url")
-  mimeType  String?      @map("mime_type")
-  sizeBytes Int?         @map("size_bytes")
-  uploadedBy String?     @map("uploaded_by") @db.Uuid
-  notes     String?
+  id         String       @id @default(uuid()) @db.Uuid
+  athleteId  String       @map("athlete_id") @db.Uuid
+  athlete    Athlete      @relation(fields: [athleteId], references: [id])
+  type       DocumentType
+  title      String
+  fileUrl    String       @map("file_url")
+  mimeType   String?      @map("mime_type")
+  sizeBytes  Int?         @map("size_bytes")
+  uploadedBy String?      @map("uploaded_by") @db.Uuid
+  notes      String?
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -906,8 +916,8 @@ model Document {
 
 enum EmailType {
   WELCOME_PARENT
-  PAYMENT_REMINDER_1  // primo sollecito
-  PAYMENT_REMINDER_2  // secondo sollecito
+  PAYMENT_REMINDER_1 // primo sollecito
+  PAYMENT_REMINDER_2 // secondo sollecito
   PAYMENT_REMINDER_MANUAL // inviato manualmente dal bottone
   PAYMENT_RECEIVED
   RECEIPT
@@ -957,7 +967,7 @@ model ReminderConfig {
   enabled Boolean @default(true)
 
   // Giorni dopo la scadenza per invio solleciti
-  firstReminderDaysAfter  Int @default(3)  @map("first_reminder_days_after")
+  firstReminderDaysAfter  Int @default(3) @map("first_reminder_days_after")
   secondReminderDaysAfter Int @default(10) @map("second_reminder_days_after")
 
   // Suspend access threshold (giorni di morosità)
@@ -977,9 +987,9 @@ model BrandSettings {
   id Int @id @default(1)
 
   // Logo e immagini
-  logoUrl      String? @map("logo_url")      // principale (header, email)
-  logoDarkUrl  String? @map("logo_dark_url") // variante per dark mode
-  faviconUrl   String? @map("favicon_url")
+  logoUrl     String? @map("logo_url") // principale (header, email)
+  logoDarkUrl String? @map("logo_dark_url") // variante per dark mode
+  faviconUrl  String? @map("favicon_url")
 
   // Colori brand (default neutri, override via UI in Impostazioni)
   primaryColor   String @default("#171717") @map("primary_color")
