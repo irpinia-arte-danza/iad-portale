@@ -981,15 +981,15 @@ model BrandSettings {
   logoDarkUrl  String? @map("logo_dark_url") // variante per dark mode
   faviconUrl   String? @map("favicon_url")
 
-  // Colori brand
-  primaryColor   String @default("#006FEE") @map("primary_color")   // accent
-  secondaryColor String @default("#7828C8") @map("secondary_color")
+  // Colori brand (default neutri, override via UI in Impostazioni)
+  primaryColor   String @default("#171717") @map("primary_color")
+  secondaryColor String @default("#737373") @map("secondary_color")
 
-  // Dati ASD
-  asdName       String @default("A.S.D. IAD Irpinia Arte Danza") @map("asd_name")
-  asdAddress    String @default("Via Cervinaro, 14 - 83048 Montella (AV)") @map("asd_address")
-  asdFiscalCode String @default("90029290641") @map("asd_fiscal_code")
-  asdEmail      String @default("info@irpiniaartedanza.it") @map("asd_email")
+  // Dati ASD (required popolati dal seed, optional configurabili via UI)
+  asdName       String  @map("asd_name")
+  asdAddress    String  @map("asd_address")
+  asdFiscalCode String  @map("asd_fiscal_code")
+  asdEmail      String  @map("asd_email")
   asdPhone      String? @map("asd_phone")
   asdWebsite    String? @map("asd_website")
   asdIban       String? @map("asd_iban")
