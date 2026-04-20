@@ -7,6 +7,10 @@ import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
 
+  // TODO(polish): usare design tokens destructive/primary per error/success
+  // Attualmente toast.error() mostra neutral gray invece di rosso
+  // Fix: aggiungere toastOptions.classNames con !bg-destructive, !text-destructive-foreground
+  // Ref: cleanup commit post-Fase 3C
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}

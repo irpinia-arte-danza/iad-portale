@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 
+import { login } from "./actions"
+
 const loginSchema = z.object({
   email: z
     .string()
@@ -50,11 +52,12 @@ export function LoginForm() {
 
   async function onSubmit(values: LoginFormValues) {
     setIsSubmitting(true)
-    console.log("Login values:", values)
-    // TODO(3C.4): replace with server action
-    await new Promise((resolve) => setTimeout(resolve, 800))
-    toast.info("Login non ancora implementato — server action in 3C.4")
-    setIsSubmitting(false)
+    const result = await login(values)
+    if (result?.error) {
+      toast.error(result.error)
+      setIsSubmitting(false)
+    }
+    // on success: server action redirects, component unmounts
   }
 
   return (
