@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, UserRole } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -59,6 +59,34 @@ async function main() {
     },
   });
   console.log(`✓ ReminderConfig: enabled=${reminderConfig.enabled}`);
+
+  const adminUuid = process.env.ADMIN_SUPABASE_UUID;
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminFirstName = process.env.ADMIN_FIRST_NAME;
+  const adminLastName = process.env.ADMIN_LAST_NAME;
+
+  if (adminUuid && adminEmail && adminFirstName && adminLastName) {
+    const admin = await prisma.user.upsert({
+      where: { id: adminUuid },
+      update: {},
+      create: {
+        id: adminUuid,
+        email: adminEmail,
+        role: UserRole.ADMIN,
+        firstName: adminFirstName,
+        lastName: adminLastName,
+        phone: null,
+        isActive: true,
+        themePreference: null,
+        deletedAt: null,
+      },
+    });
+    console.log(`✓ Admin User: ${admin.email}`);
+  } else {
+    console.warn(
+      "⚠️  Admin seed skipped: set ADMIN_SUPABASE_UUID, ADMIN_EMAIL, ADMIN_FIRST_NAME, ADMIN_LAST_NAME in .env.local to bootstrap admin user"
+    );
+  }
 
   console.log("🎉 Seed completed.");
 }
