@@ -639,6 +639,8 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
     **17.6 Schema vs Seed: dati organization**: dati IAD-specifici (asdName, asdFiscalCode, asdAddress, email) vanno SEMPRE nel seed, MAI come `@default` nello schema. Motivi: schema = struttura/forma, seed = contenuto/dati. Schema con default IAD-specific inquinano git history (CF pubblicato) e rendono schema non riusabile per altre ASD. Regola: required + senza default nello schema per dati legali, optional nullable per customization (colori, logo, telefono).
 
+    **17.7 Next.js 16 proxy.ts export naming**: il runtime Next.js 16.2.4 (`node_modules/next/dist/build/analysis/get-page-static-info.js`) accetta come nome funzione sia `export async function middleware(...)` sia `export async function proxy(...)` (entrambi riconosciuti, riga 260-273), ma legge il matcher SOLO dall'export `config`, NON da `proxyConfig` (riga 457, 562). La skill Vercel `routing-middleware` documenta `proxyConfig` come convenzione futura, ma usarla oggi rompe silenziosamente il matcher: il proxy gira su TUTTE le request (inclusi `/_next/static/chunks/*.css`) e le pagine perdono gli stili (redirect CSS → `/login`). Pattern corretto: `export async function proxy(request) {...}` + `export const config = { matcher: [...] }`. Debug tip: se CSS/JS di Next.js vengono intercettati dal proxy, verificare SEMPRE il nome dell'export config prima di sospettare regex matcher.
+
 ---
 
 ## 📚 Documenti di riferimento
@@ -655,4 +657,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-20 · Versione 2.4 — Espansi i gotcha tecnici (shadcn, Prisma 6/7, env loading, AI safety gate, schema design)_
+_Ultimo aggiornamento: 2026-04-20 · Versione 2.5 — Aggiunto gotcha 17.7 su Next.js 16 proxy.ts export naming (runtime legge `config`, non `proxyConfig`)_
