@@ -189,6 +189,46 @@ Vedi `prisma/schema.prisma` per lo schema completo. In sintesi:
 - `Avatar`, `Skeleton`
 - `Toaster` (Sonner)
 
+### Responsive strategy ⭐
+
+**Mobile-first obbligatorio per le aree /parent e /teacher.**
+
+Il target principale di queste due aree è lo **smartphone** (iPhone Safari + Android Chrome): i genitori controllano pagamenti/presenze dal telefono mentre sono in giro; l'insegnante segna presenze in sala di ballo con tablet o telefono, spesso con una sola mano libera. Un layout pensato desktop-first e "adattato" a mobile è sempre più scomodo rispetto a uno pensato mobile-first.
+
+**L'area /admin resta desktop-first** (tabelle contabili, form lunghi, multi-colonna): Giuseppina lavora dal MacBook. Ma anche /admin deve restare **usabile da mobile** per controlli veloci (chi ha pagato oggi, chi è in lezione adesso).
+
+**Breakpoint strategy** (Tailwind v4 standard):
+| Breakpoint | Larghezza | Target | Note |
+|---|---|---|---|
+| (base) | < 640px | Mobile (iPhone SE → iPhone 15) | Minimum supported: 375px |
+| `sm` | ≥ 640px | Mobile orizzontale | Raramente usato come breakpoint chiave |
+| `md` | ≥ 768px | Tablet (iPad mini) | Pivot da card stack a tabella |
+| `lg` | ≥ 1024px | Laptop | Abilita sidebar admin |
+| `xl` | ≥ 1280px | Desktop | Layout multi-colonna completo |
+
+**Regole concrete**:
+- **Touch target minimo 44×44px** ovunque (Apple HIG + Material Design standard per mobile a11y)
+- **Navigazione area /parent e /teacher**: tab-bar inferiore fissa (4-5 voci max) invece di sidebar, stile app nativa
+- **Navigazione area /admin**: sidebar su `lg+`, collapsed drawer (Sheet) su `<lg`
+- **DataTable → Card list**: tutte le tabelle shadcn/TanStack Table devono avere una variante card/list su `<md`, dove ogni riga diventa una card verticale con azioni primarie visibili e secondarie in dropdown
+- **Dialog → Sheet bottom**: su `<md` i Dialog modali diventano Sheet bottom-drawer (pattern mobile nativo)
+- **Form lunghi (≥10 campi)**: multi-step wizard con progress bar, mai scroll infinito. Un campo per step su `<md` se critico (es. dati anagrafici atleta)
+- **Tastiera ottimizzata** via attributo `inputMode`:
+  - `inputMode="numeric"` per CF, CAP, telefono, importi, codici
+  - `inputMode="email"` per email
+  - `inputMode="decimal"` per quantità con virgola
+  - `inputMode="tel"` per telefoni (apre tastierino)
+- **Date picker nativo** su `<md`: `<input type="date">` (iOS/Android picker sistema) invece di calendario shadcn custom, che su mobile piccolo è scomodo
+- **Dark mode default in /teacher**: rileva automatico dark mode OS, preferibile in sala di ballo con luci basse (meno affaticamento)
+- **Pull-to-refresh** su /parent dashboard e /teacher calendario (nice-to-have)
+
+**Testing obbligatorio prima di chiudere una PR**:
+- Viewport `375×667` (iPhone SE — minimo supportato)
+- Viewport `390×844` (iPhone 15 — mainstream)
+- Viewport `768×1024` (iPad — tablet insegnante)
+- Viewport `1440×900` (MacBook — desktop Giuseppina)
+- Test **reale** su almeno un iPhone + un Android tramite Vercel Preview QR code prima di mergeare su main
+
 ### Badge per causali contabili (da mockup Finanze)
 - Quote mensili → neutro
 - Quote saggio → giallo/ambra
@@ -581,6 +621,7 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 13. **Compenso Giuseppina** è una feature prima classe: soglia €15.000 monitorata, progress bar sempre visibile
 14. **Endas/CSEN** non hanno API: solo export PDF per referenti
 15. **Solleciti = 3 livelli di controllo**: config globale + override per-genitore + tasto manuale
+16. **Mobile-first per /parent e /teacher**: queste aree sono pensate primariamente per smartphone. Tutti i componenti devono partire da mobile (375px base) e espandersi verso desktop. Area /admin è desktop-first. Touch target ≥44×44px ovunque. Testare sempre su viewport 375×667 prima di chiudere un task.
 
 ---
 
@@ -598,4 +639,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-20 · Versione 2.1 — Aggiornato a Next.js 16 + Tailwind v4 (bootstrap Sprint 0)_
+_Ultimo aggiornamento: 2026-04-20 · Versione 2.2 — Aggiunta policy mobile-first per /parent e /teacher_
