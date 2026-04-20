@@ -622,6 +622,7 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 14. **Endas/CSEN** non hanno API: solo export PDF per referenti
 15. **Solleciti = 3 livelli di controllo**: config globale + override per-genitore + tasto manuale
 16. **Mobile-first per /parent e /teacher**: queste aree sono pensate primariamente per smartphone. Tutti i componenti devono partire da mobile (375px base) e espandersi verso desktop. Area /admin è desktop-first. Touch target ≥44×44px ovunque. Testare sempre su viewport 375×667 prima di chiudere un task.
+17. **Gotcha shadcn 4.3.0**: il comando `npx shadcn@latest add` riscrive `src/app/globals.css` senza chiedere conferma, sostituendo il pattern corretto `var(--font-geist-sans)` con stringhe hardcoded (`"Geist", "Geist Fallback", ...`) e talvolta duplicando i fallback. **Verificare SEMPRE `git diff src/app/globals.css` dopo ogni `shadcn add` PRIMA di committare**. Se il pattern è stato alterato, ripristinare manualmente le righe `--font-sans` e `--font-mono` affinché leggano le CSS variables iniettate dal font loader in `layout.tsx`. Lo stesso vale per `shadcn init` che auto-committa senza chiedere — usare `git reset --soft origin/main` + ricommit manuale con messaggio conventional.
 
 ---
 
@@ -639,4 +640,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-20 · Versione 2.2 — Aggiunta policy mobile-first per /parent e /teacher_
+_Ultimo aggiornamento: 2026-04-20 · Versione 2.3 — Aggiunti gotcha shadcn 4.3.0 (auto-commit init, globals.css rewrite su add)_
