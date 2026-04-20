@@ -150,7 +150,8 @@ Vedi `prisma/schema.prisma` per lo schema completo. In sintesi:
 | Tabelle | **TanStack Table** (DataTable shadcn) | Sort, filter, pagination, row selection |
 | Toast | **Sonner** | Integrato con shadcn |
 | Upload | **react-dropzone** | Logo admin, certificati, scansioni moduli |
-| ORM | **Prisma** | Schema-first, type-safe, eccellente DX |
+| ORM | **Prisma 6.x** (pin — NON 7.x, vedi 17.2) | Schema-first, type-safe, eccellente DX |
+| Env loading (Prisma CLI) | **dotenv-cli** (wrap script `db:*`, vedi 17.3) | Prisma CLI legge solo `.env`, non `.env.local` |
 | DB | **Supabase Postgres** (Ireland eu-west-1) | Piano Free, GDPR-compliant |
 | Auth | **Supabase Auth + Resend SMTP** | Sicurezza gestita + email affidabili |
 | Storage | **Supabase Storage** | Logo, certificati medici, moduli scansionati, ricevute PDF |
@@ -622,7 +623,21 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 14. **Endas/CSEN** non hanno API: solo export PDF per referenti
 15. **Solleciti = 3 livelli di controllo**: config globale + override per-genitore + tasto manuale
 16. **Mobile-first per /parent e /teacher**: queste aree sono pensate primariamente per smartphone. Tutti i componenti devono partire da mobile (375px base) e espandersi verso desktop. Area /admin è desktop-first. Touch target ≥44×44px ovunque. Testare sempre su viewport 375×667 prima di chiudere un task.
-17. **Gotcha shadcn 4.3.0**: il comando `npx shadcn@latest add` riscrive `src/app/globals.css` senza chiedere conferma, sostituendo il pattern corretto `var(--font-geist-sans)` con stringhe hardcoded (`"Geist", "Geist Fallback", ...`) e talvolta duplicando i fallback. **Verificare SEMPRE `git diff src/app/globals.css` dopo ogni `shadcn add` PRIMA di committare**. Se il pattern è stato alterato, ripristinare manualmente le righe `--font-sans` e `--font-mono` affinché leggano le CSS variables iniettate dal font loader in `layout.tsx`. Lo stesso vale per `shadcn init` che auto-committa senza chiedere — usare `git reset --soft origin/main` + ricommit manuale con messaggio conventional.
+17. **Gotcha e pitfall tecnici da ricordare**:
+
+    **17.1 shadcn 4.3.0**: il comando `npx shadcn@latest add` riscrive `src/app/globals.css` senza chiedere conferma, sostituendo il pattern corretto `var(--font-geist-sans)` con stringhe hardcoded (`"Geist", "Geist Fallback", ...`) e duplicando i fallback. Verificare SEMPRE `git diff src/app/globals.css` dopo ogni `shadcn add` PRIMA di committare. Se il pattern è alterato, ripristinare manualmente le righe `--font-sans` e `--font-mono`. Lo stesso vale per `shadcn init` che auto-committa senza chiedere — usare `git reset --soft origin/main` + ricommit manuale con messaggio conventional.
+
+    **17.2 Prisma version pinning**: Prisma 7 ha breaking change sul blocco `datasource` di `schema.prisma` (rimuove supporto `url` e `directUrl`, richiede nuovo file `prisma.config.ts`). Il progetto USA Prisma 6.x (pinned in `package.json` come `"prisma": "^6"` e `"@prisma/client": "^6"`). Non aggiornare a v7 finché non si è pronti a migrare API (include spostamento della sezione `prisma.seed` dal `package.json` al nuovo `prisma.config.ts`).
+
+    **17.3 Prisma CLI env loading**: Prisma CLI legge solo `.env`, non `.env.local`. Next.js legge entrambi, Prisma NO. Soluzione: tutti gli script Prisma sono wrappati con `dotenv-cli`. Pattern standard in `package.json`:
+    `"db:migrate": "dotenv -e .env.local -- prisma migrate dev"`
+    Usare sempre `npm run db:*` invece di `npx prisma *` diretto.
+
+    **17.4 Prisma AI safety gate**: Prisma 6+ rileva invocazioni da AI agents e blocca operazioni distruttive (`migrate reset`, `db push --force-reset`, `db execute` con DDL) richiedendo env var `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` settata al testo di consenso dell'utente. L'utente deve fornire consenso esplicito in chat (non command-line), che diventa il valore della env var per la singola invocazione. NON scatta su `migrate dev`.
+
+    **17.5 Workflow migration pulita**: se si modifica lo schema PRIMA di aver pushato la prima migration a GitHub, rigenerare init pulita: (1) `npm run db:reset -- --force` → (2) `rm -rf prisma/migrations/<ts>_init/` → (3) secondo `db:reset` per pulire `_prisma_migrations` → (4) `npm run db:migrate -- --name init`. Dopo il primo push, solo migration incrementali (mai rewrite history).
+
+    **17.6 Schema vs Seed: dati organization**: dati IAD-specifici (asdName, asdFiscalCode, asdAddress, email) vanno SEMPRE nel seed, MAI come `@default` nello schema. Motivi: schema = struttura/forma, seed = contenuto/dati. Schema con default IAD-specific inquinano git history (CF pubblicato) e rendono schema non riusabile per altre ASD. Regola: required + senza default nello schema per dati legali, optional nullable per customization (colori, logo, telefono).
 
 ---
 
@@ -640,4 +655,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-20 · Versione 2.3 — Aggiunti gotcha shadcn 4.3.0 (auto-commit init, globals.css rewrite su add)_
+_Ultimo aggiornamento: 2026-04-20 · Versione 2.4 — Espansi i gotcha tecnici (shadcn, Prisma 6/7, env loading, AI safety gate, schema design)_
