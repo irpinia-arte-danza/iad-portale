@@ -216,20 +216,22 @@ model Parent {
   userId String? @unique @map("user_id") @db.Uuid
   user   User?   @relation(fields: [userId], references: [id])
 
-  firstName    String   @map("first_name")
-  lastName     String   @map("last_name")
-  fiscalCode   String   @unique @map("fiscal_code")
-  dateOfBirth  DateTime @map("date_of_birth") @db.Date
-  placeOfBirth String?  @map("place_of_birth")
+  firstName    String    @map("first_name")
+  lastName     String    @map("last_name")
+  // TODO(sprint-3): fiscalCode required prima di emettere ricevuta (validateParentForInvoice)
+  fiscalCode   String?   @unique @map("fiscal_code")
+  dateOfBirth  DateTime? @map("date_of_birth") @db.Date
+  placeOfBirth String?   @map("place_of_birth")
 
-  residenceStreet   String @map("residence_street")
-  residenceNumber   String @map("residence_number")
-  residenceCity     String @map("residence_city")
-  residenceProvince String @map("residence_province") @db.Char(2)
-  residenceCap      String @map("residence_cap") @db.VarChar(5)
+  // TODO(sprint-3): residence fields required prima di emettere ricevuta
+  residenceStreet   String? @map("residence_street")
+  residenceNumber   String? @map("residence_number")
+  residenceCity     String? @map("residence_city")
+  residenceProvince String? @map("residence_province") @db.Char(2)
+  residenceCap      String? @map("residence_cap") @db.VarChar(5)
 
-  email String
-  phone String
+  email String?
+  phone String?
 
   // Override per-genitore sui solleciti automatici
   remindersEnabled            Boolean @default(true) @map("reminders_enabled")

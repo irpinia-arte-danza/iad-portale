@@ -22,8 +22,8 @@ export const parentCreateSchema = z.object({
   email: emailOptionalSchema,
   phone: phoneSchema,
   fiscalCode: fiscalCodeSchema,
-  receivesEmailCommunications: z.boolean().default(true),
-  remindersEnabled: z.boolean().default(true),
+  receivesEmailCommunications: z.boolean(),
+  remindersEnabled: z.boolean(),
 })
 
 // Schema update (parziale)

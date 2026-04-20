@@ -42,3 +42,8 @@ export const fiscalCodeSchema = z
 // Stringa non vuota (nome, cognome)
 export const nonEmptyStringSchema = (fieldLabel: string) =>
   z.string().min(1, { message: `${fieldLabel} obbligatorio` }).trim()
+
+// Result helper per server actions (UI-side error handling senza throw)
+export type ActionResult<T = void> =
+  | { ok: true; data?: T }
+  | { ok: false; error: string }
