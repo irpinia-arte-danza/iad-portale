@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home } from "lucide-react"
+import { GraduationCap, Home, Users } from "lucide-react"
 
 import {
   Sidebar,
@@ -22,6 +22,12 @@ type AdminSidebarProps = {
   lastName: string | null
   email: string
 }
+
+const NAV_ITEMS = [
+  { href: "/admin/dashboard", label: "Dashboard", icon: Home, exact: true },
+  { href: "/admin/athletes", label: "Allieve", icon: GraduationCap },
+  { href: "/admin/parents", label: "Genitori", icon: Users },
+] as const
 
 export function AdminSidebar({
   firstName,
@@ -46,18 +52,27 @@ export function AdminSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === "/admin/dashboard"}
-                  tooltip="Dashboard"
-                >
-                  <Link href="/admin/dashboard">
-                    <Home />
-                    <span>Dashboard</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {NAV_ITEMS.map((item) => {
+                const isActive =
+                  "exact" in item && item.exact
+                    ? pathname === item.href
+                    : pathname.startsWith(item.href)
+                const Icon = item.icon
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.label}
+                    >
+                      <Link href={item.href}>
+                        <Icon />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

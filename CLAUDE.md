@@ -647,6 +647,36 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
     **17.10 Vercel env var TZ è reserved**: Vercel non permette di settare `TZ` come env var custom perché è variabile di sistema (gestita da Vercel runtime). Aggiungerla produce errore `"The name of your Environment Variable is reserved"` e blocca il deploy. Fix Sprint 0: non settiamo `TZ` su Vercel. Il runtime gira in UTC di default. Per timezone-aware formatting usare: `date.toLocaleString("it-IT", { timeZone: "Europe/Rome" })` (o equivalente `formatInTimeZone` di `date-fns-tz` già previsto dallo stack). Future: se serve TZ globale, usare env var custom tipo `APP_TZ` + code che lo legge come fallback. Scoperto: 20 aprile 2026, Sprint 0 Fase 3E.2.
 
+    **17.11 Zod v4 `.default()` + RHF generic mismatch**: `z.boolean().default(true)` crea input type `boolean | undefined` / output `boolean`. `useForm<z.infer<T>>` infera l'output, ma `zodResolver` lavora sull'input → TS2322 `"Type 'boolean | undefined' is not assignable to type 'boolean'"`. Fix: tenere defaults SOLO in `useForm({ defaultValues })`, NON nel Zod schema. Lo schema Zod descrive "forma dati validi", non defaults UI. Scoperto: Sprint 1.C, 21 aprile 2026.
+
+    **17.12 Zod v4 `z.coerce.date()` input/output mismatch**: `z.coerce.date()` crea input `unknown` / output `Date`. `useForm<z.infer<T>>` infera output `Date`, ma `zodResolver` lavora su input `unknown` → TS2322 `"Type 'unknown' is not assignable to type 'Date'"`. Fix: usa `z.date()` e converti string → Date manualmente nell'`onChange` del form Input `type="date"`. Pattern:
+    ```tsx
+    onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+    ```
+    Scoperto: Sprint 1.C, 21 aprile 2026.
+
+    **17.13 Empty string vs NULL in Postgres unique constraints**: Form con campo opzionale che accetta `""` via Zod `.optional().or(z.literal(""))` salva `""` letteralmente in DB. Postgres unique constraint considera `""` come valore unico → 2 record con campo opzionale vuoto collidono (P2002). Fix: helper `cleanEmptyStrings` in server actions per trasformare `""` → `null` prima di `prisma.create/update`:
+    ```ts
+    function cleanEmptyStrings<T extends Record<string, unknown>>(data: T): T {
+      const cleaned: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(data)) {
+        cleaned[key] = typeof value === "string" && value === "" ? null : value
+      }
+      return cleaned as T
+    }
+    ```
+    Scoperto: Sprint 1.C, 21 aprile 2026, su Parent create con `fiscalCode: ""`.
+
+    **17.14 Schema asymmetry tra modelli sibling**: quando 2 modelli (es. `Athlete` + `Parent`) hanno pattern anagrafici simili, lo schema può evolversi in modo divergente nel tempo. Es. `Athlete.provinceOfBirth` ma `Parent` no, pur venendo entrambi dallo stesso modulo cartaceo IAD. Fix: quando crei componenti riusabili (es. `AnagraficaCompletaSection`) che assumono field names condivisi, verifica simmetria schema prima. Tool: `grep "model Athlete"` + `grep "model Parent"` side-by-side. Se asimmetria, aggiungi migration di normalizzazione (es. `add_province_of_birth_to_parents`). Scoperto: Sprint 1.C, 21 aprile 2026.
+
+    **17.15 `tsc --noEmit` non replica `next build` strict check**: Next.js production build (`next build`) ha type checking più stretto di `tsc --noEmit` e del dev server. Scenari tipici: Prisma `findUnique`/`findMany` con `include` dove TS inferenza è instabile, tipi derivati da Prisma payload con `Pick<>`, discriminated union con condizioni narrow. Fix:
+    1. Usa `Prisma.validator<Prisma.XDefaultArgs>()({})` + `Prisma.XGetPayload<typeof validator>` per return type espliciti
+    2. Esporta tipi derivati (es. `AthleteParentRelation`) invece di ridefinirli localmente nei componenti
+    3. **PRE-DEPLOY**: esegui sempre `npm run build` (non solo `tsc --noEmit`) prima di push. Overhead ~1–2 min ma previene deploy rossi.
+    Scoperto: Sprint 1.C, 21 aprile 2026, sui deploy Vercel falliti commit `157823e` + `3d5d5b8`.
+
+    **17.16 Vercel build cache + Prisma Client stale**: Vercel restore `node_modules` cache della build precedente → se hai modificato `schema.prisma` tra commit, il Prisma Client in `node_modules/.prisma/client` è stale e TypeScript vede type definitions obsolete (es. `email: string` invece di `email: string | null` dopo relax nullable). Errore "Property X is missing" o "Type X is not assignable" in build Vercel mentre locale passa. Fix: aggiungi `"postinstall": "prisma generate"` a `package.json` scripts. Ogni `npm install` (anche cache hit) rigenera Prisma Client. Overhead ~10s, elimina categoria di bug. Scoperto: Sprint 1.C, 21 aprile 2026, commit fix `0e1ed24`.
+
 ---
 
 ## 📚 Documenti di riferimento
@@ -663,4 +693,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-20 · Versione 2.6 — Aggiunti gotcha 17.8 (TooltipProvider globale per shadcn Sidebar), 17.9 (Next.js dev mode logga Server Action bodies), 17.10 (Vercel env var TZ reserved)_
+_Ultimo aggiornamento: 2026-04-21 · Versione 2.7 — Aggiunti gotcha 17.11 (Zod .default + RHF), 17.12 (z.coerce.date input/output), 17.13 (empty string vs NULL Postgres), 17.14 (schema asymmetry sibling models), 17.15 (tsc vs next build strict), 17.16 (Vercel cache + Prisma Client stale)_
