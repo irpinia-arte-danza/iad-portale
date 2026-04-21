@@ -282,14 +282,15 @@ model AthleteParent {
 // ============================================================================
 
 model Teacher {
-  id     String @id @default(uuid()) @db.Uuid
-  userId String @unique @map("user_id") @db.Uuid
-  user   User   @relation(fields: [userId], references: [id])
+  id     String  @id @default(uuid()) @db.Uuid
+  userId String? @unique @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id])
 
-  firstName  String  @map("first_name")
-  lastName   String  @map("last_name")
-  fiscalCode String  @unique @map("fiscal_code")
-  email      String
+  firstName String @map("first_name")
+  lastName  String @map("last_name")
+  // TODO(sprint-3): fiscalCode required prima di emettere compenso sportivo
+  fiscalCode String? @unique @map("fiscal_code")
+  email      String?
   phone      String?
 
   qualifications String?
@@ -302,6 +303,8 @@ model Teacher {
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
+  @@index([lastName, firstName])
+  @@index([fiscalCode])
   @@map("teachers")
 }
 

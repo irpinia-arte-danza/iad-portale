@@ -677,6 +677,16 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
     **17.16 Vercel build cache + Prisma Client stale**: Vercel restore `node_modules` cache della build precedente → se hai modificato `schema.prisma` tra commit, il Prisma Client in `node_modules/.prisma/client` è stale e TypeScript vede type definitions obsolete (es. `email: string` invece di `email: string | null` dopo relax nullable). Errore "Property X is missing" o "Type X is not assignable" in build Vercel mentre locale passa. Fix: aggiungi `"postinstall": "prisma generate"` a `package.json` scripts. Ogni `npm install` (anche cache hit) rigenera Prisma Client. Overhead ~10s, elimina categoria di bug. Scoperto: Sprint 1.C, 21 aprile 2026, commit fix `0e1ed24`.
 
+    **17.17 Zod v4 `z.enum()` errorMap API change**: in Zod v4 l'API di `z.enum()` per custom error message è cambiata. La sintassi vecchia `errorMap: () => ({ message })` non compila più (TS error: `"Object literal may only specify known properties, and 'errorMap' does not exist..."`). Nuova sintassi: il secondo arg è un oggetto `{ message }` diretto.
+    ```ts
+    // Vecchio (Zod v3)
+    z.enum(TUPLE, { errorMap: () => ({ message: "..." }) })
+
+    // Nuovo (Zod v4)
+    z.enum(TUPLE, { message: "..." })
+    ```
+    Scoperto: Sprint 2.A.2, 21 aprile 2026, durante creazione `courseCreateSchema` per `COURSE_TYPES`.
+
 ---
 
 ## 📚 Documenti di riferimento
@@ -693,4 +703,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-21 · Versione 2.7 — Aggiunti gotcha 17.11 (Zod .default + RHF), 17.12 (z.coerce.date input/output), 17.13 (empty string vs NULL Postgres), 17.14 (schema asymmetry sibling models), 17.15 (tsc vs next build strict), 17.16 (Vercel cache + Prisma Client stale)_
+_Ultimo aggiornamento: 2026-04-21 · Versione 2.8 — Aggiunto gotcha 17.17 (Zod v4 z.enum errorMap → message API change), scoperto durante Sprint 2.A.2 Course CRUD_

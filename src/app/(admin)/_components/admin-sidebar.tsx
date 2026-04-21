@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { GraduationCap, Home, Users } from "lucide-react"
+import { BookOpen, GraduationCap, Home, UserCog, Users } from "lucide-react"
 
 import {
   Sidebar,
@@ -27,6 +27,8 @@ const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard", icon: Home, exact: true },
   { href: "/admin/athletes", label: "Allieve", icon: GraduationCap },
   { href: "/admin/parents", label: "Genitori", icon: Users },
+  { href: "/admin/teachers", label: "Insegnanti", icon: UserCog },
+  { href: "/admin/courses", label: "Corsi", icon: BookOpen },
 ] as const
 
 export function AdminSidebar({
