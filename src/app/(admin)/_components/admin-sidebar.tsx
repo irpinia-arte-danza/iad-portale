@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   BookOpen,
   FileSpreadsheet,
+  FolderArchive,
   GraduationCap,
   Home,
   Receipt,
@@ -51,6 +52,11 @@ const NAV_ITEMS = [
     href: "/admin/reports/bilancio",
     label: "Bilancio",
     icon: TrendingUp,
+  },
+  {
+    href: "/admin/reports/annuale",
+    label: "Export annuale",
+    icon: FolderArchive,
   },
 ] as const
 
