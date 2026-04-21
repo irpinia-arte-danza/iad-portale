@@ -78,6 +78,9 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
             isCurrent: true,
           },
         },
+        paymentSchedules: {
+          orderBy: { dueDate: "asc" },
+        },
       },
       orderBy: [{ enrollmentDate: "desc" }],
     },
@@ -93,6 +96,9 @@ export type AthleteParentRelation =
 
 export type AthleteEnrollment =
   AthleteWithRelations["enrollments"][number]
+
+export type AthletePaymentSchedule =
+  AthleteEnrollment["paymentSchedules"][number]
 
 export async function getAthleteById(
   id: string,

@@ -17,6 +17,8 @@ import {
   type WithdrawEnrollmentValues,
 } from "@/lib/schemas/enrollment"
 
+import { generateMonthlySchedulesForEnrollment } from "./schedule-generator"
+
 function athletePath(athleteId: string) {
   return `/admin/athletes/${athleteId}`
 }
@@ -110,6 +112,12 @@ export async function createEnrollment(
           },
         })
       }
+
+      await generateMonthlySchedulesForEnrollment(
+        tx,
+        enrollment.id,
+        adminUserId,
+      )
 
       return enrollment.id
     })

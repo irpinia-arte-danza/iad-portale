@@ -75,12 +75,13 @@ model AcademicYear {
   monthlyRenewalDay   Int @default(10) @map("monthly_renewal_day")
 
   // Relazioni
-  enrollments CourseEnrollment[]
-  lessons     Lesson[]
-  payments    Payment[]
-  expenses    Expense[]
-  stages      Stage[]
-  showcase    Showcase?
+  enrollments      CourseEnrollment[]
+  lessons          Lesson[]
+  payments         Payment[]
+  paymentSchedules PaymentSchedule[]
+  expenses         Expense[]
+  stages           Stage[]
+  showcase         Showcase?
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -386,6 +387,9 @@ model CourseEnrollment {
   course       Course       @relation(fields: [courseId], references: [id])
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
 
+  payments         Payment[]
+  paymentSchedules PaymentSchedule[]
+
   @@unique([athleteId, courseId, academicYearId])
   @@index([courseId, academicYearId])
   @@map("course_enrollments")
@@ -607,11 +611,12 @@ enum PaymentStatus {
 }
 
 model Payment {
-  id             String  @id @default(uuid()) @db.Uuid
-  athleteId      String  @map("athlete_id") @db.Uuid
-  parentId       String? @map("parent_id") @db.Uuid
-  academicYearId String  @map("academic_year_id") @db.Uuid
-  fiscalYearId   String  @map("fiscal_year_id") @db.Uuid // doppia chiave temporale
+  id                 String  @id @default(uuid()) @db.Uuid
+  athleteId          String  @map("athlete_id") @db.Uuid
+  parentId           String? @map("parent_id") @db.Uuid
+  academicYearId     String  @map("academic_year_id") @db.Uuid
+  fiscalYearId       String  @map("fiscal_year_id") @db.Uuid // doppia chiave temporale
+  courseEnrollmentId String? @map("course_enrollment_id") @db.Uuid // MONTHLY/TRIMESTER → iscrizione corso
 
   feeType     FeeType       @map("fee_type")
   amountCents Int           @map("amount_cents")
@@ -631,19 +636,65 @@ model Payment {
   // Back-refs da stage/costume enrollments
   stageEnrollment   StageEnrollment?
   costumeAssignment CostumeAssignment?
+  // Scadenza saldata (1:1)
+  paymentSchedule   PaymentSchedule?
 
-  athlete      Athlete      @relation(fields: [athleteId], references: [id])
-  parent       Parent?      @relation(fields: [parentId], references: [id])
-  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
-  fiscalYear   FiscalYear   @relation(fields: [fiscalYearId], references: [id])
+  athlete          Athlete           @relation(fields: [athleteId], references: [id])
+  parent           Parent?           @relation(fields: [parentId], references: [id])
+  academicYear     AcademicYear      @relation(fields: [academicYearId], references: [id])
+  fiscalYear       FiscalYear        @relation(fields: [fiscalYearId], references: [id])
+  courseEnrollment CourseEnrollment? @relation(fields: [courseEnrollmentId], references: [id])
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@index([athleteId, paymentDate])
   @@index([academicYearId, status])
   @@index([fiscalYearId, status])
+  @@index([feeType, paymentDate])
   @@map("payments")
+}
+
+// ============================================================================
+// PAYMENT SCHEDULES (scadenze attese — auto-gen da CourseEnrollment)
+// ============================================================================
+
+enum ScheduleStatus {
+  DUE // scadenza aperta (non ancora pagata)
+  PAID // saldata (linked a Payment)
+  WAIVED // condonata (es. borse di studio, accordo speciale)
+  OVERDUE // scaduta senza pagamento (flag per solleciti)
+}
+
+model PaymentSchedule {
+  id                 String @id @default(uuid()) @db.Uuid
+  courseEnrollmentId String @map("course_enrollment_id") @db.Uuid
+  academicYearId     String @map("academic_year_id") @db.Uuid
+
+  feeType     FeeType  @map("fee_type")
+  dueDate     DateTime @map("due_date") @db.Date
+  amountCents Int      @map("amount_cents")
+
+  status ScheduleStatus @default(DUE)
+
+  paymentId String? @unique @map("payment_id") @db.Uuid
+
+  waiverReason String? @map("waiver_reason")
+  notes        String?
+  createdBy    String? @map("created_by") @db.Uuid
+
+  courseEnrollment CourseEnrollment @relation(fields: [courseEnrollmentId], references: [id])
+  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id])
+  payment          Payment?         @relation(fields: [paymentId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([courseEnrollmentId, dueDate])
+  @@index([status, dueDate])
+  @@index([academicYearId, status])
+  @@map("payment_schedules")
 }
 
 // ============================================================================

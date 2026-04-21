@@ -697,6 +697,24 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
     ```
     Poi usa `z.date().max(endOfToday(), { message: "..." })` in tutti gli schemi che validano date da HTML picker (`enrollmentDate`, `withdrawalDate`, `dateOfBirth`). L'upper bound diventa la fine della giornata locale → oggi passa sempre, domani no. Scoperto: Sprint 2.B, 21 aprile 2026, su `enrollmentDate` field in `EnrollCourseDialog`.
 
+    **17.19 `AcademicYear.endDate` ≠ course season end**: `AcademicYear.endDate` rappresenta la fine dell'anno **contabile** (31 agosto, usato per bilancio annuale ASD, quadrature IVA). I corsi didattici IAD finiscono invece a **giugno**: luglio e agosto sono chiusura estiva, nessuna quota mensile è dovuta. Sono due concetti semantici distinti che lo schema tratta come uno solo. Non usare `academicYear.endDate` come upper bound per generare scadenze mensili: genera quote fantasma per lug/ago. Fix: hardcode `endMonth = 5` (giugno, 0-based) nel generator. Parse `academicYear.label` (formato `"YYYY-YYYY"`) per estrarre `endYear`. Pattern:
+    ```ts
+    const COURSE_SEASON_END_MONTH = 5 // giugno
+    const endYear = Number.parseInt(academicYear.label.split("-")[1], 10)
+    while (
+      current.getUTCFullYear() < endYear ||
+      (current.getUTCFullYear() === endYear &&
+        current.getUTCMonth() <= COURSE_SEASON_END_MONTH)
+    ) { ... }
+    ```
+    Cleanup SQL per dati già generati pre-fix:
+    ```sql
+    DELETE FROM payment_schedules
+    WHERE EXTRACT(MONTH FROM due_date) IN (7, 8)
+      AND status = 'DUE';
+    ```
+    Se in futuro emergono altre policy stagionali (es. agosto aperto per campus, giugno ridotto per saggio), spostare `COURSE_SEASON_END_MONTH` in `BrandSettings` o in AcademicYear come colonna dedicata (`coursesEndMonth`) invece di hardcode. Scoperto: Sprint 2.C.5, 21 aprile 2026, test visivo auto-gen schedules mostrava luglio+agosto quote fantasma.
+
 ---
 
 ## 📚 Documenti di riferimento
@@ -713,4 +731,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-21 · Versione 2.9 — Aggiunto gotcha 17.18 (Zod z.date().max timezone border bug + endOfToday helper), scoperto durante Sprint 2.B Enrollment CRUD_
+_Ultimo aggiornamento: 2026-04-21 · Versione 3.0 — Sprint 2 complete: Teacher + Course + Enrollment + Payment + PaymentSchedule. Aggiunti gotcha 17.17 (Zod v4 enum errorMap), 17.18 (z.date().max timezone), 17.19 (AcademicYear vs course season)._

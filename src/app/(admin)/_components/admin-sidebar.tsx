@@ -2,7 +2,14 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BookOpen, GraduationCap, Home, UserCog, Users } from "lucide-react"
+import {
+  BookOpen,
+  GraduationCap,
+  Home,
+  Receipt,
+  UserCog,
+  Users,
+} from "lucide-react"
 
 import {
   Sidebar,
@@ -29,6 +36,7 @@ const NAV_ITEMS = [
   { href: "/admin/parents", label: "Genitori", icon: Users },
   { href: "/admin/teachers", label: "Insegnanti", icon: UserCog },
   { href: "/admin/courses", label: "Corsi", icon: BookOpen },
+  { href: "/admin/payments", label: "Pagamenti", icon: Receipt },
 ] as const
 
 export function AdminSidebar({
