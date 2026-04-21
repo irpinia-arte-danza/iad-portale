@@ -61,19 +61,48 @@ export async function listCourses(filters: ListFilters = {}) {
   return { items, totalCount }
 }
 
-export async function getCourseById(id: string) {
+const courseWithRelations = Prisma.validator<Prisma.CourseDefaultArgs>()({
+  include: {
+    teacher: {
+      select: { id: true, firstName: true, lastName: true },
+    },
+    enrollments: {
+      include: {
+        athlete: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            status: true,
+          },
+        },
+        academicYear: {
+          select: { id: true, label: true, isCurrent: true },
+        },
+      },
+      orderBy: [
+        { academicYear: { label: "desc" } },
+        { enrollmentDate: "desc" },
+      ],
+    },
+    schedules: {
+      orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
+    },
+  },
+})
+
+export type CourseWithRelations = Prisma.CourseGetPayload<
+  typeof courseWithRelations
+>
+
+export async function getCourseById(
+  id: string,
+): Promise<CourseWithRelations | null> {
   await requireAdmin()
 
   return prisma.course.findUnique({
     where: { id },
-    include: {
-      teacher: {
-        select: { id: true, firstName: true, lastName: true },
-      },
-      _count: {
-        select: { enrollments: true },
-      },
-    },
+    ...courseWithRelations,
   })
 }
 

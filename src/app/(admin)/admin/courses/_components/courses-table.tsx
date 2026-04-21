@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { Badge } from "@/components/ui/badge"
 import {
   Table,
@@ -97,14 +99,19 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
               }
             >
               <TableCell>
-                <div className="flex flex-col">
-                  <span className="font-medium">{course.name}</span>
-                  {course.level && (
-                    <span className="text-xs text-muted-foreground">
-                      {course.level}
-                    </span>
-                  )}
-                </div>
+                <Link
+                  href={`/admin/courses/${course.id}`}
+                  className="block hover:underline"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium">{course.name}</span>
+                    {course.level && (
+                      <span className="text-xs text-muted-foreground">
+                        {course.level}
+                      </span>
+                    )}
+                  </div>
+                </Link>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
                 <Badge variant="secondary">
