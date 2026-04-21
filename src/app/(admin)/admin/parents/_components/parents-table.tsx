@@ -61,7 +61,7 @@ export function ParentsTable({ parents }: ParentsTableProps) {
         </TableHeader>
         <TableBody>
           {parents.map((parent) => (
-            <TableRow key={parent.id}>
+            <TableRow key={parent.id} className="hover:bg-muted/50">
               <TableCell>
                 <div className="flex flex-col">
                   <span className="font-medium">

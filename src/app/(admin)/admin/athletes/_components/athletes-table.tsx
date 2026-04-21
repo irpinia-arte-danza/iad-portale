@@ -76,12 +76,12 @@ export function AthletesTable({ athletes }: AthletesTableProps) {
             return (
             <TableRow
               key={athlete.id}
-              className="cursor-pointer hover:bg-muted/50"
+              className="hover:bg-muted/50"
             >
               <TableCell>
                 <Link
                   href={`/admin/athletes/${athlete.id}`}
-                  className="block"
+                  className="block hover:underline"
                 >
                   <div className="flex flex-col">
                     <span className="font-medium">

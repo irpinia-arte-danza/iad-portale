@@ -88,7 +88,7 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
         </TableHeader>
         <TableBody>
           {courses.map((course) => (
-            <TableRow key={course.id}>
+            <TableRow key={course.id} className="hover:bg-muted/50">
               <TableCell>
                 <div className="flex flex-col">
                   <span className="font-medium">{course.name}</span>

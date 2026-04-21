@@ -53,7 +53,7 @@ export function TeachersTable({ teachers }: TeachersTableProps) {
         </TableHeader>
         <TableBody>
           {teachers.map((teacher) => (
-            <TableRow key={teacher.id}>
+            <TableRow key={teacher.id} className="hover:bg-muted/50">
               <TableCell>
                 <div className="flex flex-col">
                   <span className="font-medium">

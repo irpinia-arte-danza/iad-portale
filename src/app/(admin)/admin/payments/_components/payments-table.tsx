@@ -86,7 +86,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
           {payments.map((p) => {
             const period = formatPeriod(p.periodStart, p.periodEnd)
             return (
-              <TableRow key={p.id}>
+              <TableRow key={p.id} className="hover:bg-muted/50">
                 <TableCell className="font-mono text-xs">
                   {DATE_SHORT.format(p.paymentDate)}
                 </TableCell>
