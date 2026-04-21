@@ -82,7 +82,7 @@ export function AnagraficaCompletaSection<T extends FieldValues>({
               <FormLabel>Codice fiscale</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="16 caratteri — es. RSSMRA85M01H501Z"
+                  placeholder="16 caratteri alfanumerici"
                   autoComplete="off"
                   maxLength={16}
                   className="uppercase"
@@ -104,7 +104,7 @@ export function AnagraficaCompletaSection<T extends FieldValues>({
                 <FormLabel>Luogo di nascita</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Avellino"
+                    placeholder="Città di nascita"
                     {...field}
                     value={field.value ?? ""}
                   />
@@ -121,7 +121,7 @@ export function AnagraficaCompletaSection<T extends FieldValues>({
                 <FormLabel>Prov.</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="AV"
+                    placeholder="XX"
                     maxLength={2}
                     className="uppercase"
                     {...field}
@@ -148,7 +148,7 @@ export function AnagraficaCompletaSection<T extends FieldValues>({
                   <FormLabel>Via</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Via Cervinaro"
+                      placeholder="es. Via Roma"
                       autoComplete="address-line1"
                       {...field}
                       value={field.value ?? ""}
@@ -166,7 +166,7 @@ export function AnagraficaCompletaSection<T extends FieldValues>({
                   <FormLabel>Civico</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="14"
+                      placeholder="N°"
                       {...field}
                       value={field.value ?? ""}
                     />
@@ -186,7 +186,7 @@ export function AnagraficaCompletaSection<T extends FieldValues>({
                   <FormLabel>Città</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Montella"
+                      placeholder="Nome città"
                       autoComplete="address-level2"
                       {...field}
                       value={field.value ?? ""}
@@ -204,7 +204,7 @@ export function AnagraficaCompletaSection<T extends FieldValues>({
                   <FormLabel>Prov.</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="AV"
+                      placeholder="XX"
                       maxLength={2}
                       className="uppercase"
                       {...field}
@@ -223,7 +223,7 @@ export function AnagraficaCompletaSection<T extends FieldValues>({
                   <FormLabel>CAP</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="83048"
+                      placeholder="00000"
                       maxLength={5}
                       inputMode="numeric"
                       {...field}

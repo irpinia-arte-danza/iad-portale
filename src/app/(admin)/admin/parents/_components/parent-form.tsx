@@ -147,7 +147,7 @@ export function ParentForm({
                   type="tel"
                   inputMode="tel"
                   autoComplete="tel"
-                  placeholder="+39 333 1234567"
+                  placeholder="es. +39 333 1234567"
                   {...field}
                 />
               </FormControl>

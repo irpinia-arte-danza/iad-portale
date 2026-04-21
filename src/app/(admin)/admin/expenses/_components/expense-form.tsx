@@ -171,7 +171,7 @@ export function ExpenseForm({
               <FormLabel>Fornitore / beneficiario (opzionale)</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="Es. Palestra Basile, Commercialista Rossi"
+                  placeholder="es. Nome fornitore o beneficiario"
                   {...field}
                   value={field.value ?? ""}
                 />
@@ -194,7 +194,7 @@ export function ExpenseForm({
                     inputMode="decimal"
                     step="0.01"
                     min="0.01"
-                    placeholder="250.00"
+                    placeholder="0.00"
                     value={field.value === 0 ? "" : field.value}
                     onChange={(e) =>
                       field.onChange(

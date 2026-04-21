@@ -137,7 +137,7 @@ export function TeacherForm({
                   type="tel"
                   inputMode="tel"
                   autoComplete="tel"
-                  placeholder="+39 333 1234567"
+                  placeholder="es. +39 333 1234567"
                   {...field}
                   value={field.value ?? ""}
                 />
@@ -155,7 +155,7 @@ export function TeacherForm({
               <FormLabel>Codice fiscale</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="RSSMRA85M01H501Z"
+                  placeholder="16 caratteri alfanumerici"
                   autoComplete="off"
                   className="uppercase"
                   {...field}

@@ -257,7 +257,7 @@ export function PaymentForm({
                     inputMode="decimal"
                     step="0.01"
                     min="0.01"
-                    placeholder="40.00"
+                    placeholder="0.00"
                     value={field.value === 0 ? "" : field.value}
                     onChange={(e) =>
                       field.onChange(
