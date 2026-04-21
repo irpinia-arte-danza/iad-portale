@@ -82,8 +82,9 @@ export function AnagraficaCompletaSection<T extends FieldValues>({
               <FormLabel>Codice fiscale</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="RSSMRA85M01H501Z"
+                  placeholder="16 caratteri — es. RSSMRA85M01H501Z"
                   autoComplete="off"
+                  maxLength={16}
                   className="uppercase"
                   {...field}
                   value={field.value ?? ""}

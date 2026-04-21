@@ -36,12 +36,13 @@ export const phoneRequiredSchema = z
   .min(1, { message: "Telefono obbligatorio" })
   .regex(PHONE_REGEX, { message: PHONE_MESSAGE })
 
-// Codice fiscale italiano (opzionale, 16 chars alfanumerici)
+// Codice fiscale italiano (opzionale, 16 chars con month letter valida)
+// Month letter ∈ {A,B,C,D,E,H,L,M,P,R,S,T} — 12 mesi
 export const fiscalCodeSchema = z
   .string()
   .regex(
-    /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/i,
-    { message: "Codice fiscale non valido" }
+    /^[A-Z]{6}\d{2}[ABCDEHLMPRST]\d{2}[A-Z]\d{3}[A-Z]$/i,
+    { message: "Codice fiscale non valido (16 caratteri, formato IT)" }
   )
   .transform((v) => v.toUpperCase())
   .optional()
