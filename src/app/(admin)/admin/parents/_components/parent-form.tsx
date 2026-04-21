@@ -24,6 +24,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Separator } from "@/components/ui/separator"
+import { AnagraficaCompletaSection } from "@/components/forms/anagrafica-completa-section"
 
 interface ParentFormProps {
   mode: "create" | "edit"
@@ -47,9 +48,17 @@ export function ParentForm({
       lastName: "",
       email: "",
       phone: "",
-      fiscalCode: "",
       receivesEmailCommunications: true,
       remindersEnabled: true,
+      dateOfBirth: undefined,
+      fiscalCode: "",
+      placeOfBirth: "",
+      provinceOfBirth: "",
+      residenceStreet: "",
+      residenceNumber: "",
+      residenceCity: "",
+      residenceProvince: "",
+      residenceCap: "",
       ...defaultValues,
     },
   })
@@ -146,6 +155,10 @@ export function ParentForm({
             </FormItem>
           )}
         />
+
+        <Separator />
+
+        <AnagraficaCompletaSection personLabel="genitore" showDateOfBirth />
 
         <Separator />
 

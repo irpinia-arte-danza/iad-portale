@@ -145,17 +145,20 @@ model Athlete {
 
   firstName       String   @map("first_name")
   lastName        String   @map("last_name")
-  fiscalCode      String   @unique @map("fiscal_code")
+  // TODO(sprint-3): fiscalCode required prima di tesseramento Endas/CSEN
+  fiscalCode      String?  @unique @map("fiscal_code")
   dateOfBirth     DateTime @map("date_of_birth") @db.Date
-  placeOfBirth    String   @map("place_of_birth")
-  provinceOfBirth String   @map("province_of_birth") @db.Char(2)
+  // TODO(sprint-3): placeOfBirth + provinceOfBirth required prima di tesseramento
+  placeOfBirth    String?  @map("place_of_birth")
+  provinceOfBirth String?  @map("province_of_birth") @db.Char(2)
   gender          Gender   @default(F)
 
-  residenceStreet   String @map("residence_street")
-  residenceNumber   String @map("residence_number")
-  residenceCity     String @map("residence_city")
-  residenceProvince String @map("residence_province") @db.Char(2)
-  residenceCap      String @map("residence_cap") @db.VarChar(5)
+  // TODO(sprint-3): residence fields required prima di emettere ricevuta
+  residenceStreet   String? @map("residence_street")
+  residenceNumber   String? @map("residence_number")
+  residenceCity     String? @map("residence_city")
+  residenceProvince String? @map("residence_province") @db.Char(2)
+  residenceCap      String? @map("residence_cap") @db.VarChar(5)
 
   email String?
   phone String?
@@ -222,6 +225,8 @@ model Parent {
   fiscalCode   String?   @unique @map("fiscal_code")
   dateOfBirth  DateTime? @map("date_of_birth") @db.Date
   placeOfBirth String?   @map("place_of_birth")
+  // TODO(sprint-3): provinceOfBirth required prima di tesseramento
+  provinceOfBirth String? @map("province_of_birth") @db.Char(2)
 
   // TODO(sprint-3): residence fields required prima di emettere ricevuta
   residenceStreet   String? @map("residence_street")

@@ -42,6 +42,15 @@ interface ParentRowActionsProps {
     phone: string | null
     receivesEmailCommunications: boolean
     remindersEnabled: boolean
+    dateOfBirth: Date | null
+    fiscalCode: string | null
+    placeOfBirth: string | null
+    provinceOfBirth: string | null
+    residenceStreet: string | null
+    residenceNumber: string | null
+    residenceCity: string | null
+    residenceProvince: string | null
+    residenceCap: string | null
   }
 }
 
@@ -104,6 +113,15 @@ export function ParentRowActions({ parent }: ParentRowActionsProps) {
               phone: parent.phone ?? "",
               receivesEmailCommunications: parent.receivesEmailCommunications,
               remindersEnabled: parent.remindersEnabled,
+              dateOfBirth: parent.dateOfBirth ?? undefined,
+              fiscalCode: parent.fiscalCode ?? "",
+              placeOfBirth: parent.placeOfBirth ?? "",
+              provinceOfBirth: parent.provinceOfBirth ?? "",
+              residenceStreet: parent.residenceStreet ?? "",
+              residenceNumber: parent.residenceNumber ?? "",
+              residenceCity: parent.residenceCity ?? "",
+              residenceProvince: parent.residenceProvince ?? "",
+              residenceCap: parent.residenceCap ?? "",
             }}
             onSuccess={() => setEditOpen(false)}
           />

@@ -21,9 +21,41 @@ export const parentCreateSchema = z.object({
   lastName: nonEmptyStringSchema("Cognome"),
   email: emailOptionalSchema,
   phone: phoneSchema,
-  fiscalCode: fiscalCodeSchema,
   receivesEmailCommunications: z.boolean(),
   remindersEnabled: z.boolean(),
+
+  dateOfBirth: z
+    .date()
+    .max(new Date(), {
+      message: "La data di nascita non può essere nel futuro",
+    })
+    .optional(),
+  fiscalCode: fiscalCodeSchema,
+  placeOfBirth: z.string().trim().max(100).optional(),
+  provinceOfBirth: z
+    .string()
+    .trim()
+    .length(2, "Provincia: 2 lettere (es. AV)")
+    .toUpperCase()
+    .optional()
+    .or(z.literal("")),
+
+  residenceStreet: z.string().trim().max(200).optional(),
+  residenceNumber: z.string().trim().max(20).optional(),
+  residenceCity: z.string().trim().max(100).optional(),
+  residenceProvince: z
+    .string()
+    .trim()
+    .length(2, "Provincia: 2 lettere (es. AV)")
+    .toUpperCase()
+    .optional()
+    .or(z.literal("")),
+  residenceCap: z
+    .string()
+    .trim()
+    .regex(/^\d{5}$/, "CAP: 5 cifre")
+    .optional()
+    .or(z.literal("")),
 })
 
 // Schema update (parziale)

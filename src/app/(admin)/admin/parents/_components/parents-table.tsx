@@ -19,6 +19,15 @@ type ParentRow = {
   phone: string | null
   receivesEmailCommunications: boolean
   remindersEnabled: boolean
+  dateOfBirth: Date | null
+  fiscalCode: string | null
+  placeOfBirth: string | null
+  provinceOfBirth: string | null
+  residenceStreet: string | null
+  residenceNumber: string | null
+  residenceCity: string | null
+  residenceProvince: string | null
+  residenceCap: string | null
   _count: { athleteRelations: number }
 }
 

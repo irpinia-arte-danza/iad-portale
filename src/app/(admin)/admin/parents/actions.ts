@@ -17,9 +17,22 @@ import {
 
 const PARENTS_PATH = "/admin/parents"
 
+function cleanEmptyStrings<T extends Record<string, unknown>>(data: T): T {
+  const cleaned: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(data)) {
+    cleaned[key] = typeof value === "string" && value === "" ? null : value
+  }
+  return cleaned as T
+}
+
 function mapPrismaError(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === "P2002") return "Codice fiscale già esistente"
+    if (error.code === "P2002") {
+      const target = (error.meta?.target as string[] | undefined) ?? []
+      if (target.includes("fiscal_code")) return "Codice fiscale già esistente"
+      if (target.includes("email")) return "Email già in uso"
+      return "Valore duplicato"
+    }
     if (error.code === "P2025") return "Genitore non trovato"
     if (error.code === "P2003") return "Riferimento a record inesistente"
   }
@@ -39,7 +52,7 @@ export async function createParent(
 
   try {
     const parent = await prisma.parent.create({
-      data: parsed.data,
+      data: cleanEmptyStrings(parsed.data),
       select: { id: true },
     })
     revalidatePath(PARENTS_PATH)
@@ -68,7 +81,7 @@ export async function updateParent(
   try {
     await prisma.parent.update({
       where: { id: idParsed.data, deletedAt: null },
-      data: parsed.data,
+      data: cleanEmptyStrings(parsed.data),
     })
     revalidatePath(PARENTS_PATH)
     return { ok: true }
