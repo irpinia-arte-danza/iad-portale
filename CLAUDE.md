@@ -157,7 +157,7 @@ Vedi `prisma/schema.prisma` per lo schema completo. In sintesi:
 | Storage | **Supabase Storage** | Logo, certificati medici, moduli scansionati, ricevute PDF |
 | Email | **Resend** | Transazionali + notifiche |
 | PDF | **@react-pdf/renderer** | Ricevute, moduli precompilati, export tesseramento |
-| Date | **date-fns** + **date-fns-tz** (locale `it`) | Timezone Europe/Rome sempre esplicito |
+| Date | **Date nativo + `Intl.DateTimeFormat("it-IT")`** | `date-fns` NON installata. Installare se servono operations complesse (parsing ISO, timezone conversion non banale) in sprint futuri (es. Sprint 5 calendario presenze) |
 | Hosting | **Vercel** (team IAD) | Deploy da GitHub main |
 | Monitoring | **Vercel Analytics + Sentry** | Errori in produzione |
 
@@ -358,8 +358,9 @@ iad-portale/
 ### Date & timezone
 - **Timezone operativo**: `Europe/Rome`
 - Date in DB: sempre UTC (`DateTime` Prisma)
-- Date in UI: convertite con `date-fns-tz` → `formatInTimeZone(date, 'Europe/Rome', 'dd/MM/yyyy')`
+- Date in UI: formattate con `Intl.DateTimeFormat("it-IT")` (vedi helper in `src/lib/utils/format.ts`) — `date-fns` NON installata (vedi stack table sopra)
 - Formato display italiano: `dd/MM/yyyy` (date), `HH:mm` (ore)
+- Quando serve forzare TZ Europe/Rome in un rendering specifico: `date.toLocaleString("it-IT", { timeZone: "Europe/Rome" })`. Per operazioni complesse (parsing ISO con TZ, add/sub robusto) valutare installazione `date-fns` + `date-fns-tz` in sprint futuri.
 
 ### Errori
 - Mai `alert()` o `console.log()` per l'utente
@@ -715,6 +716,47 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
     ```
     Se in futuro emergono altre policy stagionali (es. agosto aperto per campus, giugno ridotto per saggio), spostare `COURSE_SEASON_END_MONTH` in `BrandSettings` o in AcademicYear come colonna dedicata (`coursesEndMonth`) invece di hardcode. Scoperto: Sprint 2.C.5, 21 aprile 2026, test visivo auto-gen schedules mostrava luglio+agosto quote fantasma.
 
+    **17.20 `@react-pdf/renderer` in Next.js 16 richiede `next/dynamic` con `ssr: false`**: il modulo esegue side-effect al parse (es. `Font.register` globale) incompatibili con SSR/RSC. Usare `"use client"` da solo non basta — Next 16 tenta comunque di includere il bundle lato server durante la route analysis, rompendo il build. Pattern corretto per **download client-side**:
+    ```tsx
+    const PDFDownloadLink = dynamic(
+      () =>
+        import("@react-pdf/renderer").then((m) => ({
+          default: m.PDFDownloadLink,
+        })),
+      { ssr: false, loading: () => <Button disabled>Caricamento...</Button> },
+    )
+    ```
+    Tip: `PDFDownloadLink` è un **named export** → richiede `{ default: m.PDFDownloadLink }` nel `.then()` perché `next/dynamic` vuole un default export.
+
+    Pattern per **rendering server-side** (ZIP bundle, email attachment, cron-generated PDF):
+    ```ts
+    import { renderToBuffer } from "@react-pdf/renderer"
+    const pdfBuffer = await renderToBuffer(MyDocument({ data }))
+    ```
+    Richiede runtime Node.js nel route handler (NON Edge, perché Edge non supporta le API native che @react-pdf usa):
+    ```ts
+    export const runtime = "nodejs"
+    ```
+    Scoperto: Sprint 7.D (Athlete card PDF client-side) + Sprint 7.F (Annual bundle server-side), 21 aprile 2026.
+
+    **17.21 Helper file (CSV/XLSX/PDF): separare builder Buffer-based da wrapper download**: helper come `generateXLSX` e `generateCSV` scritti inizialmente client-side (Blob + `URL.createObjectURL` + DOM) **non sono riusabili server-side** per generation in ZIP bundle, email attachment, storage upload. Pattern: estrarre builder puro (ritorna Buffer o stringa) + wrapper download che chiama il builder + side-effect DOM.
+
+    Esempio `excel.ts`:
+    ```ts
+    function buildWorkbook(sheets): XLSX.WorkBook { ... }  // shared
+
+    export function buildXlsxBuffer(sheets): Buffer {       // server
+      const wb = buildWorkbook(sheets)
+      return XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
+    }
+
+    export function generateXLSX(sheets, filename): void {  // client
+      const wb = buildWorkbook(sheets)
+      XLSX.writeFile(wb, filename)
+    }
+    ```
+    Stesso pattern applicabile a CSV (`buildCsvString` separato da `downloadCsv`) e PDF (`renderToBuffer` separato da `PDFDownloadLink`). Regola pratica: se è pensabile riusare la logica in un cron/webhook/email/zip, estrarre subito il builder Buffer-based — refactor dopo costa di più. Scoperto: Sprint 7.F (Annual bundle richiedeva `buildXlsxBuffer` mentre `generateXLSX` era solo client-side), 21 aprile 2026.
+
 ---
 
 ## 📚 Documenti di riferimento
@@ -731,4 +773,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-21 · Versione 3.0 — Sprint 2 complete: Teacher + Course + Enrollment + Payment + PaymentSchedule. Aggiunti gotcha 17.17 (Zod v4 enum errorMap), 17.18 (z.date().max timezone), 17.19 (AcademicYear vs course season)._
+_Ultimo aggiornamento: 2026-04-21 · Versione 3.1 — Sprint 7 complete: Expense CRUD + 5 Report (Corrispettivi XLSX/CSV, Bilancio con chart, Athlete card PDF, Analytics dashboard, Annual ZIP bundle). Aggiunti gotcha 17.20 (@react-pdf/renderer Next.js dynamic ssr:false), 17.21 (server vs client helper duality). Rimossa `date-fns` dalla dichiarazione stack (non installata); formattazione date via `Intl.DateTimeFormat`._
