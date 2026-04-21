@@ -40,8 +40,9 @@ model User {
   phone     String?
   isActive  Boolean  @default(true) @map("is_active")
 
-  // Preferenze UI
-  themePreference String? @map("theme_preference") // "light" | "dark" | "system"
+  // Preferenze UI (per-user)
+  themePreference  String? @map("theme_preference") // "light" | "dark" | "system"
+  localePreference String? @default("it") @map("locale_preference") // "it" | "en"
 
   parentProfile  Parent?
   teacherProfile Teacher?
@@ -1050,26 +1051,57 @@ model BrandSettings {
   id Int @id @default(1)
 
   // Logo e immagini
-  logoUrl     String? @map("logo_url") // principale (header, email)
+  logoUrl     String? @map("logo_url") // principale light (header, email)
   logoDarkUrl String? @map("logo_dark_url") // variante per dark mode
+  logoSvgUrl  String? @map("logo_svg_url") // versione vettoriale (PDF ricevute)
   faviconUrl  String? @map("favicon_url")
 
   // Colori brand (default neutri, override via UI in Impostazioni)
   primaryColor   String @default("#171717") @map("primary_color")
   secondaryColor String @default("#737373") @map("secondary_color")
 
-  // Dati ASD (required popolati dal seed, optional configurabili via UI)
+  // Dati ASD — legale (required popolati dal seed)
   asdName       String  @map("asd_name")
-  asdAddress    String  @map("asd_address")
   asdFiscalCode String  @map("asd_fiscal_code")
+  asdVatNumber  String? @map("asd_vat_number") // Partita IVA (se ≠ CF)
   asdEmail      String  @map("asd_email")
+  asdPec        String? @map("asd_pec")
   asdPhone      String? @map("asd_phone")
   asdWebsite    String? @map("asd_website")
   asdIban       String? @map("asd_iban")
+  asdSdiCode    String? @map("asd_sdi_code") // Codice SDI fattura elettronica
+
+  // Indirizzo legale (nuovo: decomposto)
+  addressStreet   String? @map("address_street")
+  addressZip      String? @map("address_zip") @db.VarChar(5)
+  addressCity     String? @map("address_city")
+  addressProvince String? @map("address_province") @db.Char(2)
+
+  // Indirizzo palestra (override opzionale se ≠ legale)
+  gymSameAsLegal Boolean @default(true) @map("gym_same_as_legal")
+  gymAddress     String? @map("gym_address")
+
+  // Legacy: indirizzo in singola riga (deprecato, tenuto per retrocompat)
+  asdAddress String? @map("asd_address")
 
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("brand_settings")
+}
+
+// ============================================================================
+// RECEIPT SETTINGS (numerazione ricevute, singleton stateful)
+// ============================================================================
+
+model ReceiptSettings {
+  id            Int      @id @default(1)
+  receiptPrefix String   @default("IAD/") @map("receipt_prefix")
+  receiptNumber Int      @default(0) @map("receipt_number")
+  receiptFooter String?  @map("receipt_footer")
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy     String?  @map("updated_by") @db.Uuid
+
+  @@map("receipt_settings")
 }
 
 // ============================================================================
@@ -1091,6 +1123,15 @@ enum AuditAction {
   BRAND_UPDATE
   REMINDER_SENT
   BULK_EMAIL
+  // Settings actions (Sprint 7.X)
+  UPDATE_BRAND
+  UPDATE_ASSOCIATION
+  UPDATE_RICEVUTE
+  UPDATE_PROFILE
+  CHANGE_PASSWORD
+  INVITE_ADMIN
+  LOGO_UPLOAD
+  LOGO_DELETE
 }
 
 model AuditLog {

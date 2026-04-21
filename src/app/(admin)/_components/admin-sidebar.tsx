@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Home,
   Receipt,
+  Settings,
   TrendingUp,
   UserCog,
   Users,
@@ -58,6 +59,7 @@ const NAV_ITEMS = [
     label: "Export annuale",
     icon: FolderArchive,
   },
+  { href: "/admin/settings", label: "Impostazioni", icon: Settings },
 ] as const
 
 export function AdminSidebar({

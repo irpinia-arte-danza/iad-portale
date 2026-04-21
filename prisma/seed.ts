@@ -39,16 +39,36 @@ async function main() {
       asdName: "A.S.D. IAD Irpinia Arte Danza",
       asdFiscalCode: "90029290641",
       asdAddress: "Via Cervinaro, 14 - 83048 Montella (AV)",
+      addressStreet: "Via Cervinaro, 14",
+      addressZip: "83048",
+      addressCity: "Montella",
+      addressProvince: "AV",
+      gymSameAsLegal: true,
       asdEmail: "info@irpiniaartedanza.it",
       asdPhone: null,
       asdWebsite: "https://irpiniaartedanza.it",
       asdIban: null,
       logoUrl: null,
       logoDarkUrl: null,
+      logoSvgUrl: null,
       faviconUrl: null,
     },
   });
   console.log(`✓ BrandSettings: ${brandSettings.asdName}`);
+
+  const receiptSettings = await prisma.receiptSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      receiptPrefix: "IAD/",
+      receiptNumber: 0,
+      receiptFooter: null,
+    },
+  });
+  console.log(
+    `✓ ReceiptSettings: prefix=${receiptSettings.receiptPrefix} counter=${receiptSettings.receiptNumber}`,
+  );
 
   const reminderConfig = await prisma.reminderConfig.upsert({
     where: { id: 1 },
