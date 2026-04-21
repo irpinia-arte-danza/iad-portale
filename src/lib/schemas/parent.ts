@@ -1,8 +1,8 @@
 import { z } from "zod"
 import {
-  emailOptionalSchema,
+  emailRequiredSchema,
   endOfToday,
-  phoneSchema,
+  phoneRequiredSchema,
   fiscalCodeSchema,
   nonEmptyStringSchema,
 } from "./common"
@@ -20,8 +20,8 @@ export const parentRelationshipOptions = [
 export const parentCreateSchema = z.object({
   firstName: nonEmptyStringSchema("Nome"),
   lastName: nonEmptyStringSchema("Cognome"),
-  email: emailOptionalSchema,
-  phone: phoneSchema,
+  email: emailRequiredSchema,
+  phone: phoneRequiredSchema,
   receivesEmailCommunications: z.boolean(),
   remindersEnabled: z.boolean(),
 

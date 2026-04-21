@@ -18,15 +18,23 @@ export const emailRequiredSchema = z
   .min(1, { message: "Email obbligatoria" })
   .email({ message: "Email non valida" })
 
+// Phone italiano (regex condivisa)
+const PHONE_REGEX =
+  /^(\+39)?\s?3\d{2}\s?\d{6,7}$|^(\+39)?\s?0\d{1,3}\s?\d{5,10}$/
+const PHONE_MESSAGE = "Telefono non valido (es. +39 333 1234567)"
+
 // Phone italiano (optional)
 export const phoneSchema = z
   .string()
-  .regex(
-    /^(\+39)?\s?3\d{2}\s?\d{6,7}$|^(\+39)?\s?0\d{1,3}\s?\d{5,10}$/,
-    { message: "Telefono non valido (es. +39 333 1234567)" }
-  )
+  .regex(PHONE_REGEX, { message: PHONE_MESSAGE })
   .optional()
   .or(z.literal(""))
+
+// Phone italiano (required)
+export const phoneRequiredSchema = z
+  .string()
+  .min(1, { message: "Telefono obbligatorio" })
+  .regex(PHONE_REGEX, { message: PHONE_MESSAGE })
 
 // Codice fiscale italiano (opzionale, 16 chars alfanumerici)
 export const fiscalCodeSchema = z

@@ -122,7 +122,7 @@ export function ParentForm({
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>Email *</FormLabel>
               <FormControl>
                 <Input
                   type="email"
@@ -141,7 +141,7 @@ export function ParentForm({
           name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Telefono</FormLabel>
+              <FormLabel>Telefono *</FormLabel>
               <FormControl>
                 <Input
                   type="tel"
