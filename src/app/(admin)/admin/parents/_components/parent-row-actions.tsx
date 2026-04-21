@@ -75,7 +75,12 @@ export function ParentRowActions({ parent }: ParentRowActionsProps) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Azioni">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Azioni"
+            onClick={(e) => e.stopPropagation()}
+          >
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
