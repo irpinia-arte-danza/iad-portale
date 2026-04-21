@@ -11,6 +11,13 @@ import {
   getRecentAthletes,
   getRecentParents,
 } from "./queries"
+import {
+  getEnrollmentsTrend,
+  getIncomeTrend,
+  getPopularCourses,
+  getRetentionRate,
+} from "./analytics-queries"
+import { AnalyticsSection } from "./_components/analytics-section"
 import { KpiCards } from "./_components/kpi-cards"
 import { RecentActivity } from "./_components/recent-activity"
 import { QuickActions } from "./_components/quick-actions"
@@ -25,7 +32,16 @@ export default async function AdminDashboardPage() {
     redirect("/login")
   }
 
-  const [user, stats, athletes, parents] = await Promise.all([
+  const [
+    user,
+    stats,
+    athletes,
+    parents,
+    enrollmentsTrend,
+    incomeTrend,
+    popularCourses,
+    retention,
+  ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: authUser.id },
       select: { firstName: true },
@@ -33,6 +49,10 @@ export default async function AdminDashboardPage() {
     getDashboardStats(),
     getRecentAthletes(5),
     getRecentParents(5),
+    getEnrollmentsTrend(12),
+    getIncomeTrend(12),
+    getPopularCourses(10),
+    getRetentionRate(),
   ])
 
   return (
@@ -45,6 +65,12 @@ export default async function AdminDashboardPage() {
       <ResourceContent>
         <div className="flex flex-col gap-6">
           <KpiCards stats={stats} />
+          <AnalyticsSection
+            enrollmentsTrend={enrollmentsTrend}
+            incomeTrend={incomeTrend}
+            popularCourses={popularCourses}
+            retention={retention}
+          />
           <RecentActivity athletes={athletes} parents={parents} />
           <QuickActions />
         </div>
