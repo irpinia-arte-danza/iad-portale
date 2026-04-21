@@ -50,20 +50,30 @@ export async function listAthletes(filters: ListFilters = {}) {
   return { items, totalCount }
 }
 
-export async function getAthleteById(id: string) {
+const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
+  include: {
+    parentRelations: {
+      where: { parent: { deletedAt: null } },
+      include: { parent: true },
+      orderBy: [
+        { isPrimaryContact: "desc" },
+        { isPrimaryPayer: "desc" },
+      ],
+    },
+  },
+})
+
+export type AthleteWithRelations = Prisma.AthleteGetPayload<
+  typeof athleteWithRelations
+>
+
+export async function getAthleteById(
+  id: string,
+): Promise<AthleteWithRelations | null> {
   await requireAdmin()
 
   return prisma.athlete.findUnique({
     where: { id, deletedAt: null },
-    include: {
-      parentRelations: {
-        where: { parent: { deletedAt: null } },
-        include: { parent: true },
-        orderBy: [
-          { isPrimaryContact: "desc" },
-          { isPrimaryPayer: "desc" },
-        ],
-      },
-    },
+    ...athleteWithRelations,
   })
 }
