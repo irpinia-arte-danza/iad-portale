@@ -28,6 +28,7 @@ interface GuardianEditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   athleteParent: AthleteParentRelation
+  otherRelations: AthleteParentRelation[]
   onSuccess?: () => void
 }
 
@@ -35,9 +36,20 @@ export function GuardianEditDialog({
   open,
   onOpenChange,
   athleteParent,
+  otherRelations,
   onSuccess,
 }: GuardianEditDialogProps) {
   const [isPending, startTransition] = useTransition()
+
+  const lockedPrimaryContact = otherRelations.find((r) => r.isPrimaryContact)
+  const lockedPrimaryPayer = otherRelations.find((r) => r.isPrimaryPayer)
+
+  const lockedPrimaryContactName = lockedPrimaryContact
+    ? `${lockedPrimaryContact.parent.firstName} ${lockedPrimaryContact.parent.lastName}`
+    : null
+  const lockedPrimaryPayerName = lockedPrimaryPayer
+    ? `${lockedPrimaryPayer.parent.firstName} ${lockedPrimaryPayer.parent.lastName}`
+    : null
 
   const form = useForm<GuardianRelationValues>({
     resolver: zodResolver(guardianRelationSchema),
@@ -75,7 +87,10 @@ export function GuardianEditDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <GuardianRelationFields />
+            <GuardianRelationFields
+              lockedPrimaryContactName={lockedPrimaryContactName}
+              lockedPrimaryPayerName={lockedPrimaryPayerName}
+            />
             <div className="flex sm:justify-end">
               <Button
                 type="submit"

@@ -18,9 +18,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { relationshipOptions } from "@/lib/schemas/guardian"
 
-export function GuardianRelationFields() {
+interface GuardianRelationFieldsProps {
+  lockedPrimaryContactName?: string | null
+  lockedPrimaryPayerName?: string | null
+}
+
+export function GuardianRelationFields({
+  lockedPrimaryContactName,
+  lockedPrimaryPayerName,
+}: GuardianRelationFieldsProps = {}) {
   const form = useFormContext()
 
   return (
@@ -56,45 +69,85 @@ export function GuardianRelationFields() {
         <FormField
           control={form.control}
           name="isPrimaryContact"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start gap-3 space-y-0">
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel className="cursor-pointer">
-                  Contatto principale
-                </FormLabel>
-                <FormDescription>
-                  Riceve comunicazioni urgenti per primo. Solo 1 per allieva.
-                </FormDescription>
-              </div>
-            </FormItem>
-          )}
+          render={({ field }) => {
+            const isLocked = Boolean(lockedPrimaryContactName) && !field.value
+            const checkbox = (
+              <Checkbox
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                disabled={isLocked}
+              />
+            )
+            return (
+              <FormItem className="flex flex-row items-start gap-3 space-y-0">
+                <FormControl>
+                  {isLocked ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">{checkbox}</span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Già assegnato a {lockedPrimaryContactName}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    checkbox
+                  )}
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel className="cursor-pointer">
+                    Contatto principale
+                  </FormLabel>
+                  <FormDescription>
+                    {isLocked
+                      ? `Ruolo attualmente assegnato a ${lockedPrimaryContactName}. Modifica quella relazione per liberarlo.`
+                      : "Riceve comunicazioni urgenti per primo. Solo 1 per allieva."}
+                  </FormDescription>
+                </div>
+              </FormItem>
+            )
+          }}
         />
 
         <FormField
           control={form.control}
           name="isPrimaryPayer"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start gap-3 space-y-0">
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel className="cursor-pointer">Paga le quote</FormLabel>
-                <FormDescription>
-                  Riceve solleciti pagamento. Solo 1 per allieva.
-                </FormDescription>
-              </div>
-            </FormItem>
-          )}
+          render={({ field }) => {
+            const isLocked = Boolean(lockedPrimaryPayerName) && !field.value
+            const checkbox = (
+              <Checkbox
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                disabled={isLocked}
+              />
+            )
+            return (
+              <FormItem className="flex flex-row items-start gap-3 space-y-0">
+                <FormControl>
+                  {isLocked ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">{checkbox}</span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Già assegnato a {lockedPrimaryPayerName}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    checkbox
+                  )}
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel className="cursor-pointer">Paga le quote</FormLabel>
+                  <FormDescription>
+                    {isLocked
+                      ? `Ruolo attualmente assegnato a ${lockedPrimaryPayerName}. Modifica quella relazione per liberarlo.`
+                      : "Riceve solleciti pagamento. Solo 1 per allieva."}
+                  </FormDescription>
+                </div>
+              </FormItem>
+            )
+          }}
         />
 
         <FormField

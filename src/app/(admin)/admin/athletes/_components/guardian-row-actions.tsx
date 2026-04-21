@@ -30,6 +30,7 @@ import { GuardianEditDialog } from "./guardian-edit-dialog"
 
 interface GuardianRowActionsProps {
   athleteParent: AthleteParentRelation
+  otherRelations: AthleteParentRelation[]
 }
 
 const RELATIONSHIP_LABELS: Record<
@@ -43,7 +44,10 @@ const RELATIONSHIP_LABELS: Record<
   OTHER: "Altro",
 }
 
-export function GuardianRowActions({ athleteParent }: GuardianRowActionsProps) {
+export function GuardianRowActions({
+  athleteParent,
+  otherRelations,
+}: GuardianRowActionsProps) {
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
   const [unlinkOpen, setUnlinkOpen] = useState(false)
@@ -90,6 +94,7 @@ export function GuardianRowActions({ athleteParent }: GuardianRowActionsProps) {
         open={editOpen}
         onOpenChange={setEditOpen}
         athleteParent={athleteParent}
+        otherRelations={otherRelations}
         onSuccess={() => router.refresh()}
       />
 

@@ -39,10 +39,22 @@ import {
 } from "../guardians-actions"
 import { GuardianRelationFields } from "./guardian-relation-fields"
 
+type ExistingGuardian = {
+  id: string
+  firstName: string
+  lastName: string
+  isPrimaryContact: boolean
+  isPrimaryPayer: boolean
+}
+
 interface GuardianPickerDialogProps {
   athleteId: string
-  existingGuardiansCount: number
+  existingGuardians: ExistingGuardian[]
   onSuccess?: () => void
+}
+
+function fullName(g: ExistingGuardian) {
+  return `${g.firstName} ${g.lastName}`
 }
 
 const linkExistingSchema = z.object({
@@ -72,20 +84,30 @@ type ParentSearchResult = {
 
 export function GuardianPickerDialog({
   athleteId,
-  existingGuardiansCount,
+  existingGuardians,
   onSuccess,
 }: GuardianPickerDialogProps) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<"existing" | "new">("existing")
 
-  const isFirstGuardian = existingGuardiansCount === 0
+  const lockedPrimaryContact = existingGuardians.find((g) => g.isPrimaryContact)
+  const lockedPrimaryPayer = existingGuardians.find((g) => g.isPrimaryPayer)
+
+  const isFirstGuardian = existingGuardians.length === 0
   const defaultRelation: GuardianRelationValues = {
     relationship: ParentRelationship.MOTHER,
-    isPrimaryContact: isFirstGuardian,
-    isPrimaryPayer: isFirstGuardian,
+    isPrimaryContact: isFirstGuardian && !lockedPrimaryContact,
+    isPrimaryPayer: isFirstGuardian && !lockedPrimaryPayer,
     isPickupAuthorized: true,
     hasParentalAuthority: true,
   }
+
+  const lockedPrimaryContactName = lockedPrimaryContact
+    ? fullName(lockedPrimaryContact)
+    : null
+  const lockedPrimaryPayerName = lockedPrimaryPayer
+    ? fullName(lockedPrimaryPayer)
+    : null
 
   function handleSuccess() {
     setOpen(false)
@@ -128,6 +150,8 @@ export function GuardianPickerDialog({
             <ExistingParentForm
               athleteId={athleteId}
               defaultRelation={defaultRelation}
+              lockedPrimaryContactName={lockedPrimaryContactName}
+              lockedPrimaryPayerName={lockedPrimaryPayerName}
               onSuccess={handleSuccess}
             />
           </TabsContent>
@@ -136,6 +160,8 @@ export function GuardianPickerDialog({
             <NewParentForm
               athleteId={athleteId}
               defaultRelation={defaultRelation}
+              lockedPrimaryContactName={lockedPrimaryContactName}
+              lockedPrimaryPayerName={lockedPrimaryPayerName}
               onSuccess={handleSuccess}
             />
           </TabsContent>
@@ -148,10 +174,14 @@ export function GuardianPickerDialog({
 function ExistingParentForm({
   athleteId,
   defaultRelation,
+  lockedPrimaryContactName,
+  lockedPrimaryPayerName,
   onSuccess,
 }: {
   athleteId: string
   defaultRelation: GuardianRelationValues
+  lockedPrimaryContactName: string | null
+  lockedPrimaryPayerName: string | null
   onSuccess: () => void
 }) {
   const [isPending, startTransition] = useTransition()
@@ -266,7 +296,10 @@ function ExistingParentForm({
         {selectedParentId && (
           <>
             <Separator />
-            <GuardianRelationFields />
+            <GuardianRelationFields
+              lockedPrimaryContactName={lockedPrimaryContactName}
+              lockedPrimaryPayerName={lockedPrimaryPayerName}
+            />
             <div className="flex sm:justify-end">
               <Button
                 type="submit"
@@ -293,10 +326,14 @@ function ExistingParentForm({
 function NewParentForm({
   athleteId,
   defaultRelation,
+  lockedPrimaryContactName,
+  lockedPrimaryPayerName,
   onSuccess,
 }: {
   athleteId: string
   defaultRelation: GuardianRelationValues
+  lockedPrimaryContactName: string | null
+  lockedPrimaryPayerName: string | null
   onSuccess: () => void
 }) {
   const [isPending, startTransition] = useTransition()
@@ -398,7 +435,10 @@ function NewParentForm({
         </div>
 
         <Separator />
-        <GuardianRelationFields />
+        <GuardianRelationFields
+          lockedPrimaryContactName={lockedPrimaryContactName}
+          lockedPrimaryPayerName={lockedPrimaryPayerName}
+        />
 
         <div className="flex sm:justify-end">
           <Button

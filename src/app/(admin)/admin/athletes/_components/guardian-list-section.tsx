@@ -46,7 +46,13 @@ export function GuardianListSection({
           </div>
           <GuardianPickerDialog
             athleteId={athleteId}
-            existingGuardiansCount={parentRelations.length}
+            existingGuardians={parentRelations.map((rel) => ({
+              id: rel.id,
+              firstName: rel.parent.firstName,
+              lastName: rel.parent.lastName,
+              isPrimaryContact: rel.isPrimaryContact,
+              isPrimaryPayer: rel.isPrimaryPayer,
+            }))}
           />
         </div>
       </CardHeader>
@@ -89,7 +95,12 @@ export function GuardianListSection({
                     </div>
                   )}
                 </div>
-                <GuardianRowActions athleteParent={rel} />
+                <GuardianRowActions
+                  athleteParent={rel}
+                  otherRelations={parentRelations.filter(
+                    (r) => r.id !== rel.id,
+                  )}
+                />
               </li>
             ))}
           </ul>
