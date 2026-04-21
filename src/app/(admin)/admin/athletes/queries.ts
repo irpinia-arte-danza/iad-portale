@@ -110,3 +110,68 @@ export async function getAthleteById(
     ...athleteWithRelations,
   })
 }
+
+const athleteForPDF = Prisma.validator<Prisma.AthleteDefaultArgs>()({
+  include: {
+    parentRelations: {
+      where: { parent: { deletedAt: null } },
+      include: { parent: true },
+      orderBy: [
+        { isPrimaryContact: "desc" },
+        { isPrimaryPayer: "desc" },
+      ],
+    },
+    enrollments: {
+      include: {
+        course: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            teacher: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        academicYear: {
+          select: { id: true, label: true, isCurrent: true },
+        },
+        paymentSchedules: {
+          where: {
+            status: { in: ["DUE", "WAIVED"] },
+          },
+          orderBy: { dueDate: "asc" },
+        },
+      },
+      orderBy: [{ enrollmentDate: "desc" }],
+    },
+    payments: {
+      where: { status: "PAID", deletedAt: null },
+      include: {
+        courseEnrollment: {
+          select: {
+            course: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
+    },
+  },
+})
+
+export type AthleteForPDF = Prisma.AthleteGetPayload<typeof athleteForPDF>
+
+export async function getAthleteForPDF(
+  id: string,
+): Promise<AthleteForPDF | null> {
+  await requireAdmin()
+
+  return prisma.athlete.findUnique({
+    where: { id, deletedAt: null },
+    ...athleteForPDF,
+  })
+}

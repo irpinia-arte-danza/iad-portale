@@ -10,7 +10,8 @@ import { AthleteDetailHeader } from "../_components/athlete-detail-header"
 import { EnrollmentsSection } from "../_components/enrollments-section"
 import { GuardianListSection } from "../_components/guardian-list-section"
 import { SchedulesSection } from "../_components/schedules-section"
-import { getAthleteById } from "../queries"
+import { getAthleteById, getAthleteForPDF } from "../queries"
+import { AthletePDFButton } from "./_components/athlete-pdf-button"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -19,25 +20,31 @@ interface PageProps {
 export default async function AthleteDetailPage({ params }: PageProps) {
   const resolvedParams = await params
 
-  const [athlete, activeCourses, currentAcademicYear, athletesForPaymentForm] =
-    await Promise.all([
-      getAthleteById(resolvedParams.id),
-      prisma.course.findMany({
-        where: { isActive: true },
-        select: {
-          id: true,
-          name: true,
-          type: true,
-          monthlyFeeCents: true,
-        },
-        orderBy: { name: "asc" },
-      }),
-      prisma.academicYear.findFirst({
-        where: { isCurrent: true },
-        select: { id: true, label: true },
-      }),
-      listAthletesWithRelations(),
-    ])
+  const [
+    athlete,
+    athleteForPDF,
+    activeCourses,
+    currentAcademicYear,
+    athletesForPaymentForm,
+  ] = await Promise.all([
+    getAthleteById(resolvedParams.id),
+    getAthleteForPDF(resolvedParams.id),
+    prisma.course.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        monthlyFeeCents: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.academicYear.findFirst({
+      where: { isCurrent: true },
+      select: { id: true, label: true },
+    }),
+    listAthletesWithRelations(),
+  ])
 
   if (!athlete) {
     notFound()
@@ -53,7 +60,12 @@ export default async function AthleteDetailPage({ params }: PageProps) {
           { label: fullName },
         ]}
         title={fullName}
-        action={<AthleteDetailHeader athlete={athlete} />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            {athleteForPDF ? <AthletePDFButton data={athleteForPDF} /> : null}
+            <AthleteDetailHeader athlete={athlete} />
+          </div>
+        }
       />
       <ResourceContent>
         <div className="flex flex-col gap-6">
