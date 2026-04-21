@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Plus } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -23,9 +24,13 @@ type TeacherOption = {
 
 interface CourseCreateDialogProps {
   teachers: TeacherOption[]
+  currentAcademicYearLabel: string | null
 }
 
-export function CourseCreateDialog({ teachers }: CourseCreateDialogProps) {
+export function CourseCreateDialog({
+  teachers,
+  currentAcademicYearLabel,
+}: CourseCreateDialogProps) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -38,7 +43,14 @@ export function CourseCreateDialog({ teachers }: CourseCreateDialogProps) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Aggiungi corso</DialogTitle>
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle>Aggiungi corso</DialogTitle>
+            {currentAcademicYearLabel && (
+              <Badge variant="outline" className="font-mono text-xs">
+                AA {currentAcademicYearLabel}
+              </Badge>
+            )}
+          </div>
           <DialogDescription>
             Configura un nuovo corso. L&apos;insegnante e gli orari possono
             essere aggiunti o modificati più tardi.

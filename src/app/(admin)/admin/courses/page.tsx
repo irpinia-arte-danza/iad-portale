@@ -1,3 +1,6 @@
+import { prisma } from "@/lib/prisma"
+import { Badge } from "@/components/ui/badge"
+
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
 
@@ -26,11 +29,16 @@ export default async function CoursesPage({ searchParams }: PageProps) {
   const search = resolvedSearchParams.search ?? ""
   const status = parseStatus(resolvedSearchParams.status)
 
-  const [{ items, totalCount }, teachers, counts] = await Promise.all([
-    listCourses({ search, status }),
-    listActiveTeachers(),
-    getCourseStatusCounts(),
-  ])
+  const [{ items, totalCount }, teachers, counts, currentAcademicYear] =
+    await Promise.all([
+      listCourses({ search, status }),
+      listActiveTeachers(),
+      getCourseStatusCounts(),
+      prisma.academicYear.findFirst({
+        where: { isCurrent: true },
+        select: { label: true },
+      }),
+    ])
 
   return (
     <>
@@ -38,11 +46,23 @@ export default async function CoursesPage({ searchParams }: PageProps) {
         breadcrumbs={[{ label: "Corsi" }]}
         title="Corsi"
         description="Catalogo corsi, fasce d'età e quote mensili."
-        action={<CourseCreateDialog teachers={teachers} />}
+        action={
+          <CourseCreateDialog
+            teachers={teachers}
+            currentAcademicYearLabel={currentAcademicYear?.label ?? null}
+          />
+        }
       />
       <ResourceContent>
         <div className="flex flex-col gap-4">
-          <CoursesStatusTabs current={status} counts={counts} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CoursesStatusTabs current={status} counts={counts} />
+            {currentAcademicYear && (
+              <Badge variant="outline" className="font-mono text-xs">
+                AA {currentAcademicYear.label}
+              </Badge>
+            )}
+          </div>
           <CoursesSearch defaultValue={search} />
           <CoursesTable courses={items} teachers={teachers} />
           <p className="text-xs text-muted-foreground">
