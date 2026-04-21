@@ -8,7 +8,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { computeScheduleDisplayStatus } from "@/lib/utils/schedule-status"
+import {
+  computeScheduleDisplayStatus,
+  type ScheduleDisplayStatus,
+} from "@/lib/utils/schedule-status"
 
 import type { AthleteEnrollment, AthletePaymentSchedule } from "../queries"
 import type { AthleteWithFormRelations } from "../../payments/queries"
@@ -69,6 +72,10 @@ export function SchedulesSection({
     .filter((s) => computeScheduleDisplayStatus(s) === "DUE")
     .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
 
+  const future = all
+    .filter((s) => computeScheduleDisplayStatus(s) === "FUTURE")
+    .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+
   const paid = all
     .filter((s) => s.status === "PAID")
     .sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime())
@@ -84,6 +91,7 @@ export function SchedulesSection({
   }[] = [
     { key: "OVERDUE", label: "In ritardo", items: overdue },
     { key: "DUE", label: "In scadenza", items: due },
+    { key: "FUTURE", label: "Prossime", items: future },
     { key: "PAID", label: "Pagate", items: paid },
     { key: "WAIVED", label: "Condonate", items: waived },
   ]
@@ -111,6 +119,7 @@ export function SchedulesSection({
             <div className="mb-4 flex flex-wrap gap-2">
               <Badge variant="destructive">{overdue.length} In ritardo</Badge>
               <Badge variant="outline">{due.length} In scadenza</Badge>
+              <Badge variant="outline">{future.length} Prossime</Badge>
               <Badge variant="secondary">{paid.length} Pagate</Badge>
               <Badge variant="outline">{waived.length} Condonate</Badge>
             </div>
@@ -195,11 +204,7 @@ function ScheduleRow({
   )
 }
 
-function StatusBadge({
-  status,
-}: {
-  status: "DUE" | "OVERDUE" | "PAID" | "WAIVED"
-}) {
+function StatusBadge({ status }: { status: ScheduleDisplayStatus }) {
   if (status === "OVERDUE") {
     return <Badge variant="destructive">In ritardo</Badge>
   }
@@ -212,6 +217,9 @@ function StatusBadge({
         In scadenza
       </Badge>
     )
+  }
+  if (status === "FUTURE") {
+    return <Badge variant="outline">Prossima</Badge>
   }
   if (status === "PAID") {
     return (

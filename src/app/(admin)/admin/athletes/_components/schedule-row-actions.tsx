@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { ScheduleStatus } from "@prisma/client"
 
+import type { ScheduleDisplayStatus } from "@/lib/utils/schedule-status"
 import type { AthleteWithFormRelations } from "../../payments/queries"
 import { ScheduleSettleDialog } from "./schedule-settle-dialog"
 import { ScheduleUnwaiveDialog } from "./schedule-unwaive-dialog"
@@ -27,7 +28,7 @@ interface ScheduleRowActionsProps {
   schedule: {
     id: string
     status: ScheduleStatus
-    displayStatus: ScheduleStatus
+    displayStatus: ScheduleDisplayStatus
     courseEnrollmentId: string
     courseName: string
     dueDate: Date
