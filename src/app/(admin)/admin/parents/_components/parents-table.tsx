@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import {
   Table,
   TableBody,
@@ -63,14 +65,19 @@ export function ParentsTable({ parents }: ParentsTableProps) {
           {parents.map((parent) => (
             <TableRow key={parent.id} className="hover:bg-muted/50">
               <TableCell>
-                <div className="flex flex-col">
-                  <span className="font-medium">
-                    {parent.lastName} {parent.firstName}
-                  </span>
-                  <span className="sm:hidden truncate max-w-[200px] text-xs text-muted-foreground">
-                    {parent.email || parent.phone || "—"}
-                  </span>
-                </div>
+                <Link
+                  href={`/admin/parents/${parent.id}`}
+                  className="block hover:underline"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {parent.lastName} {parent.firstName}
+                    </span>
+                    <span className="sm:hidden truncate max-w-[200px] text-xs text-muted-foreground">
+                      {parent.email || parent.phone || "—"}
+                    </span>
+                  </div>
+                </Link>
               </TableCell>
               <TableCell className="hidden sm:table-cell max-w-[200px] truncate">
                 {parent.email || "—"}
