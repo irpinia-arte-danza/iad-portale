@@ -23,6 +23,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { LogoutButton } from "@/components/auth/logout-button"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 type AdminSidebarProps = {
   firstName: string | null
@@ -92,8 +93,9 @@ export function AdminSidebar({
           <span className="truncate font-medium">{displayName}</span>
           <span className="truncate text-muted-foreground">{email}</span>
         </div>
-        <div className="px-2 py-1">
+        <div className="flex items-center justify-between gap-2 px-2 py-1">
           <LogoutButton />
+          <ThemeToggle />
         </div>
       </SidebarFooter>
     </Sidebar>
