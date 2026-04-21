@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   BookOpen,
+  FileSpreadsheet,
   GraduationCap,
   Home,
   Receipt,
@@ -40,6 +41,11 @@ const NAV_ITEMS = [
   { href: "/admin/courses", label: "Corsi", icon: BookOpen },
   { href: "/admin/payments", label: "Pagamenti", icon: Receipt },
   { href: "/admin/expenses", label: "Spese", icon: Wallet },
+  {
+    href: "/admin/reports/corrispettivi",
+    label: "Corrispettivi",
+    icon: FileSpreadsheet,
+  },
 ] as const
 
 export function AdminSidebar({
