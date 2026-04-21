@@ -8,6 +8,7 @@ import {
   getSpese,
 } from "@/app/(admin)/admin/reports/annuale/queries"
 import { BilancioPDF } from "@/lib/pdf/components/bilancio-pdf"
+import { prisma } from "@/lib/prisma"
 import { EXPENSE_TYPE_LABELS } from "@/lib/schemas/expense"
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { buildXlsxBuffer, type XlsxSheet } from "@/lib/utils/excel"
@@ -165,10 +166,14 @@ export async function generateAnnualBundle(
   const to = new Date(fiscalYear.endDate)
   to.setHours(23, 59, 59, 999)
 
-  const [corrispettivi, spese, bilancio] = await Promise.all([
+  const [corrispettivi, spese, bilancio, brand] = await Promise.all([
     getCorrispettivi({ from, to }),
     getSpese({ from, to }),
     getBilancio({ from, to }),
+    prisma.brandSettings.findUnique({
+      where: { id: 1 },
+      select: { logoUrl: true },
+    }),
   ])
 
   const corrispettiviBuffer = buildXlsxBuffer(
@@ -182,6 +187,7 @@ export async function generateAnnualBundle(
       periodFrom: from,
       periodTo: to,
       data: bilancio,
+      logoUrl: brand?.logoUrl ?? null,
     }),
   )
 

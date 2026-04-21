@@ -1,6 +1,9 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer"
 
-import type { AthleteForPDF } from "@/app/(admin)/admin/athletes/queries"
+import type {
+  AthleteForPDF,
+  BrandForPDF,
+} from "@/app/(admin)/admin/athletes/queries"
 import { relationshipOptions } from "@/lib/schemas/guardian"
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 
@@ -9,6 +12,7 @@ import { IADHeaderMark } from "./iad-header"
 
 type Props = {
   data: AthleteForPDF
+  brand?: BrandForPDF | null
 }
 
 function formatDateIt(date: Date | null | undefined): string {
@@ -67,10 +71,11 @@ function composeAddress(a: AthleteForPDF): string {
   return all || ""
 }
 
-export function AthleteCardPDF({ data }: Props) {
+export function AthleteCardPDF({ data, brand }: Props) {
   const generatedAt = new Date()
   const fullName = `${data.lastName} ${data.firstName}`
   const address = composeAddress(data)
+  const logoUrl = brand?.logoUrl ?? null
 
   const totalPaidCents = data.payments.reduce(
     (sum, p) => sum + p.amountCents,
@@ -103,7 +108,7 @@ export function AthleteCardPDF({ data }: Props) {
       <Page size="A4" style={pdfStyles.page}>
         {/* HEADER */}
         <View style={pdfStyles.headerRow}>
-          <IADHeaderMark />
+          <IADHeaderMark logoUrl={logoUrl} />
           <View>
             <Text style={pdfStyles.documentTitle}>Scheda Allieva</Text>
             <Text style={pdfStyles.documentMeta}>

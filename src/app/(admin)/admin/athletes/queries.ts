@@ -165,13 +165,37 @@ const athleteForPDF = Prisma.validator<Prisma.AthleteDefaultArgs>()({
 
 export type AthleteForPDF = Prisma.AthleteGetPayload<typeof athleteForPDF>
 
+export type BrandForPDF = {
+  logoUrl: string | null
+  logoSvgUrl: string | null
+  asdName: string | null
+}
+
+export type AthletePDFPayload = {
+  athlete: AthleteForPDF
+  brand: BrandForPDF | null
+}
+
 export async function getAthleteForPDF(
   id: string,
-): Promise<AthleteForPDF | null> {
+): Promise<AthletePDFPayload | null> {
   await requireAdmin()
 
-  return prisma.athlete.findUnique({
-    where: { id, deletedAt: null },
-    ...athleteForPDF,
-  })
+  const [athlete, brand] = await Promise.all([
+    prisma.athlete.findUnique({
+      where: { id, deletedAt: null },
+      ...athleteForPDF,
+    }),
+    prisma.brandSettings.findUnique({
+      where: { id: 1 },
+      select: {
+        logoUrl: true,
+        logoSvgUrl: true,
+        asdName: true,
+      },
+    }),
+  ])
+
+  if (!athlete) return null
+  return { athlete, brand }
 }

@@ -62,7 +62,12 @@ export default async function AthleteDetailPage({ params }: PageProps) {
         title={fullName}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            {athleteForPDF ? <AthletePDFButton data={athleteForPDF} /> : null}
+            {athleteForPDF ? (
+              <AthletePDFButton
+                data={athleteForPDF.athlete}
+                brand={athleteForPDF.brand}
+              />
+            ) : null}
             <AthleteDetailHeader athlete={athlete} />
           </div>
         }

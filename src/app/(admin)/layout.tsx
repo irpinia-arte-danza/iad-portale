@@ -25,16 +25,26 @@ export default async function AdminLayout({
     redirect("/login")
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: authUser.id },
-    select: {
-      firstName: true,
-      lastName: true,
-      email: true,
-      role: true,
-      isActive: true,
-    },
-  })
+  const [user, brand] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+        isActive: true,
+      },
+    }),
+    prisma.brandSettings.findUnique({
+      where: { id: 1 },
+      select: {
+        logoUrl: true,
+        logoDarkUrl: true,
+        asdName: true,
+      },
+    }),
+  ])
 
   if (!user || !user.isActive || user.role !== UserRole.ADMIN) {
     redirect("/login")
@@ -46,6 +56,11 @@ export default async function AdminLayout({
         firstName={user.firstName}
         lastName={user.lastName}
         email={user.email}
+        brand={{
+          logoUrl: brand?.logoUrl ?? null,
+          logoDarkUrl: brand?.logoDarkUrl ?? null,
+          asdName: brand?.asdName ?? null,
+        }}
       />
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">

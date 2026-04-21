@@ -16,6 +16,7 @@ type Props = {
   periodFrom: Date
   periodTo: Date
   data: BilancioResult
+  logoUrl?: string | null
 }
 
 function formatDateIt(date: Date): string {
@@ -106,7 +107,13 @@ function KpiBox({
   )
 }
 
-export function BilancioPDF({ year, periodFrom, periodTo, data }: Props) {
+export function BilancioPDF({
+  year,
+  periodFrom,
+  periodTo,
+  data,
+  logoUrl,
+}: Props) {
   const generatedAt = new Date()
   const { totals, entrateByType, usciteByType } = data
 
@@ -119,7 +126,7 @@ export function BilancioPDF({ year, periodFrom, periodTo, data }: Props) {
       <Page size="A4" style={pdfStyles.page}>
         {/* HEADER */}
         <View style={pdfStyles.headerRow}>
-          <IADHeaderMark />
+          <IADHeaderMark logoUrl={logoUrl} />
           <View>
             <Text style={pdfStyles.documentTitle}>
               Bilancio annuale {year}

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "@react-pdf/renderer"
+import { Image, StyleSheet, Text, View } from "@react-pdf/renderer"
 
 import { pdfColors } from "../styles"
 
@@ -27,9 +27,26 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: "uppercase",
   },
+  logoImage: {
+    width: 90,
+    height: 36,
+    objectFit: "contain",
+  },
 })
 
-export function IADHeaderMark() {
+type IADHeaderMarkProps = {
+  logoUrl?: string | null
+}
+
+export function IADHeaderMark({ logoUrl }: IADHeaderMarkProps = {}) {
+  if (logoUrl) {
+    return (
+      <View style={styles.wrapper}>
+        <Image src={logoUrl} style={styles.logoImage} />
+      </View>
+    )
+  }
+
   return (
     <View style={styles.wrapper}>
       <View style={styles.logoBox}>

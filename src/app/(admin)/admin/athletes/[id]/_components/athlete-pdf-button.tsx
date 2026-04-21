@@ -5,7 +5,10 @@ import { FileDown, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { AthleteCardPDF } from "@/lib/pdf/components/athlete-card"
-import type { AthleteForPDF } from "@/app/(admin)/admin/athletes/queries"
+import type {
+  AthleteForPDF,
+  BrandForPDF,
+} from "@/app/(admin)/admin/athletes/queries"
 
 const PDFDownloadLink = dynamic(
   () =>
@@ -39,12 +42,13 @@ function buildFilename(data: AthleteForPDF): string {
 
 interface AthletePDFButtonProps {
   data: AthleteForPDF
+  brand: BrandForPDF | null
 }
 
-export function AthletePDFButton({ data }: AthletePDFButtonProps) {
+export function AthletePDFButton({ data, brand }: AthletePDFButtonProps) {
   return (
     <PDFDownloadLink
-      document={<AthleteCardPDF data={data} />}
+      document={<AthleteCardPDF data={data} brand={brand} />}
       fileName={buildFilename(data)}
     >
       {({ loading, error }) => (
