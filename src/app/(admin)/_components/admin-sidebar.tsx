@@ -8,6 +8,7 @@ import {
   GraduationCap,
   Home,
   Receipt,
+  TrendingUp,
   UserCog,
   Users,
   Wallet,
@@ -45,6 +46,11 @@ const NAV_ITEMS = [
     href: "/admin/reports/corrispettivi",
     label: "Corrispettivi",
     icon: FileSpreadsheet,
+  },
+  {
+    href: "/admin/reports/bilancio",
+    label: "Bilancio",
+    icon: TrendingUp,
   },
 ] as const
 

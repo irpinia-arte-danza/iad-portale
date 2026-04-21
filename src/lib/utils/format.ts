@@ -22,6 +22,22 @@ const DATE_ISO = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 })
 
+const MONTH_ISO = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric",
+  month: "2-digit",
+})
+
+const MONTH_LABEL_IT = new Intl.DateTimeFormat("it-IT", {
+  month: "short",
+  year: "2-digit",
+})
+
+const PERCENT_IT = new Intl.NumberFormat("it-IT", {
+  style: "percent",
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+})
+
 export function formatEur(cents: number): string {
   return CURRENCY_IT.format(cents / 100)
 }
@@ -60,4 +76,16 @@ export function endOfDay(date: Date): Date {
 
 export function dayKey(date: Date): string {
   return DATE_ISO.format(date)
+}
+
+export function monthKey(date: Date): string {
+  return MONTH_ISO.format(date)
+}
+
+export function monthLabel(date: Date): string {
+  return MONTH_LABEL_IT.format(date)
+}
+
+export function formatPercent(value: number): string {
+  return PERCENT_IT.format(value)
 }
