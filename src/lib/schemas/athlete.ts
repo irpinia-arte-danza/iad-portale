@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { Gender } from "@prisma/client"
 
-import { fiscalCodeSchema, nonEmptyStringSchema } from "./common"
+import { endOfToday, fiscalCodeSchema, nonEmptyStringSchema } from "./common"
 
 export const genderOptions = [
   { value: Gender.F, label: "Femmina" },
@@ -14,7 +14,9 @@ export const athleteCreateSchema = z.object({
   lastName: nonEmptyStringSchema("Cognome"),
   dateOfBirth: z
     .date({ message: "Data di nascita obbligatoria" })
-    .max(new Date(), { message: "La data di nascita non può essere nel futuro" }),
+    .max(endOfToday(), {
+      message: "La data di nascita non può essere nel futuro",
+    }),
   gender: z.enum(Gender),
 
   fiscalCode: fiscalCodeSchema,

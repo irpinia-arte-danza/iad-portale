@@ -47,3 +47,11 @@ export const nonEmptyStringSchema = (fieldLabel: string) =>
 export type ActionResult<T = void> =
   | { ok: true; data?: T }
   | { ok: false; error: string }
+
+// Upper bound per Zod .max() su date da <Input type="date"> — evita il
+// border bug in cui il midnight UTC del picker viene rigettato come futuro.
+export function endOfToday(): Date {
+  const d = new Date()
+  d.setHours(23, 59, 59, 999)
+  return d
+}

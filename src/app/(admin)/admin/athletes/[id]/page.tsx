@@ -1,9 +1,12 @@
 import { notFound } from "next/navigation"
 
+import { prisma } from "@/lib/prisma"
+
 import { ResourceContent } from "../../_components/resource-content"
 import { ResourceHeader } from "../../_components/resource-header"
 import { AthleteAnagraficaDisplay } from "../_components/athlete-anagrafica-display"
 import { AthleteDetailHeader } from "../_components/athlete-detail-header"
+import { EnrollmentsSection } from "../_components/enrollments-section"
 import { GuardianListSection } from "../_components/guardian-list-section"
 import { getAthleteById } from "../queries"
 
@@ -13,7 +16,24 @@ interface PageProps {
 
 export default async function AthleteDetailPage({ params }: PageProps) {
   const resolvedParams = await params
-  const athlete = await getAthleteById(resolvedParams.id)
+
+  const [athlete, activeCourses, currentAcademicYear] = await Promise.all([
+    getAthleteById(resolvedParams.id),
+    prisma.course.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        monthlyFeeCents: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.academicYear.findFirst({
+      where: { isCurrent: true },
+      select: { id: true, label: true },
+    }),
+  ])
 
   if (!athlete) {
     notFound()
@@ -37,6 +57,13 @@ export default async function AthleteDetailPage({ params }: PageProps) {
           <GuardianListSection
             athleteId={athlete.id}
             parentRelations={athlete.parentRelations}
+          />
+          <EnrollmentsSection
+            athleteId={athlete.id}
+            athleteFirstName={athlete.firstName}
+            enrollments={athlete.enrollments}
+            activeCourses={activeCourses}
+            currentAcademicYearLabel={currentAcademicYear?.label ?? null}
           />
         </div>
       </ResourceContent>

@@ -1,6 +1,7 @@
 import { z } from "zod"
 import {
   emailOptionalSchema,
+  endOfToday,
   phoneSchema,
   fiscalCodeSchema,
   nonEmptyStringSchema,
@@ -26,7 +27,7 @@ export const parentCreateSchema = z.object({
 
   dateOfBirth: z
     .date()
-    .max(new Date(), {
+    .max(endOfToday(), {
       message: "La data di nascita non può essere nel futuro",
     })
     .optional(),

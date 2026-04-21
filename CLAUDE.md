@@ -687,6 +687,16 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
     ```
     Scoperto: Sprint 2.A.2, 21 aprile 2026, durante creazione `courseCreateSchema` per `COURSE_TYPES`.
 
+    **17.18 Zod `z.date().max()` + HTML date picker → timezone border bug**: un form con `<Input type="date">` il cui `onChange` fa `new Date(e.target.value)` produce un `Date` a **midnight UTC** (il browser interpreta `"YYYY-MM-DD"` come ISO date → UTC). Uno schema `z.date().max(new Date(), { message: "non può essere nel futuro" })` confronta quel midnight UTC con `new Date()` (now locale). In TZ Europe/Rome (UTC+1/+2), now locale > midnight UTC di **oggi** → il check `.max()` passa. MA se l'utente è in TZ negative o a cavallo DST, o semplicemente la differenza è minima, il confronto può rigettare "oggi" come futuro. Anche senza quello, selezionare la data di **oggi** produce spesso falsi positivi quando Prisma/Node processa la conversione. Fix: helper `endOfToday()` in `src/lib/schemas/common.ts`:
+    ```ts
+    export function endOfToday(): Date {
+      const d = new Date()
+      d.setHours(23, 59, 59, 999)
+      return d
+    }
+    ```
+    Poi usa `z.date().max(endOfToday(), { message: "..." })` in tutti gli schemi che validano date da HTML picker (`enrollmentDate`, `withdrawalDate`, `dateOfBirth`). L'upper bound diventa la fine della giornata locale → oggi passa sempre, domani no. Scoperto: Sprint 2.B, 21 aprile 2026, su `enrollmentDate` field in `EnrollCourseDialog`.
+
 ---
 
 ## 📚 Documenti di riferimento
@@ -703,4 +713,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-21 · Versione 2.8 — Aggiunto gotcha 17.17 (Zod v4 z.enum errorMap → message API change), scoperto durante Sprint 2.A.2 Course CRUD_
+_Ultimo aggiornamento: 2026-04-21 · Versione 2.9 — Aggiunto gotcha 17.18 (Zod z.date().max timezone border bug + endOfToday helper), scoperto durante Sprint 2.B Enrollment CRUD_

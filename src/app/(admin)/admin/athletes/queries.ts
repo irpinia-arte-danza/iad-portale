@@ -60,6 +60,27 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
         { isPrimaryPayer: "desc" },
       ],
     },
+    enrollments: {
+      include: {
+        course: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            monthlyFeeCents: true,
+            isActive: true,
+          },
+        },
+        academicYear: {
+          select: {
+            id: true,
+            label: true,
+            isCurrent: true,
+          },
+        },
+      },
+      orderBy: [{ enrollmentDate: "desc" }],
+    },
   },
 })
 
@@ -69,6 +90,9 @@ export type AthleteWithRelations = Prisma.AthleteGetPayload<
 
 export type AthleteParentRelation =
   AthleteWithRelations["parentRelations"][number]
+
+export type AthleteEnrollment =
+  AthleteWithRelations["enrollments"][number]
 
 export async function getAthleteById(
   id: string,

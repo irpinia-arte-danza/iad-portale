@@ -380,6 +380,8 @@ model CourseEnrollment {
   enrollmentDate DateTime  @default(now()) @map("enrollment_date") @db.Date
   withdrawalDate DateTime? @map("withdrawal_date") @db.Date
 
+  notes String?
+
   athlete      Athlete      @relation(fields: [athleteId], references: [id])
   course       Course       @relation(fields: [courseId], references: [id])
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
