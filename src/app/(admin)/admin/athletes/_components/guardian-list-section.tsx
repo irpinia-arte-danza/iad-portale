@@ -10,30 +10,15 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
+import type { AthleteParentRelation } from "../queries"
 import { GuardianPickerDialog } from "./guardian-picker-dialog"
 import { GuardianRowActions } from "./guardian-row-actions"
 
-type Relationship = "MOTHER" | "FATHER" | "GRANDPARENT" | "TUTOR" | "OTHER"
-
-type ParentRelation = {
-  id: string
-  relationship: Relationship
-  isPrimaryContact: boolean
-  isPrimaryPayer: boolean
-  isPickupAuthorized: boolean
-  hasParentalAuthority: boolean
-  parent: {
-    id: string
-    firstName: string
-    lastName: string
-    email: string | null
-    phone: string | null
-  }
-}
+type Relationship = AthleteParentRelation["relationship"]
 
 interface GuardianListSectionProps {
   athleteId: string
-  parentRelations: ParentRelation[]
+  parentRelations: AthleteParentRelation[]
 }
 
 const RELATIONSHIP_LABELS: Record<Relationship, string> = {

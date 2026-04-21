@@ -20,24 +20,14 @@ import {
   guardianRelationSchema,
   type GuardianRelationValues,
 } from "@/lib/schemas/guardian"
+import type { AthleteParentRelation } from "../queries"
 import { updateGuardianRelation } from "../guardians-actions"
 import { GuardianRelationFields } from "./guardian-relation-fields"
 
 interface GuardianEditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  athleteParent: {
-    id: string
-    relationship: "MOTHER" | "FATHER" | "GRANDPARENT" | "TUTOR" | "OTHER"
-    isPrimaryContact: boolean
-    isPrimaryPayer: boolean
-    isPickupAuthorized: boolean
-    hasParentalAuthority: boolean
-    parent: {
-      firstName: string
-      lastName: string
-    }
-  }
+  athleteParent: AthleteParentRelation
   onSuccess?: () => void
 }
 

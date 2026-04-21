@@ -24,26 +24,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
+import type { AthleteParentRelation } from "../queries"
 import { unlinkGuardian } from "../guardians-actions"
 import { GuardianEditDialog } from "./guardian-edit-dialog"
 
 interface GuardianRowActionsProps {
-  athleteParent: {
-    id: string
-    relationship: "MOTHER" | "FATHER" | "GRANDPARENT" | "TUTOR" | "OTHER"
-    isPrimaryContact: boolean
-    isPrimaryPayer: boolean
-    isPickupAuthorized: boolean
-    hasParentalAuthority: boolean
-    parent: {
-      firstName: string
-      lastName: string
-    }
-  }
+  athleteParent: AthleteParentRelation
 }
 
 const RELATIONSHIP_LABELS: Record<
-  GuardianRowActionsProps["athleteParent"]["relationship"],
+  AthleteParentRelation["relationship"],
   string
 > = {
   MOTHER: "Madre",

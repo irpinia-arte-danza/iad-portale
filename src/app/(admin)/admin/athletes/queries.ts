@@ -67,6 +67,9 @@ export type AthleteWithRelations = Prisma.AthleteGetPayload<
   typeof athleteWithRelations
 >
 
+export type AthleteParentRelation =
+  AthleteWithRelations["parentRelations"][number]
+
 export async function getAthleteById(
   id: string,
 ): Promise<AthleteWithRelations | null> {
