@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import {
   Table,
   TableBody,
@@ -55,14 +57,19 @@ export function TeachersTable({ teachers }: TeachersTableProps) {
           {teachers.map((teacher) => (
             <TableRow key={teacher.id} className="hover:bg-muted/50">
               <TableCell>
-                <div className="flex flex-col">
-                  <span className="font-medium">
-                    {teacher.lastName} {teacher.firstName}
-                  </span>
-                  <span className="sm:hidden truncate max-w-[200px] text-xs text-muted-foreground">
-                    {teacher.email || teacher.phone || "—"}
-                  </span>
-                </div>
+                <Link
+                  href={`/admin/teachers/${teacher.id}`}
+                  className="block hover:underline"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {teacher.lastName} {teacher.firstName}
+                    </span>
+                    <span className="sm:hidden truncate max-w-[200px] text-xs text-muted-foreground">
+                      {teacher.email || teacher.phone || "—"}
+                    </span>
+                  </div>
+                </Link>
               </TableCell>
               <TableCell className="hidden sm:table-cell max-w-[200px] truncate">
                 {teacher.email || "—"}

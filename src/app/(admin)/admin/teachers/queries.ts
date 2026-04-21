@@ -47,15 +47,32 @@ export async function listTeachers(filters: ListFilters = {}) {
   return { items, totalCount }
 }
 
-export async function getTeacherById(id: string) {
+const teacherWithRelations = Prisma.validator<Prisma.TeacherDefaultArgs>()({
+  include: {
+    courses: {
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        isActive: true,
+        _count: { select: { enrollments: true } },
+      },
+      orderBy: [{ isActive: "desc" }, { name: "asc" }],
+    },
+  },
+})
+
+export type TeacherWithRelations = Prisma.TeacherGetPayload<
+  typeof teacherWithRelations
+>
+
+export async function getTeacherById(
+  id: string,
+): Promise<TeacherWithRelations | null> {
   await requireAdmin()
 
   return prisma.teacher.findUnique({
     where: { id, deletedAt: null },
-    include: {
-      _count: {
-        select: { courses: true },
-      },
-    },
+    ...teacherWithRelations,
   })
 }
