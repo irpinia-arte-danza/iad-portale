@@ -9,6 +9,7 @@ import {
   Receipt,
   UserCog,
   Users,
+  Wallet,
 } from "lucide-react"
 
 import {
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
   { href: "/admin/teachers", label: "Insegnanti", icon: UserCog },
   { href: "/admin/courses", label: "Corsi", icon: BookOpen },
   { href: "/admin/payments", label: "Pagamenti", icon: Receipt },
+  { href: "/admin/expenses", label: "Spese", icon: Wallet },
 ] as const
 
 export function AdminSidebar({
