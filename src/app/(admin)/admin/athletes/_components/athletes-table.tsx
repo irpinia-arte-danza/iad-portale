@@ -1,9 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { MoreHorizontal } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -15,13 +13,24 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { computeAge } from "@/lib/utils/date-helpers"
 
+import { AthleteRowActions } from "./athlete-row-actions"
+
 type AthleteRow = {
   id: string
   firstName: string
   lastName: string
-  dateOfBirth: Date | null
+  dateOfBirth: Date
   gender: "F" | "M" | "OTHER"
   status: "TRIAL" | "ACTIVE" | "SUSPENDED" | "WITHDRAWN"
+  fiscalCode: string | null
+  placeOfBirth: string | null
+  provinceOfBirth: string | null
+  residenceStreet: string | null
+  residenceNumber: string | null
+  residenceCity: string | null
+  residenceProvince: string | null
+  residenceCap: string | null
+  instructorNotes: string | null
   _count: { parentRelations: number }
 }
 
@@ -106,14 +115,24 @@ export function AthletesTable({ athletes }: AthletesTableProps) {
                 {athlete._count.parentRelations}
               </TableCell>
               <TableCell>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled
-                  aria-label="Azioni"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <AthleteRowActions
+                  athlete={{
+                    id: athlete.id,
+                    firstName: athlete.firstName,
+                    lastName: athlete.lastName,
+                    dateOfBirth: athlete.dateOfBirth,
+                    gender: athlete.gender,
+                    fiscalCode: athlete.fiscalCode,
+                    placeOfBirth: athlete.placeOfBirth,
+                    provinceOfBirth: athlete.provinceOfBirth,
+                    residenceStreet: athlete.residenceStreet,
+                    residenceNumber: athlete.residenceNumber,
+                    residenceCity: athlete.residenceCity,
+                    residenceProvince: athlete.residenceProvince,
+                    residenceCap: athlete.residenceCap,
+                    instructorNotes: athlete.instructorNotes,
+                  }}
+                />
               </TableCell>
             </TableRow>
             )
