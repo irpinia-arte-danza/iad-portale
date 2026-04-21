@@ -24,7 +24,7 @@ const PAYMENT_METHOD_VALUES = [
 ] as const satisfies ReadonlyArray<PaymentMethod>
 
 export const FEE_TYPE_LABELS: Record<FeeType, string> = {
-  ASSOCIATION: "Quota associativa",
+  ASSOCIATION: "Quota iscrizione",
   MONTHLY: "Quota mensile",
   TRIMESTER: "Quota trimestrale",
   STAGE: "Stage",
