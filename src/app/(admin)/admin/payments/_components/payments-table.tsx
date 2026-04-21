@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/lib/schemas/payment"
 
 import type { PaymentListItem } from "../queries"
+import { PaymentDetailSheet } from "./payment-detail-sheet"
 import { PaymentRowActions } from "./payment-row-actions"
 
 interface PaymentsTableProps {
@@ -56,6 +58,16 @@ function formatPeriod(
 }
 
 export function PaymentsTable({ payments }: PaymentsTableProps) {
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(
+    null,
+  )
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  function openDetailSheet(id: string) {
+    setSelectedPaymentId(id)
+    setSheetOpen(true)
+  }
+
   if (payments.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center">
@@ -68,8 +80,9 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
   }
 
   return (
-    <div className="rounded-md border">
-      <Table>
+    <>
+      <div className="rounded-md border">
+        <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Data</TableHead>
@@ -86,7 +99,11 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
           {payments.map((p) => {
             const period = formatPeriod(p.periodStart, p.periodEnd)
             return (
-              <TableRow key={p.id} className="hover:bg-muted/50">
+              <TableRow
+                key={p.id}
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => openDetailSheet(p.id)}
+              >
                 <TableCell className="font-mono text-xs">
                   {DATE_SHORT.format(p.paymentDate)}
                 </TableCell>
@@ -94,6 +111,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
                   <Link
                     href={`/admin/athletes/${p.athlete.id}`}
                     className="font-medium hover:underline"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     {p.athlete.lastName} {p.athlete.firstName}
                   </Link>
@@ -121,7 +139,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
                     <Badge variant="destructive">Stornato</Badge>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <PaymentRowActions
                     payment={{
                       id: p.id,
@@ -136,6 +154,13 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
           })}
         </TableBody>
       </Table>
-    </div>
+      </div>
+
+      <PaymentDetailSheet
+        paymentId={selectedPaymentId}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+      />
+    </>
   )
 }

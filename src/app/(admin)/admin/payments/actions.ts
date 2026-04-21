@@ -17,6 +17,8 @@ import {
   type PaymentUpdateValues,
 } from "@/lib/schemas/payment"
 
+import { getPaymentById, type PaymentWithRelations } from "./queries"
+
 function mapPrismaError(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") return "Pagamento duplicato"
@@ -43,6 +45,25 @@ function monthBoundsUTC(date: Date): { start: Date; nextStart: Date } {
   return {
     start: new Date(Date.UTC(y, m, 1)),
     nextStart: new Date(Date.UTC(y, m + 1, 1)),
+  }
+}
+
+export async function getPaymentDetail(
+  id: string,
+): Promise<ActionResult<{ payment: PaymentWithRelations }>> {
+  const idParsed = uuidSchema.safeParse(id)
+  if (!idParsed.success) {
+    return { ok: false, error: "Identificativo non valido" }
+  }
+
+  try {
+    const payment = await getPaymentById(idParsed.data)
+    if (!payment) {
+      return { ok: false, error: "Pagamento non trovato" }
+    }
+    return { ok: true, data: { payment } }
+  } catch (error) {
+    return { ok: false, error: mapPrismaError(error) }
   }
 }
 
