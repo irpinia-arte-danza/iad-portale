@@ -95,7 +95,7 @@ export function AthletesTable({ athletes }: AthletesTableProps) {
                 </Link>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                {age ?? "—"}
+                {age !== null ? age : "—"}
               </TableCell>
               <TableCell className="hidden md:table-cell">
                 <Badge variant={STATUS_VARIANTS[athlete.status]}>

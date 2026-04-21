@@ -2,8 +2,10 @@ export function computeAge(
   dateOfBirth: Date | null | undefined,
 ): number | null {
   if (!dateOfBirth) return null
-  const today = new Date()
   const birth = new Date(dateOfBirth)
+  if (Number.isNaN(birth.getTime())) return null
+
+  const today = new Date()
   let age = today.getFullYear() - birth.getFullYear()
   const monthDiff = today.getMonth() - birth.getMonth()
   if (
@@ -12,5 +14,6 @@ export function computeAge(
   ) {
     age--
   }
+  if (age < 0) return null
   return age
 }
