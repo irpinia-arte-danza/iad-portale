@@ -13,12 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { computeAge } from "@/lib/utils/date-helpers"
 
 type AthleteRow = {
   id: string
   firstName: string
   lastName: string
-  dateOfBirth: Date
+  dateOfBirth: Date | null
   gender: "F" | "M" | "OTHER"
   status: "TRIAL" | "ACTIVE" | "SUSPENDED" | "WITHDRAWN"
   _count: { parentRelations: number }
@@ -43,17 +44,6 @@ const STATUS_VARIANTS: Record<
   ACTIVE: "default",
   SUSPENDED: "outline",
   WITHDRAWN: "destructive",
-}
-
-function calculateAge(dateOfBirth: Date): number {
-  const today = new Date()
-  const birth = new Date(dateOfBirth)
-  let age = today.getFullYear() - birth.getFullYear()
-  const monthDiff = today.getMonth() - birth.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--
-  }
-  return age
 }
 
 export function AthletesTable({ athletes }: AthletesTableProps) {
@@ -81,7 +71,9 @@ export function AthletesTable({ athletes }: AthletesTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {athletes.map((athlete) => (
+          {athletes.map((athlete) => {
+            const age = computeAge(athlete.dateOfBirth)
+            return (
             <TableRow
               key={athlete.id}
               className="cursor-pointer hover:bg-muted/50"
@@ -96,14 +88,14 @@ export function AthletesTable({ athletes }: AthletesTableProps) {
                       {athlete.lastName} {athlete.firstName}
                     </span>
                     <span className="sm:hidden text-xs text-muted-foreground">
-                      {calculateAge(athlete.dateOfBirth)} anni ·{" "}
+                      {age !== null ? `${age} anni` : "—"} ·{" "}
                       {STATUS_LABELS[athlete.status]}
                     </span>
                   </div>
                 </Link>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                {calculateAge(athlete.dateOfBirth)}
+                {age ?? "—"}
               </TableCell>
               <TableCell className="hidden md:table-cell">
                 <Badge variant={STATUS_VARIANTS[athlete.status]}>
@@ -124,7 +116,8 @@ export function AthletesTable({ athletes }: AthletesTableProps) {
                 </Button>
               </TableCell>
             </TableRow>
-          ))}
+            )
+          })}
         </TableBody>
       </Table>
     </div>

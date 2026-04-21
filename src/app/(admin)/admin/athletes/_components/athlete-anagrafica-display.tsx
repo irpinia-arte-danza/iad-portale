@@ -8,12 +8,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { computeAge } from "@/lib/utils/date-helpers"
 
 interface AthleteAnagraficaDisplayProps {
   athlete: {
     firstName: string
     lastName: string
-    dateOfBirth: Date
+    dateOfBirth: Date | null
     gender: "F" | "M" | "OTHER"
     status: "TRIAL" | "ACTIVE" | "SUSPENDED" | "WITHDRAWN"
     fiscalCode: string | null
@@ -57,17 +58,6 @@ const STATUS_VARIANTS: Record<
   WITHDRAWN: "destructive",
 }
 
-function calculateAge(dateOfBirth: Date): number {
-  const today = new Date()
-  const birth = new Date(dateOfBirth)
-  let age = today.getFullYear() - birth.getFullYear()
-  const monthDiff = today.getMonth() - birth.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--
-  }
-  return age
-}
-
 function formatDate(date: Date): string {
   return new Date(date).toLocaleDateString("it-IT", {
     day: "2-digit",
@@ -79,7 +69,7 @@ function formatDate(date: Date): string {
 export function AthleteAnagraficaDisplay({
   athlete,
 }: AthleteAnagraficaDisplayProps) {
-  const age = calculateAge(athlete.dateOfBirth)
+  const age = computeAge(athlete.dateOfBirth)
   const hasAnagraficaCompleta = !!(
     athlete.fiscalCode ||
     athlete.placeOfBirth ||
@@ -114,8 +104,11 @@ export function AthleteAnagraficaDisplay({
           <div>
             <CardTitle>Anagrafica</CardTitle>
             <CardDescription>
-              {age} anni · {GENDER_LABELS[athlete.gender]} · Nata il{" "}
-              {formatDate(athlete.dateOfBirth)}
+              {age !== null ? `${age} anni` : "—"} ·{" "}
+              {GENDER_LABELS[athlete.gender]}
+              {athlete.dateOfBirth
+                ? ` · Nata il ${formatDate(athlete.dateOfBirth)}`
+                : ""}
             </CardDescription>
           </div>
           <Badge variant={STATUS_VARIANTS[athlete.status]}>
