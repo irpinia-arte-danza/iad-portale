@@ -3,8 +3,11 @@ import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
 
+export type CourseStatusFilter = "active" | "archived" | "all"
+
 type ListFilters = {
   search?: string
+  status?: CourseStatusFilter
   limit?: number
   offset?: number
 }
@@ -14,9 +17,19 @@ const DEFAULT_LIMIT = 50
 export async function listCourses(filters: ListFilters = {}) {
   await requireAdmin()
 
-  const { search, limit = DEFAULT_LIMIT, offset = 0 } = filters
+  const {
+    search,
+    status = "active",
+    limit = DEFAULT_LIMIT,
+    offset = 0,
+  } = filters
 
   const where: Prisma.CourseWhereInput = {
+    ...(status === "active"
+      ? { isActive: true }
+      : status === "archived"
+        ? { isActive: false }
+        : {}),
     ...(search && search.trim().length > 0
       ? {
           OR: [
@@ -62,6 +75,15 @@ export async function getCourseById(id: string) {
       },
     },
   })
+}
+
+export async function getCourseStatusCounts() {
+  await requireAdmin()
+  const [active, archived] = await Promise.all([
+    prisma.course.count({ where: { isActive: true } }),
+    prisma.course.count({ where: { isActive: false } }),
+  ])
+  return { active, archived, all: active + archived }
 }
 
 export async function listActiveTeachers() {

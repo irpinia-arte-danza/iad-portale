@@ -88,7 +88,14 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
         </TableHeader>
         <TableBody>
           {courses.map((course) => (
-            <TableRow key={course.id} className="hover:bg-muted/50">
+            <TableRow
+              key={course.id}
+              className={
+                course.isActive
+                  ? "hover:bg-muted/50"
+                  : "opacity-60 hover:bg-muted/50"
+              }
+            >
               <TableCell>
                 <div className="flex flex-col">
                   <span className="font-medium">{course.name}</span>
