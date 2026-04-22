@@ -12,6 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
+import { EmailLogTable } from "../../_components/email-log/table"
+import { getParentEmailLog } from "../../_components/email-log/queries"
 import { ResourceContent } from "../../_components/resource-content"
 import { ResourceHeader } from "../../_components/resource-header"
 import { ParentAnagraficaDisplay } from "../_components/parent-anagrafica-display"
@@ -49,7 +51,10 @@ interface PageProps {
 
 export default async function ParentDetailPage({ params }: PageProps) {
   const resolvedParams = await params
-  const parent = await getParentById(resolvedParams.id)
+  const [parent, emailLog] = await Promise.all([
+    getParentById(resolvedParams.id),
+    getParentEmailLog(resolvedParams.id),
+  ])
 
   if (!parent) {
     notFound()
@@ -137,9 +142,7 @@ export default async function ParentDetailPage({ params }: PageProps) {
         <Card>
           <CardHeader>
             <CardTitle>Riepilogo pagamenti</CardTitle>
-            <CardDescription>
-              Disponibile dopo Sprint 3 (Email + reminder)
-            </CardDescription>
+            <CardDescription>In arrivo nei prossimi sprint.</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -148,6 +151,12 @@ export default async function ParentDetailPage({ params }: PageProps) {
             </p>
           </CardContent>
         </Card>
+
+        <EmailLogTable
+          title="Storico email"
+          description="Tutte le email inviate a questo genitore, in ordine cronologico."
+          logs={emailLog}
+        />
       </ResourceContent>
     </>
   )

@@ -2,6 +2,8 @@ import { notFound } from "next/navigation"
 
 import { prisma } from "@/lib/prisma"
 
+import { EmailLogTable } from "../../_components/email-log/table"
+import { getAthleteEmailLog } from "../../_components/email-log/queries"
 import { ResourceContent } from "../../_components/resource-content"
 import { ResourceHeader } from "../../_components/resource-header"
 import { listAthletesWithRelations } from "../../payments/queries"
@@ -26,6 +28,7 @@ export default async function AthleteDetailPage({ params }: PageProps) {
     activeCourses,
     currentAcademicYear,
     athletesForPaymentForm,
+    emailLog,
   ] = await Promise.all([
     getAthleteById(resolvedParams.id),
     getAthleteForPDF(resolvedParams.id),
@@ -44,6 +47,7 @@ export default async function AthleteDetailPage({ params }: PageProps) {
       select: { id: true, label: true },
     }),
     listAthletesWithRelations(),
+    getAthleteEmailLog(resolvedParams.id),
   ])
 
   if (!athlete) {
@@ -92,6 +96,11 @@ export default async function AthleteDetailPage({ params }: PageProps) {
             athleteLastName={athlete.lastName}
             enrollments={athlete.enrollments}
             athletesForPaymentForm={athletesForPaymentForm}
+          />
+          <EmailLogTable
+            title="Storico email"
+            description="Tutte le email inviate relative a questa allieva, in ordine cronologico."
+            logs={emailLog}
           />
         </div>
       </ResourceContent>
