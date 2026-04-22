@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache"
 
-import { EmailCategory, EmailStatus, ScheduleStatus } from "@prisma/client"
+import {
+  EmailCategory,
+  EmailStatus,
+  EmailTrigger,
+  ScheduleStatus,
+} from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
@@ -448,6 +453,8 @@ export async function sendReminderBatch(
         status: ok ? EmailStatus.SENT : EmailStatus.FAILED,
         providerId: ok ? outcome.providerId : null,
         errorMessage: ok ? null : outcome?.error ?? "Errore invio",
+        triggeredBy: EmailTrigger.ADMIN_MANUAL,
+        milestoneKey: null,
       }
     })
 

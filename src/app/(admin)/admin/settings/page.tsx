@@ -17,17 +17,24 @@ import {
   getSettingsAuditLog,
   getUserProfile,
 } from "./queries"
+import {
+  getReminderConfig,
+  previewCronReminders,
+} from "./reminder-actions"
 
 export default async function SettingsPage() {
   const { userId } = await requireAdmin()
 
-  const [brand, receipt, profile, admins, auditRows] = await Promise.all([
-    getBrandSettings(),
-    getReceiptSettings(),
-    getUserProfile(userId),
-    getAdminUsers(),
-    getSettingsAuditLog(50),
-  ])
+  const [brand, receipt, profile, admins, auditRows, reminder, reminderPreview] =
+    await Promise.all([
+      getBrandSettings(),
+      getReceiptSettings(),
+      getUserProfile(userId),
+      getAdminUsers(),
+      getSettingsAuditLog(50),
+      getReminderConfig(),
+      previewCronReminders(),
+    ])
 
   const initialAssociation: AssociationValues = {
     asdName: brand.asdName,
@@ -99,6 +106,8 @@ export default async function SettingsPage() {
           initialAssociation={initialAssociation}
           initialBrand={initialBrand}
           initialRicevute={initialRicevute}
+          initialReminder={reminder}
+          initialReminderPreview={reminderPreview}
           initialProfile={initialProfile}
           admins={admins}
           auditRows={auditRows}

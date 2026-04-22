@@ -8,14 +8,17 @@ import type {
   ProfileValues,
   RicevuteValues,
 } from "@/lib/schemas/admin-settings"
+import type { ReminderConfigValues } from "@/lib/schemas/reminder-config"
 
 import type { AuditLogRow } from "../queries"
+import type { CronPreview } from "../reminder-actions"
 
 import { AccountTab } from "./account-tab"
 import { AdminTab } from "./admin-tab"
 import { AssociationTab } from "./association-tab"
 import { BrandTab } from "./brand-tab"
 import { DirtyGuardDialog } from "./dirty-guard-dialog"
+import { ReminderTab } from "./reminder-tab"
 import { RicevuteTab } from "./ricevute-tab"
 import {
   SettingsNav,
@@ -35,6 +38,8 @@ interface SettingsShellProps {
     }
   }
   initialRicevute: RicevuteValues
+  initialReminder: ReminderConfigValues
+  initialReminderPreview: CronPreview
   initialProfile: ProfileValues
   admins: {
     id: string
@@ -105,6 +110,15 @@ export function SettingsShell(props: SettingsShellProps) {
           <RicevuteTab
             key="ricevute"
             initial={props.initialRicevute}
+            onDirtyChange={onDirtyChange}
+          />
+        ) : null}
+
+        {active === "reminder" ? (
+          <ReminderTab
+            key="reminder"
+            initial={props.initialReminder}
+            initialPreview={props.initialReminderPreview}
             onDirtyChange={onDirtyChange}
           />
         ) : null}

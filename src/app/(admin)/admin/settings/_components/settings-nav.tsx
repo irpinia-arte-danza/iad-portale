@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  BellRing,
   Building2,
   FileText,
   Palette,
@@ -22,6 +23,7 @@ export type SettingsTabKey =
   | "associazione"
   | "brand"
   | "ricevute"
+  | "reminder"
   | "admin"
 
 export const SETTINGS_TABS: {
@@ -33,6 +35,7 @@ export const SETTINGS_TABS: {
   { key: "associazione", label: "Associazione", icon: Building2 },
   { key: "brand", label: "Brand", icon: Palette },
   { key: "ricevute", label: "Ricevute", icon: FileText },
+  { key: "reminder", label: "Reminder", icon: BellRing },
   { key: "admin", label: "Admin", icon: ShieldCheck },
 ]
 
