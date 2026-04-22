@@ -10,6 +10,7 @@ import {
   FolderArchive,
   GraduationCap,
   Home,
+  MailPlus,
   Receipt,
   Settings,
   TrendingUp,
@@ -66,6 +67,11 @@ const NAV_ITEMS = [
     href: "/admin/reports/annuale",
     label: "Export annuale",
     icon: FolderArchive,
+  },
+  {
+    href: "/admin/email-templates",
+    label: "Email templates",
+    icon: MailPlus,
   },
   { href: "/admin/settings", label: "Impostazioni", icon: Settings },
 ] as const
