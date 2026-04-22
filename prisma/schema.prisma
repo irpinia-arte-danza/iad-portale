@@ -47,6 +47,7 @@ model User {
   parentProfile  Parent?
   teacherProfile Teacher?
   auditLogs      AuditLog[]
+  emailsSent     EmailLog[] @relation("EmailsSent")
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -978,49 +979,77 @@ model Document {
 // EMAILS & REMINDERS (configurabili)
 // ============================================================================
 
-enum EmailType {
-  WELCOME_PARENT
-  PAYMENT_REMINDER_1 // primo sollecito
-  PAYMENT_REMINDER_2 // secondo sollecito
-  PAYMENT_REMINDER_MANUAL // inviato manualmente dal bottone
-  PAYMENT_RECEIVED
-  RECEIPT
-  MEDICAL_CERTIFICATE_EXPIRING
-  SUSPENSION_NOTICE
-  STAGE_CONFIRMATION
-  SHOWCASE_REMINDER
-  BROADCAST
-  PASSWORD_RESET
-  CONSENT_REREQUEST
-  OTHER
+enum EmailCategory {
+  SOLLECITO // quote scadute
+  PROMEMORIA // quote in scadenza 7gg, certificato medico, saggio
+  BENVENUTO // nuova iscrizione
+  CONFERMA // pagamento, stage
+  COMUNICAZIONE // manuale broadcast
 }
 
 enum EmailStatus {
-  QUEUED
+  PENDING
   SENT
-  FAILED
+  DELIVERED
+  OPENED
   BOUNCED
+  COMPLAINED
+  FAILED
+}
+
+model EmailTemplate {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  name        String
+  description String?
+  subject     String
+  bodyHtml    String        @map("body_html")
+  bodyText    String?       @map("body_text")
+  category    EmailCategory
+  isActive    Boolean       @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  emailLogs EmailLog[]
+
+  @@map("email_templates")
 }
 
 model EmailLog {
-  id           String      @id @default(uuid()) @db.Uuid
-  type         EmailType
-  toEmail      String      @map("to_email")
+  id String @id @default(cuid())
+
+  sentBy     String @map("sent_by") @db.Uuid
+  sentByUser User   @relation("EmailsSent", fields: [sentBy], references: [id])
+
+  recipientEmail String  @map("recipient_email")
+  recipientName  String? @map("recipient_name")
+
+  templateSlug String?        @map("template_slug")
+  template     EmailTemplate? @relation(fields: [templateSlug], references: [slug], onDelete: SetNull)
   subject      String
-  status       EmailStatus @default(QUEUED)
-  errorMessage String?     @map("error_message")
-  resendId     String?     @map("resend_id")
-  sentAt       DateTime?   @map("sent_at") @db.Timestamptz(6)
-  triggeredBy  String?     @map("triggered_by") @db.Uuid // user id se manuale
+  bodyHtml     String         @map("body_html")
+  bodyText     String?        @map("body_text")
 
-  athleteId String? @map("athlete_id") @db.Uuid
-  parentId  String? @map("parent_id") @db.Uuid
-  paymentId String? @map("payment_id") @db.Uuid
+  athleteId         String? @map("athlete_id") @db.Uuid
+  parentId          String? @map("parent_id") @db.Uuid
+  paymentScheduleId String? @map("payment_schedule_id") @db.Uuid
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  status        EmailStatus
+  providerId    String?     @map("provider_id")
+  errorMessage  String?     @map("error_message")
 
-  @@index([toEmail, createdAt])
-  @@index([type, status])
+  sentAt      DateTime  @default(now()) @map("sent_at") @db.Timestamptz(6)
+  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz(6)
+  openedAt    DateTime? @map("opened_at") @db.Timestamptz(6)
+  bouncedAt   DateTime? @map("bounced_at") @db.Timestamptz(6)
+
+  @@index([sentBy, sentAt])
+  @@index([recipientEmail, sentAt])
+  @@index([athleteId, sentAt])
+  @@index([parentId, sentAt])
+  @@index([paymentScheduleId])
   @@map("email_logs")
 }
 

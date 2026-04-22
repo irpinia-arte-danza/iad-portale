@@ -1,4 +1,4 @@
-import { CourseType, PrismaClient, UserRole } from "@prisma/client";
+import { CourseType, EmailCategory, PrismaClient, UserRole } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -163,6 +163,93 @@ async function main() {
       description: "Espressione corporea contemporanea",
     },
   ];
+
+  const emailTemplates: Array<{
+    slug: string
+    name: string
+    description: string
+    category: EmailCategory
+    subject: string
+    bodyHtml: string
+    bodyText?: string
+  }> = [
+    {
+      slug: "sollecito-scadenza",
+      name: "Sollecito scadenza pagamento",
+      description: "Email per quote scadute non pagate",
+      category: EmailCategory.SOLLECITO,
+      subject: "Promemoria: quota {mese} - {allieva_nome}",
+      bodyHtml: `<p>Gentile {genitore_nome},</p>
+<p>le ricordiamo che la quota di <strong>{mese}</strong> per {allieva_nome} risulta ancora da saldare.</p>
+<ul>
+  <li><strong>Importo</strong>: {importo}</li>
+  <li><strong>Scadenza</strong>: {data_scadenza}</li>
+</ul>
+<p>La preghiamo di regolarizzare quanto prima.</p>
+<p>Per informazioni: <a href="mailto:info@irpiniaartedanza.it">info@irpiniaartedanza.it</a></p>
+<hr>
+<p><small>Email automatica, non rispondere.<br>
+A.S.D. IAD Irpinia Arte Danza</small></p>`,
+      bodyText: `Gentile {genitore_nome},
+la quota di {mese} per {allieva_nome} è da saldare.
+Importo: {importo}
+Scadenza: {data_scadenza}
+Info: info@irpiniaartedanza.it
+A.S.D. IAD Irpinia Arte Danza`,
+    },
+    {
+      slug: "promemoria-scadenza",
+      name: "Promemoria scadenza in arrivo",
+      description: "Avviso anticipato 7gg prima scadenza",
+      category: EmailCategory.PROMEMORIA,
+      subject: "Scadenza in arrivo - quota {mese}",
+      bodyHtml: `<p>Gentile {genitore_nome},</p>
+<p>la quota di {mese} per {allieva_nome} scade il <strong>{data_scadenza}</strong>.</p>
+<p>Importo: <strong>{importo}</strong></p>
+<p>Grazie per il pagamento puntuale.</p>
+<hr>
+<p><small>A.S.D. IAD Irpinia Arte Danza</small></p>`,
+    },
+    {
+      slug: "benvenuto-iscrizione",
+      name: "Benvenuto nuova allieva",
+      description: "Email dopo nuova iscrizione",
+      category: EmailCategory.BENVENUTO,
+      subject: "Benvenuta in A.S.D. IAD - {allieva_nome}",
+      bodyHtml: `<p>Gentile {genitore_nome},</p>
+<p>siamo felici di accogliere <strong>{allieva_nome}</strong> nel corso di {corso_nome}.</p>
+<p>Per informazioni: info@irpiniaartedanza.it</p>
+<hr>
+<p><small>A.S.D. IAD Irpinia Arte Danza</small></p>`,
+    },
+    {
+      slug: "conferma-pagamento",
+      name: "Conferma pagamento ricevuto",
+      description: "Email dopo registrazione pagamento",
+      category: EmailCategory.CONFERMA,
+      subject: "Pagamento ricevuto - {allieva_nome}",
+      bodyHtml: `<p>Gentile {genitore_nome},</p>
+<p>confermiamo il ricevimento del pagamento per {allieva_nome}:</p>
+<ul>
+  <li>Importo: <strong>{importo}</strong></li>
+  <li>Tipo: {tipo_quota}</li>
+  <li>Data: {data_pagamento}</li>
+  <li>Metodo: {metodo}</li>
+</ul>
+<p>La ricevuta PDF può essere richiesta a info@irpiniaartedanza.it</p>
+<hr>
+<p><small>A.S.D. IAD Irpinia Arte Danza</small></p>`,
+    },
+  ]
+
+  for (const tpl of emailTemplates) {
+    await prisma.emailTemplate.upsert({
+      where: { slug: tpl.slug },
+      update: {},
+      create: tpl,
+    })
+  }
+  console.log(`✓ EmailTemplate: ${emailTemplates.length} seeded`)
 
   for (const course of iadCourses) {
     const existing = await prisma.course.findFirst({
