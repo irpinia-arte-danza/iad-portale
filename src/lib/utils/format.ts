@@ -32,6 +32,11 @@ const MONTH_LABEL_IT = new Intl.DateTimeFormat("it-IT", {
   year: "2-digit",
 })
 
+const MONTH_FULL_IT = new Intl.DateTimeFormat("it-IT", {
+  month: "long",
+  year: "numeric",
+})
+
 const PERCENT_IT = new Intl.NumberFormat("it-IT", {
   style: "percent",
   minimumFractionDigits: 1,
@@ -84,6 +89,11 @@ export function monthKey(date: Date): string {
 
 export function monthLabel(date: Date): string {
   return MONTH_LABEL_IT.format(date)
+}
+
+export function formatMeseIt(date: Date): string {
+  const raw = MONTH_FULL_IT.format(date)
+  return raw.charAt(0).toUpperCase() + raw.slice(1)
 }
 
 export function formatPercent(value: number): string {

@@ -40,12 +40,11 @@ import { generateCSV } from "@/lib/utils/csv"
 
 import { getScadenzeCSVData } from "../actions"
 import type { ScadenzaWithDetails } from "../queries"
+import { SendReminderDialog } from "./send-reminder-dialog"
 
 interface ScadenzeTableProps {
   scadenze: ScadenzaWithDetails[]
 }
-
-const DISABLED_TOOLTIP = "Disponibile prossima sessione (Fase 5)"
 
 function csvFilename() {
   const now = new Date()
@@ -79,6 +78,8 @@ function ScadenzaStatusBadge({ giorniRitardo }: { giorniRitardo: number }) {
 export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [isExporting, startExportTransition] = useTransition()
+  const [reminderOpen, setReminderOpen] = useState(false)
+  const [reminderScheduleIds, setReminderScheduleIds] = useState<string[]>([])
 
   const selectableIds = useMemo(
     () => scadenze.map((s) => s.id),
@@ -122,6 +123,32 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
   function clearSelection() {
     setSelected(new Set())
   }
+
+  function openReminderFor(ids: string[]) {
+    if (ids.length === 0) return
+    setReminderScheduleIds(ids)
+    setReminderOpen(true)
+  }
+
+  function handleReminderSent() {
+    setSelected(new Set())
+  }
+
+  const hasEmailByScheduleId = useMemo(() => {
+    const map = new Map<string, boolean>()
+    for (const s of scadenze) {
+      map.set(s.id, Boolean(s.parent?.email))
+    }
+    return map
+  }, [scadenze])
+
+  const selectedWithEmailCount = useMemo(() => {
+    let n = 0
+    for (const id of selected) {
+      if (hasEmailByScheduleId.get(id)) n += 1
+    }
+    return n
+  }, [selected, hasEmailByScheduleId])
 
   function exportCsv(ids: string[]) {
     startExportTransition(async () => {
@@ -295,19 +322,31 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div>
-                              <DropdownMenuItem disabled>
-                                <Mail className="h-4 w-4" />
-                                Invia sollecito ora
-                              </DropdownMenuItem>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="left">
-                            {DISABLED_TOOLTIP}
-                          </TooltipContent>
-                        </Tooltip>
+                        {s.parent?.email ? (
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault()
+                              openReminderFor([s.id])
+                            }}
+                          >
+                            <Mail className="h-4 w-4" />
+                            Invia sollecito ora
+                          </DropdownMenuItem>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div>
+                                <DropdownMenuItem disabled>
+                                  <Mail className="h-4 w-4" />
+                                  Invia sollecito ora
+                                </DropdownMenuItem>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="left">
+                              Email genitore mancante
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem asChild>
                           <Link href={`/admin/athletes/${s.athlete.id}`}>
@@ -343,17 +382,39 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button variant="default" size="sm" disabled>
-                    <Mail className="h-4 w-4" />
-                    Invia sollecito
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{DISABLED_TOOLTIP}</TooltipContent>
-            </Tooltip>
+            {selectedWithEmailCount < selected.size ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => openReminderFor(selectedIds)}
+                      disabled={selectedWithEmailCount === 0}
+                    >
+                      <Mail className="h-4 w-4" />
+                      Invia sollecito ({selectedWithEmailCount}/{selected.size})
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {selected.size - selectedWithEmailCount}{" "}
+                  {selected.size - selectedWithEmailCount === 1
+                    ? "scadenza senza email"
+                    : "scadenze senza email"}{" "}
+                  verranno saltate
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => openReminderFor(selectedIds)}
+              >
+                <Mail className="h-4 w-4" />
+                Invia sollecito ({selected.size})
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -374,6 +435,13 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
           </div>
         </div>
       )}
+
+      <SendReminderDialog
+        open={reminderOpen}
+        onOpenChange={setReminderOpen}
+        scheduleIds={reminderScheduleIds}
+        onSent={handleReminderSent}
+      />
     </>
   )
 }
