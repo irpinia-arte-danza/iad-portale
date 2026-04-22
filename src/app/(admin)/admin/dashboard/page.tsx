@@ -10,6 +10,7 @@ import {
   getDashboardStats,
   getRecentAthletes,
   getRecentParents,
+  getScadenzeKPI,
 } from "./queries"
 import {
   getEnrollmentsTrend,
@@ -21,6 +22,7 @@ import { AnalyticsSection } from "./_components/analytics-section"
 import { KpiCards } from "./_components/kpi-cards"
 import { RecentActivity } from "./_components/recent-activity"
 import { QuickActions } from "./_components/quick-actions"
+import { ScadenzeKpiWidget } from "./_components/scadenze-kpi-widget"
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient()
@@ -35,6 +37,7 @@ export default async function AdminDashboardPage() {
   const [
     user,
     stats,
+    scadenzeKpi,
     athletes,
     parents,
     enrollmentsTrend,
@@ -47,6 +50,7 @@ export default async function AdminDashboardPage() {
       select: { firstName: true },
     }),
     getDashboardStats(),
+    getScadenzeKPI(),
     getRecentAthletes(5),
     getRecentParents(5),
     getEnrollmentsTrend(12),
@@ -64,6 +68,7 @@ export default async function AdminDashboardPage() {
       />
       <ResourceContent>
         <div className="flex flex-col gap-6">
+          <ScadenzeKpiWidget kpi={scadenzeKpi} />
           <KpiCards stats={stats} />
           <AnalyticsSection
             enrollmentsTrend={enrollmentsTrend}

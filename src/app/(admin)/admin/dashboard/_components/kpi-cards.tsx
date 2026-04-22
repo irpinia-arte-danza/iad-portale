@@ -3,8 +3,6 @@
 import Link from "next/link"
 import {
   AlertCircle,
-  AlertTriangle,
-  Calendar,
   GraduationCap,
   UserCheck,
   Users,
@@ -62,22 +60,6 @@ export function KpiCards({ stats }: KpiCardsProps) {
       icon: Users,
       href: "/admin/parents",
       description: "Tutori registrati",
-      emphasis: false,
-    },
-    {
-      title: "Scadenze in ritardo",
-      value: stats.schedulesOverdue,
-      icon: AlertTriangle,
-      href: "/admin/payments",
-      description: "Quote non saldate oltre scadenza",
-      emphasis: stats.schedulesOverdue > 0,
-    },
-    {
-      title: "Scadenze questo mese",
-      value: stats.schedulesDueThisMonth,
-      icon: Calendar,
-      href: "/admin/payments",
-      description: "Quote in scadenza nel mese corrente",
       emphasis: false,
     },
   ]

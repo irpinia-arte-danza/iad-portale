@@ -67,6 +67,58 @@ export async function getDashboardStats() {
   }
 }
 
+export async function getScadenzeKPI() {
+  await requireAdmin()
+
+  const now = new Date()
+  const today = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  )
+  const in7days = new Date(today)
+  in7days.setUTCDate(in7days.getUTCDate() + 7)
+
+  const [inRitardo, inScadenza7gg] = await Promise.all([
+    prisma.paymentSchedule.aggregate({
+      where: {
+        status: ScheduleStatus.DUE,
+        dueDate: { lt: today },
+      },
+      _sum: { amountCents: true },
+      _count: true,
+    }),
+    prisma.paymentSchedule.aggregate({
+      where: {
+        status: ScheduleStatus.DUE,
+        dueDate: { gte: today, lte: in7days },
+      },
+      _sum: { amountCents: true },
+      _count: true,
+    }),
+  ])
+
+  const inRitardoCount = inRitardo._count
+  const inRitardoAmount = inRitardo._sum.amountCents ?? 0
+  const inScadenzaCount = inScadenza7gg._count
+  const inScadenzaAmount = inScadenza7gg._sum.amountCents ?? 0
+
+  return {
+    inRitardo: {
+      count: inRitardoCount,
+      amountCents: inRitardoAmount,
+    },
+    inScadenza7gg: {
+      count: inScadenzaCount,
+      amountCents: inScadenzaAmount,
+    },
+    total: {
+      count: inRitardoCount + inScadenzaCount,
+      amountCents: inRitardoAmount + inScadenzaAmount,
+    },
+  }
+}
+
+export type ScadenzeKPI = Awaited<ReturnType<typeof getScadenzeKPI>>
+
 export async function getRecentAthletes(limit = 5) {
   await requireAdmin()
   return prisma.athlete.findMany({
