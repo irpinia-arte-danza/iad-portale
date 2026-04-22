@@ -1048,10 +1048,11 @@ model EmailLog {
   triggeredBy  EmailTrigger @default(ADMIN_MANUAL) @map("triggered_by")
   milestoneKey String?      @map("milestone_key") // PROMEMORIA_DUE | SOLLECITO_FIRST | SOLLECITO_SECOND (null per manual)
 
-  sentAt      DateTime  @default(now()) @map("sent_at") @db.Timestamptz(6)
-  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz(6)
-  openedAt    DateTime? @map("opened_at") @db.Timestamptz(6)
-  bouncedAt   DateTime? @map("bounced_at") @db.Timestamptz(6)
+  sentAt       DateTime  @default(now()) @map("sent_at") @db.Timestamptz(6)
+  deliveredAt  DateTime? @map("delivered_at") @db.Timestamptz(6)
+  openedAt     DateTime? @map("opened_at") @db.Timestamptz(6)
+  bouncedAt    DateTime? @map("bounced_at") @db.Timestamptz(6)
+  complainedAt DateTime? @map("complained_at") @db.Timestamptz(6)
 
   @@index([sentBy, sentAt])
   @@index([recipientEmail, sentAt])
