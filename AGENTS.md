@@ -7,7 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## Project Context
 
 IAD Portale — gestionale web per A.S.D. Irpinia Arte Danza (Montella, AV).
-Per contesto completo, leggere `CLAUDE.md` (stack, schema, convenzioni, gotchas §17.x).
+Per contesto completo, leggere `CLAUDE.md` (stack, schema, convenzioni, principi). I gotcha tecnici §17.x sono ora in `docs/gotchas.md` (split v4.0 del 2026-04-24).
 
 ## Stack Core
 
@@ -44,7 +44,11 @@ Per contesto completo, leggere `CLAUDE.md` (stack, schema, convenzioni, gotchas 
 
 ## Documenti di Riferimento
 
-- `CLAUDE.md` — contesto progetto dettagliato
+- `CLAUDE.md` — contesto progetto + principi stabili (index dei docs)
+- `docs/gotchas.md` — gotcha tecnici §17.x (Prisma, Next.js, Zod/RHF, shadcn, PDF, Vercel, UX, Settings, Domain) con TOC per topic
+- `docs/email-system.md` — Sprint 3 Email completo (architettura + 9 fasi + gotcha §17.25-27 + file principali + env vars)
+- `docs/sprints.md` — cronologia sprint completati + roadmap pianificata
 - `docs/PRD.md` — product requirements (se esiste)
+- `docs/architecture.md` — decisioni architetturali (ADR)
 - `prisma/schema.prisma` — source of truth schema DB
 - `/admin/email-templates` — edit runtime testi email Giuseppina
