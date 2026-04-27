@@ -21,7 +21,7 @@ type TeacherRow = {
   phone: string | null
   fiscalCode: string | null
   qualifications: string | null
-  _count: { courses: number }
+  _count: { courses: number; teacherCourses?: number }
 }
 
 interface TeachersTableProps {
@@ -81,7 +81,10 @@ export function TeachersTable({ teachers }: TeachersTableProps) {
                 {teacher.qualifications || "—"}
               </TableCell>
               <TableCell className="text-center">
-                {teacher._count.courses}
+                {Math.max(
+                  teacher._count.courses,
+                  teacher._count.teacherCourses ?? 0,
+                )}
               </TableCell>
               <TableCell>
                 <TeacherRowActions teacher={teacher} />

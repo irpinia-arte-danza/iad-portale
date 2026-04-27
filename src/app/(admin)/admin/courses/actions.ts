@@ -29,26 +29,42 @@ function mapPrismaError(error: unknown): string {
   return "Errore interno, riprova"
 }
 
-function normalizeInput(values: CourseCreateValues) {
+// Risolve la lista teachers da inviare alla M2M:
+// - Se input ha array `teachers` valorizzato → usa quello
+// - Altrimenti, se solo `teacherId` legacy fornito → singolo entry primary
+// - Altrimenti → array vuoto
+function resolveTeachersInput(
+  values: CourseCreateValues,
+): { teacherId: string; isPrimary: boolean }[] {
+  if (values.teachers && values.teachers.length > 0) return values.teachers
+  if (values.teacherId && values.teacherId !== "") {
+    return [{ teacherId: values.teacherId, isPrimary: true }]
+  }
+  return []
+}
+
+function normalizeCourseFields(values: CourseCreateValues) {
   const {
     monthlyFeeEur,
     trimesterFeeEur,
-    teacherId,
     description,
     level,
     minAge,
     maxAge,
-    ...rest
+    name,
+    type,
+    capacity,
   } = values
 
   return {
-    ...rest,
+    name,
+    type,
+    capacity,
     monthlyFeeCents: Math.round(monthlyFeeEur * 100),
     trimesterFeeCents:
       trimesterFeeEur !== undefined && trimesterFeeEur !== null
         ? Math.round(trimesterFeeEur * 100)
         : null,
-    teacherId: teacherId && teacherId !== "" ? teacherId : null,
     description: description && description !== "" ? description : null,
     level: level && level !== "" ? level : null,
     minAge: minAge ?? null,
@@ -69,10 +85,28 @@ export async function createCourse(
     }
   }
 
+  const teachers = resolveTeachersInput(parsed.data)
+  const primary = teachers.find((t) => t.isPrimary) ?? null
+
   try {
-    const course = await prisma.course.create({
-      data: normalizeInput(parsed.data),
-      select: { id: true },
+    const course = await prisma.$transaction(async (tx) => {
+      const c = await tx.course.create({
+        data: {
+          ...normalizeCourseFields(parsed.data),
+          teacherId: primary?.teacherId ?? null,
+        },
+        select: { id: true },
+      })
+      if (teachers.length > 0) {
+        await tx.teacherCourse.createMany({
+          data: teachers.map((t) => ({
+            teacherId: t.teacherId,
+            courseId: c.id,
+            isPrimary: t.isPrimary,
+          })),
+        })
+      }
+      return c
     })
     revalidatePath(COURSES_PATH)
     return { ok: true, data: { id: course.id } }
@@ -100,10 +134,33 @@ export async function updateCourse(
     }
   }
 
+  const teachers = resolveTeachersInput(parsed.data)
+  const primary = teachers.find((t) => t.isPrimary) ?? null
+
   try {
-    await prisma.course.update({
-      where: { id: idParsed.data },
-      data: normalizeInput(parsed.data),
+    await prisma.$transaction(async (tx) => {
+      await tx.course.update({
+        where: { id: idParsed.data },
+        data: {
+          ...normalizeCourseFields(parsed.data),
+          teacherId: primary?.teacherId ?? null,
+        },
+      })
+      // M2M sync: deleteMany + createMany è il pattern più semplice
+      // (volumi piccoli, max 5 teacher per corso). Per volumi maggiori
+      // fare diff incrementale.
+      await tx.teacherCourse.deleteMany({
+        where: { courseId: idParsed.data },
+      })
+      if (teachers.length > 0) {
+        await tx.teacherCourse.createMany({
+          data: teachers.map((t) => ({
+            teacherId: t.teacherId,
+            courseId: idParsed.data,
+            isPrimary: t.isPrimary,
+          })),
+        })
+      }
     })
     revalidatePath(COURSES_PATH)
     return { ok: true }

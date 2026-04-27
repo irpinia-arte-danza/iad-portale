@@ -13,6 +13,7 @@ import {
   COURSE_TYPE_LABELS,
 } from "@/lib/schemas/course"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -47,8 +48,6 @@ interface CourseFormProps {
   onSuccess?: () => void
 }
 
-const NONE_TEACHER = "__none__"
-
 export function CourseForm({
   mode,
   defaultValues,
@@ -70,6 +69,7 @@ export function CourseForm({
       capacity: 20,
       monthlyFeeEur: 0,
       trimesterFeeEur: undefined,
+      teachers: [],
       teacherId: "",
       ...defaultValues,
     },
@@ -314,33 +314,98 @@ export function CourseForm({
 
         <FormField
           control={form.control}
-          name="teacherId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Insegnante</FormLabel>
-              <Select
-                value={field.value && field.value !== "" ? field.value : NONE_TEACHER}
-                onValueChange={(v) =>
-                  field.onChange(v === NONE_TEACHER ? "" : v)
-                }
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleziona insegnante" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value={NONE_TEACHER}>Nessuno</SelectItem>
-                  {teachers.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.lastName} {t.firstName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
+          name="teachers"
+          render={({ field }) => {
+            const selected = field.value ?? []
+            const selectedIds = new Set(selected.map((t) => t.teacherId))
+            const ensurePrimary = (
+              list: { teacherId: string; isPrimary: boolean }[],
+            ) => {
+              if (list.length === 0) return list
+              if (list.some((t) => t.isPrimary)) return list
+              return list.map((t, i) =>
+                i === 0 ? { ...t, isPrimary: true } : t,
+              )
+            }
+
+            const toggleTeacher = (teacherId: string, checked: boolean) => {
+              if (checked) {
+                if (selectedIds.has(teacherId)) return
+                const next = ensurePrimary([
+                  ...selected,
+                  { teacherId, isPrimary: selected.length === 0 },
+                ])
+                field.onChange(next)
+              } else {
+                const next = ensurePrimary(
+                  selected.filter((t) => t.teacherId !== teacherId),
+                )
+                field.onChange(next)
+              }
+            }
+
+            const setPrimary = (teacherId: string) => {
+              field.onChange(
+                selected.map((t) => ({
+                  ...t,
+                  isPrimary: t.teacherId === teacherId,
+                })),
+              )
+            }
+
+            return (
+              <FormItem>
+                <FormLabel>Insegnanti</FormLabel>
+                {teachers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nessun insegnante disponibile. Aggiungili da{" "}
+                    <em>Insegnanti</em>.
+                  </p>
+                ) : (
+                  <div className="space-y-2 rounded-md border p-3">
+                    {teachers.map((t) => {
+                      const isSelected = selectedIds.has(t.id)
+                      const link = selected.find((s) => s.teacherId === t.id)
+                      return (
+                        <div
+                          key={t.id}
+                          className="flex items-center gap-3 text-sm"
+                        >
+                          <Checkbox
+                            id={`teacher-${t.id}`}
+                            checked={isSelected}
+                            onCheckedChange={(c) =>
+                              toggleTeacher(t.id, c === true)
+                            }
+                          />
+                          <label
+                            htmlFor={`teacher-${t.id}`}
+                            className="flex-1 cursor-pointer"
+                          >
+                            {t.lastName} {t.firstName}
+                          </label>
+                          {selected.length > 1 ? (
+                            <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <input
+                                type="radio"
+                                name="primary-teacher"
+                                checked={!!link?.isPrimary}
+                                onChange={() => setPrimary(t.id)}
+                                disabled={!isSelected}
+                                className="h-4 w-4"
+                              />
+                              Principale
+                            </label>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <FormMessage />
+              </FormItem>
+            )
+          }}
         />
 
         <div className="flex sm:justify-end">

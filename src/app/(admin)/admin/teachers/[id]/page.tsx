@@ -31,8 +31,25 @@ export default async function TeacherDetailPage({ params }: PageProps) {
   }
 
   const fullName = `${teacher.lastName} ${teacher.firstName}`
-  const activeCourses = teacher.courses.filter((c) => c.isActive)
-  const archivedCourses = teacher.courses.filter((c) => !c.isActive)
+
+  // Sprint 5: M2M via teacherCourses (con isPrimary). Lista deduplicata
+  // unendo legacy teacher.courses (per backward compat su record che il
+  // backfill non ha sincronizzato).
+  const m2mCourses = teacher.teacherCourses.map((tc) => ({
+    id: tc.course.id,
+    name: tc.course.name,
+    type: tc.course.type,
+    isActive: tc.course.isActive,
+    _count: tc.course._count,
+    isPrimary: tc.isPrimary,
+  }))
+  const m2mIds = new Set(m2mCourses.map((c) => c.id))
+  const legacyOnlyCourses = teacher.courses
+    .filter((c) => !m2mIds.has(c.id))
+    .map((c) => ({ ...c, isPrimary: false }))
+  const courses = [...m2mCourses, ...legacyOnlyCourses]
+  const activeCourses = courses.filter((c) => c.isActive)
+  const archivedCourses = courses.filter((c) => !c.isActive)
 
   return (
     <>
@@ -52,13 +69,13 @@ export default async function TeacherDetailPage({ params }: PageProps) {
             <CardHeader>
               <CardTitle>Corsi assegnati</CardTitle>
               <CardDescription>
-                {teacher.courses.length === 0
+                {courses.length === 0
                   ? "Nessun corso assegnato"
                   : `${activeCourses.length} attivi · ${archivedCourses.length} archiviati`}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {teacher.courses.length === 0 ? (
+              {courses.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-6 text-center">
                   <BookOpen className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                   <p className="text-xs text-muted-foreground">
@@ -67,7 +84,7 @@ export default async function TeacherDetailPage({ params }: PageProps) {
                 </div>
               ) : (
                 <ul className="space-y-2">
-                  {teacher.courses.map((course) => (
+                  {courses.map((course) => (
                     <li key={course.id}>
                       <Link
                         href={`/admin/courses/${course.id}`}
@@ -81,6 +98,11 @@ export default async function TeacherDetailPage({ params }: PageProps) {
                             <Badge variant="secondary">
                               {COURSE_TYPE_LABELS[course.type]}
                             </Badge>
+                            {course.isPrimary ? (
+                              <Badge variant="outline" className="text-xs">
+                                Principale
+                              </Badge>
+                            ) : null}
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
                             {course._count.enrollments}{" "}

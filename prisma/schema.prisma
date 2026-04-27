@@ -299,8 +299,11 @@ model Teacher {
   qualifications String?
   isActive       Boolean @default(true) @map("is_active")
 
-  courses       Course[]
-  compensations TeacherCompensation[]
+  // Legacy 1:N (deprecated): popolato fino a Sprint 4. Sprint 5 introduce
+  // M2M via TeacherCourse. Drop in batch futuro (vedi §17.23 gotchas).
+  courses        Course[]
+  teacherCourses TeacherCourse[]
+  compensations  TeacherCompensation[]
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -339,18 +342,41 @@ model Course {
   monthlyFeeCents   Int  @map("monthly_fee_cents")
   trimesterFeeCents Int? @map("trimester_fee_cents")
 
+  // Legacy 1:N (deprecated): popolato fino a Sprint 4. Sprint 5 sposta
+  // l'associazione a TeacherCourse (M2M con isPrimary). Mantenuto nullable
+  // per backfill + drop futuro in batch (vedi §17.23 gotchas).
   teacherId String?  @map("teacher_id") @db.Uuid
   teacher   Teacher? @relation(fields: [teacherId], references: [id])
 
   isActive Boolean @default(true) @map("is_active")
 
-  schedules   CourseSchedule[]
-  enrollments CourseEnrollment[]
+  schedules      CourseSchedule[]
+  enrollments    CourseEnrollment[]
+  teacherCourses TeacherCourse[]
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("courses")
+}
+
+// Sprint 5: M2M Teacher↔Course con flag isPrimary (1 per corso).
+// Sostituisce Course.teacherId 1:N (deprecated, drop futuro batch).
+model TeacherCourse {
+  id        String  @id @default(uuid()) @db.Uuid
+  teacherId String  @map("teacher_id") @db.Uuid
+  courseId  String  @map("course_id") @db.Uuid
+  isPrimary Boolean @default(false) @map("is_primary")
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([teacherId, courseId])
+  @@index([courseId])
+  @@index([teacherId])
+  @@map("teacher_courses")
 }
 
 model CourseSchedule {
@@ -432,6 +458,9 @@ model Lesson {
 enum AttendanceStatus {
   PRESENT
   ABSENT
+  // Sprint 5: assenza giustificata (tracciata ma equivalente ad ABSENT
+  // per regole "no recuperi, no rimborsi" — solo audit/comunicazione)
+  JUSTIFIED
 }
 
 model Attendance {
@@ -1180,6 +1209,8 @@ enum AuditAction {
   LOGO_DELETE
   // Parent portal (Sprint 4.A)
   INVITE_PARENT
+  // Teacher portal (Sprint 5)
+  INVITE_TEACHER
 }
 
 model AuditLog {

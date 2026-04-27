@@ -34,7 +34,7 @@ export async function listTeachers(filters: ListFilters = {}) {
       where,
       include: {
         _count: {
-          select: { courses: true },
+          select: { courses: true, teacherCourses: true },
         },
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -49,6 +49,8 @@ export async function listTeachers(filters: ListFilters = {}) {
 
 const teacherWithRelations = Prisma.validator<Prisma.TeacherDefaultArgs>()({
   include: {
+    // Legacy 1:N (deprecated). Mantenuto per backward compat ma il rendering
+    // dovrebbe ora usare teacherCourses (M2M).
     courses: {
       select: {
         id: true,
@@ -58,6 +60,21 @@ const teacherWithRelations = Prisma.validator<Prisma.TeacherDefaultArgs>()({
         _count: { select: { enrollments: true } },
       },
       orderBy: [{ isActive: "desc" }, { name: "asc" }],
+    },
+    teacherCourses: {
+      select: {
+        isPrimary: true,
+        course: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            isActive: true,
+            _count: { select: { enrollments: true } },
+          },
+        },
+      },
+      orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
     },
   },
 })

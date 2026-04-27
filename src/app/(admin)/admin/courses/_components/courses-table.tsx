@@ -30,6 +30,10 @@ type CourseRow = {
   teacherId: string | null
   isActive: boolean
   teacher: { id: string; firstName: string; lastName: string } | null
+  teacherCourses?: {
+    isPrimary: boolean
+    teacher: { id: string; firstName: string; lastName: string }
+  }[]
   _count: { enrollments: number }
 }
 
@@ -125,9 +129,28 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
                 {euroFormatter.format(course.monthlyFeeCents / 100)}
               </TableCell>
               <TableCell className="hidden lg:table-cell">
-                {course.teacher
-                  ? `${course.teacher.lastName} ${course.teacher.firstName}`
-                  : "—"}
+                {course.teacherCourses && course.teacherCourses.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1">
+                    {course.teacherCourses.map((tc) => (
+                      <span
+                        key={tc.teacher.id}
+                        className="inline-flex items-center gap-1 text-xs"
+                      >
+                        {tc.teacher.lastName} {tc.teacher.firstName}
+                        {tc.isPrimary &&
+                        course.teacherCourses!.length > 1 ? (
+                          <Badge variant="secondary" className="px-1 text-[10px]">
+                            Princ.
+                          </Badge>
+                        ) : null}
+                      </span>
+                    ))}
+                  </div>
+                ) : course.teacher ? (
+                  `${course.teacher.lastName} ${course.teacher.firstName}`
+                ) : (
+                  "—"
+                )}
               </TableCell>
               <TableCell className="text-center">
                 {course._count.enrollments}

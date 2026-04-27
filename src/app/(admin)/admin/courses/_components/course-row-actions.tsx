@@ -38,6 +38,10 @@ interface CourseRowActionsProps {
     trimesterFeeCents: number | null
     teacherId: string | null
     isActive: boolean
+    teacherCourses?: {
+      isPrimary: boolean
+      teacher: { id: string; firstName: string; lastName: string }
+    }[]
   }
   teachers: Array<{ id: string; firstName: string; lastName: string }>
 }
@@ -118,6 +122,10 @@ export function CourseRowActions({ course, teachers }: CourseRowActionsProps) {
                 course.trimesterFeeCents !== null
                   ? course.trimesterFeeCents / 100
                   : undefined,
+              teachers: (course.teacherCourses ?? []).map((tc) => ({
+                teacherId: tc.teacher.id,
+                isPrimary: tc.isPrimary,
+              })),
               teacherId: course.teacherId ?? "",
             }}
             onSuccess={() => setEditOpen(false)}

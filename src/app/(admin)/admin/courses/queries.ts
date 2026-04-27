@@ -47,6 +47,16 @@ export async function listCourses(filters: ListFilters = {}) {
         teacher: {
           select: { id: true, firstName: true, lastName: true },
         },
+        teacherCourses: {
+          where: { teacher: { deletedAt: null } },
+          orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+          select: {
+            isPrimary: true,
+            teacher: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+          },
+        },
         _count: {
           select: { enrollments: true },
         },
@@ -65,6 +75,16 @@ const courseWithRelations = Prisma.validator<Prisma.CourseDefaultArgs>()({
   include: {
     teacher: {
       select: { id: true, firstName: true, lastName: true },
+    },
+    teacherCourses: {
+      where: { teacher: { deletedAt: null } },
+      orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+      select: {
+        isPrimary: true,
+        teacher: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
     },
     enrollments: {
       include: {

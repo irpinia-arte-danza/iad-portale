@@ -90,12 +90,20 @@ export async function GET(request: NextRequest) {
 
   const next = nextParam && nextParam.startsWith("/") ? nextParam : null
 
+  // Set-password path role-aware: TEACHER usa /teacher/set-password,
+  // PARENT (e fallback default) usa /parent/set-password. ADMIN flow
+  // resta separato (magic link admin atterra su /login direttamente).
+  const setPasswordPath =
+    prismaUser.role === "TEACHER"
+      ? "/teacher/set-password"
+      : "/parent/set-password"
+
   // Invite: forza set-password come primo step. next preservato per
   // redirect post-set-password.
   if (type === "invite") {
     const target = next ?? getDashboardPath(prismaUser.role)
     return NextResponse.redirect(
-      `${origin}/parent/set-password?next=${encodeURIComponent(target)}`,
+      `${origin}${setPasswordPath}?next=${encodeURIComponent(target)}`,
     )
   }
 
@@ -103,7 +111,7 @@ export async function GET(request: NextRequest) {
   if (type === "recovery") {
     const target = next ?? getDashboardPath(prismaUser.role)
     return NextResponse.redirect(
-      `${origin}/parent/set-password?next=${encodeURIComponent(target)}&recovery=1`,
+      `${origin}${setPasswordPath}?next=${encodeURIComponent(target)}&recovery=1`,
     )
   }
 

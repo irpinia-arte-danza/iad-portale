@@ -54,19 +54,38 @@ export function TeacherForm({
 
   function onSubmit(values: TeacherCreateValues) {
     startTransition(async () => {
-      const result =
-        mode === "create"
-          ? await createTeacher(values)
-          : await updateTeacher(teacherId!, values)
-
-      if (result.ok) {
-        toast.success(
-          mode === "create" ? "Insegnante aggiunto" : "Modifiche salvate",
-        )
-        if (mode === "create") form.reset()
-        onSuccess?.()
+      if (mode === "create") {
+        const result = await createTeacher(values)
+        if (result.ok) {
+          const data = result.data
+          if (data?.invited) {
+            toast.success("Insegnante aggiunto · invito email inviato")
+          } else if (data?.inviteSkipReason === "no-email") {
+            toast.success("Insegnante aggiunto · nessuna email per invito")
+          } else if (data?.inviteSkipReason === "email-in-use") {
+            toast.warning(
+              "Insegnante aggiunto · email già in uso da altro account, invito non inviato",
+            )
+          } else if (data?.inviteSkipReason === "invite-failed") {
+            toast.warning(
+              "Insegnante aggiunto · invito email non riuscito, riprova manualmente",
+            )
+          } else {
+            toast.success("Insegnante aggiunto")
+          }
+          form.reset()
+          onSuccess?.()
+        } else {
+          toast.error(result.error)
+        }
       } else {
-        toast.error(result.error)
+        const result = await updateTeacher(teacherId!, values)
+        if (result.ok) {
+          toast.success("Modifiche salvate")
+          onSuccess?.()
+        } else {
+          toast.error(result.error)
+        }
       }
     })
   }
