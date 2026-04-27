@@ -65,19 +65,38 @@ export function ParentForm({
 
   function onSubmit(values: ParentCreateValues) {
     startTransition(async () => {
-      const result =
-        mode === "create"
-          ? await createParent(values)
-          : await updateParent(parentId!, values)
-
-      if (result.ok) {
-        toast.success(
-          mode === "create" ? "Genitore aggiunto" : "Modifiche salvate"
-        )
-        if (mode === "create") form.reset()
-        onSuccess?.()
+      if (mode === "create") {
+        const result = await createParent(values)
+        if (result.ok) {
+          const data = result.data
+          if (data?.invited) {
+            toast.success("Genitore aggiunto · invito email inviato")
+          } else if (data?.inviteSkipReason === "no-email") {
+            toast.success("Genitore aggiunto · nessuna email per invito")
+          } else if (data?.inviteSkipReason === "email-in-use") {
+            toast.warning(
+              "Genitore aggiunto · email già in uso da altro account, invito non inviato",
+            )
+          } else if (data?.inviteSkipReason === "invite-failed") {
+            toast.warning(
+              "Genitore aggiunto · invito email non riuscito, riprova manualmente",
+            )
+          } else {
+            toast.success("Genitore aggiunto")
+          }
+          form.reset()
+          onSuccess?.()
+        } else {
+          toast.error(result.error)
+        }
       } else {
-        toast.error(result.error)
+        const result = await updateParent(parentId!, values)
+        if (result.ok) {
+          toast.success("Modifiche salvate")
+          onSuccess?.()
+        } else {
+          toast.error(result.error)
+        }
       }
     })
   }

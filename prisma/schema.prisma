@@ -1178,6 +1178,8 @@ enum AuditAction {
   INVITE_ADMIN
   LOGO_UPLOAD
   LOGO_DELETE
+  // Parent portal (Sprint 4.A)
+  INVITE_PARENT
 }
 
 model AuditLog {

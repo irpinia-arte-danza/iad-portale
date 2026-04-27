@@ -2,9 +2,8 @@
 
 import { redirect } from "next/navigation";
 
-import { UserRole } from "@prisma/client";
-
 import { prisma } from "@/lib/prisma";
+import { getDashboardPath } from "@/lib/auth/dashboard-path";
 import { createClient } from "@/lib/supabase/server";
 
 type LoginValues = {
@@ -23,23 +22,6 @@ function mapAuthError(message: string): string {
     return "Troppi tentativi, riprova tra qualche minuto";
   }
   return "Errore durante l'accesso, riprova";
-}
-
-function getDashboardPath(role: UserRole): string {
-  switch (role) {
-    case UserRole.ADMIN:
-      return "/admin/dashboard";
-    case UserRole.TEACHER:
-      return "/teacher/dashboard";
-    case UserRole.PARENT:
-      return "/parent/dashboard";
-    default: {
-      // Exhaustiveness check: if UserRole gains a new value,
-      // TypeScript will fail the `never` assignment below
-      const _exhaustive: never = role;
-      throw new Error(`Unhandled UserRole: ${_exhaustive}`);
-    }
-  }
 }
 
 export async function login(
