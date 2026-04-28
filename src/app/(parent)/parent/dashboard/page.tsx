@@ -18,6 +18,7 @@ import {
   getGeneralCourseSchedules,
   getMyAthletes,
   getMyAthleteSchedules,
+  getMyAttendanceStats,
   getMyOpenSchedules,
   getMyPayments,
   getParentProfile,
@@ -76,6 +77,7 @@ export default async function ParentDashboardPage() {
     myAthleteSchedules,
     generalSchedules,
     brand,
+    attendance,
   ] = await Promise.all([
     getParentProfile(parentId),
     getMyAthletes(parentId),
@@ -84,6 +86,7 @@ export default async function ParentDashboardPage() {
     getMyAthleteSchedules(parentId),
     getGeneralCourseSchedules(),
     getBrandIban(),
+    getMyAttendanceStats(parentId),
   ])
 
   const overdue = openSchedules.filter((s) => classifySchedule(s) === "overdue")
@@ -249,6 +252,64 @@ export default async function ParentDashboardPage() {
                         ))}
                       </ul>
                     )}
+                  </div>
+
+                  {/* Presenze AA corrente */}
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Presenze
+                      {attendance.academicYearLabel
+                        ? ` ${attendance.academicYearLabel}`
+                        : ""}
+                    </h3>
+                    {(() => {
+                      const stats = attendance.byAthlete.get(athlete.id)
+                      if (!stats || stats.totalLessons === 0) {
+                        return (
+                          <p className="text-sm text-muted-foreground">
+                            Nessuna lezione registrata ancora.
+                          </p>
+                        )
+                      }
+                      return (
+                        <>
+                          <div className="grid grid-cols-3 gap-2 rounded-md border p-3">
+                            <div className="text-center">
+                              <div className="text-lg font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                                {stats.presentCount}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Presenti
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-lg font-semibold tabular-nums text-red-700 dark:text-red-300">
+                                {stats.absentCount}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Assenti
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-lg font-semibold tabular-nums text-amber-700 dark:text-amber-300">
+                                {stats.justifiedCount}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Giustificate
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Frequenza:{" "}
+                            <strong className="tabular-nums">
+                              {stats.attendanceRate}%
+                            </strong>{" "}
+                            su {stats.totalLessons}{" "}
+                            {stats.totalLessons === 1 ? "lezione" : "lezioni"}
+                          </p>
+                        </>
+                      )
+                    })()}
                   </div>
                 </CardContent>
               </Card>

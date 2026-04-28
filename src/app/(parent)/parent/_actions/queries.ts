@@ -275,3 +275,69 @@ export async function getBrandIban() {
   })
   return brand
 }
+
+export type AttendanceStats = {
+  presentCount: number
+  absentCount: number
+  justifiedCount: number
+  totalLessons: number
+  attendanceRate: number
+}
+
+// Stats presenze per allieva nell'AA corrente. Mappa athleteId → stats.
+// Allieve senza alcuna presenza registrata NON appaiono nella mappa
+// (caller mostra empty state). Sprint 4.A.1.
+export async function getMyAttendanceStats(parentId: string): Promise<{
+  byAthlete: Map<string, AttendanceStats>
+  academicYearLabel: string | null
+}> {
+  // Risolvi AA corrente. isCurrent boolean = source of truth.
+  const currentYear = await prisma.academicYear.findFirst({
+    where: { isCurrent: true },
+    select: { id: true, label: true },
+  })
+
+  if (!currentYear) {
+    return { byAthlete: new Map(), academicYearLabel: null }
+  }
+
+  const grouped = await prisma.attendance.groupBy({
+    by: ["athleteId", "status"],
+    where: {
+      athlete: {
+        deletedAt: null,
+        parentRelations: { some: { parentId } },
+      },
+      lesson: { academicYearId: currentYear.id },
+    },
+    _count: { _all: true },
+  })
+
+  const byAthlete = new Map<string, AttendanceStats>()
+  for (const row of grouped) {
+    const cur =
+      byAthlete.get(row.athleteId) ??
+      ({
+        presentCount: 0,
+        absentCount: 0,
+        justifiedCount: 0,
+        totalLessons: 0,
+        attendanceRate: 0,
+      } satisfies AttendanceStats)
+
+    if (row.status === "PRESENT") cur.presentCount += row._count._all
+    else if (row.status === "ABSENT") cur.absentCount += row._count._all
+    else if (row.status === "JUSTIFIED") cur.justifiedCount += row._count._all
+
+    cur.totalLessons =
+      cur.presentCount + cur.absentCount + cur.justifiedCount
+    cur.attendanceRate =
+      cur.totalLessons > 0
+        ? Math.round((cur.presentCount / cur.totalLessons) * 100)
+        : 0
+
+    byAthlete.set(row.athleteId, cur)
+  }
+
+  return { byAthlete, academicYearLabel: currentYear.label }
+}
