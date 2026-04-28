@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { CalendarDays, UserX } from "lucide-react"
+import { UserX } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import {
@@ -18,19 +18,11 @@ import { CourseDetailHeader } from "../_components/course-detail-header"
 import { CourseInfoDisplay } from "../_components/course-info-display"
 import { getCourseById, listActiveTeachers } from "../queries"
 
+import { SchedulesSection } from "./_components/schedules-section"
+
 interface PageProps {
   params: Promise<{ id: string }>
 }
-
-const DAY_OF_WEEK_LABELS = [
-  "Domenica",
-  "Lunedì",
-  "Martedì",
-  "Mercoledì",
-  "Giovedì",
-  "Venerdì",
-  "Sabato",
-]
 
 const ATHLETE_STATUS_LABELS: Record<string, string> = {
   TRIAL: "Prova",
@@ -85,53 +77,10 @@ export default async function CourseDetailPage({ params }: PageProps) {
             currentAcademicYearLabel={currentAcademicYear?.label ?? null}
           />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Orari</CardTitle>
-              <CardDescription>
-                {course.schedules.length === 0
-                  ? "Nessun orario configurato"
-                  : `${course.schedules.length} ${
-                      course.schedules.length === 1 ? "slot" : "slot"
-                    } settimanali`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {course.schedules.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-6 text-center">
-                  <CalendarDays className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-xs text-muted-foreground">
-                    Nessun orario configurato per questo corso.
-                  </p>
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {course.schedules.map((schedule) => (
-                    <li
-                      key={schedule.id}
-                      className="flex items-center justify-between gap-3 rounded-md border p-3"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium">
-                            {DAY_OF_WEEK_LABELS[schedule.dayOfWeek] ?? "—"}
-                          </span>
-                          <span className="font-mono text-sm">
-                            {schedule.startTime}–{schedule.endTime}
-                          </span>
-                        </div>
-                        {schedule.location && (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {schedule.location}
-                          </p>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+          <SchedulesSection
+            courseId={course.id}
+            schedules={course.schedules}
+          />
 
           <Card>
             <CardHeader>

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   BookOpen,
+  Calendar,
   CalendarClock,
   FileSpreadsheet,
   FolderArchive,
@@ -50,6 +51,7 @@ const NAV_ITEMS = [
   { href: "/admin/parents", label: "Genitori", icon: Users },
   { href: "/admin/teachers", label: "Insegnanti", icon: UserCog },
   { href: "/admin/courses", label: "Corsi", icon: BookOpen },
+  { href: "/admin/academic-years", label: "Anni accademici", icon: Calendar },
   { href: "/admin/payments", label: "Pagamenti", icon: Receipt },
   { href: "/admin/scadenze", label: "Scadenze", icon: CalendarClock },
   { href: "/admin/expenses", label: "Spese", icon: Wallet },

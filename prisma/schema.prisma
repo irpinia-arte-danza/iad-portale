@@ -1211,6 +1211,14 @@ enum AuditAction {
   INVITE_PARENT
   // Teacher portal (Sprint 5)
   INVITE_TEACHER
+  // Fase 1.A — CourseSchedule CRUD + AcademicYear management
+  SCHEDULE_CREATE
+  SCHEDULE_UPDATE
+  SCHEDULE_DELETE
+  AY_CREATE
+  AY_UPDATE
+  AY_SET_CURRENT
+  AY_AUTO_SET_CURRENT
 }
 
 model AuditLog {

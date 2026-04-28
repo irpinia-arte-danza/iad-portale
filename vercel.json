@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/reminders",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/academic-year-rollover",
+      "schedule": "0 3 * * *"
     }
   ]
 }
