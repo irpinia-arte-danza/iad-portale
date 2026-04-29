@@ -14,6 +14,7 @@ import {
   MailPlus,
   Receipt,
   Settings,
+  Trash2,
   TrendingUp,
   UserCog,
   Users,
@@ -76,6 +77,7 @@ const NAV_ITEMS = [
     icon: MailPlus,
   },
   { href: "/admin/settings", label: "Impostazioni", icon: Settings },
+  { href: "/admin/cestino", label: "Cestino", icon: Trash2 },
 ] as const
 
 export function AdminSidebar({

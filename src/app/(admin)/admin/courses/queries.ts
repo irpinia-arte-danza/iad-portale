@@ -25,6 +25,7 @@ export async function listCourses(filters: ListFilters = {}) {
   } = filters
 
   const where: Prisma.CourseWhereInput = {
+    deletedAt: null,
     ...(status === "active"
       ? { isActive: true }
       : status === "archived"
@@ -120,8 +121,9 @@ export async function getCourseById(
 ): Promise<CourseWithRelations | null> {
   await requireAdmin()
 
-  return prisma.course.findUnique({
-    where: { id },
+  // findFirst (non findUnique) per poter combinare filtro deletedAt:null
+  return prisma.course.findFirst({
+    where: { id, deletedAt: null },
     ...courseWithRelations,
   })
 }
@@ -129,8 +131,8 @@ export async function getCourseById(
 export async function getCourseStatusCounts() {
   await requireAdmin()
   const [active, archived] = await Promise.all([
-    prisma.course.count({ where: { isActive: true } }),
-    prisma.course.count({ where: { isActive: false } }),
+    prisma.course.count({ where: { isActive: true, deletedAt: null } }),
+    prisma.course.count({ where: { isActive: false, deletedAt: null } }),
   ])
   return { active, archived, all: active + archived }
 }

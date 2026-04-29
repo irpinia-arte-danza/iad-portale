@@ -45,8 +45,8 @@ export default async function TeacherCourseDetailPage({ params }: PageProps) {
   const { teacherId } = await requireTeacher()
   const { id: courseId } = await params
 
-  const course = await prisma.course.findUnique({
-    where: { id: courseId },
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, deletedAt: null },
     select: {
       id: true,
       name: true,

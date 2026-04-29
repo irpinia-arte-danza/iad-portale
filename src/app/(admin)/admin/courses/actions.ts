@@ -181,6 +181,9 @@ export async function toggleCourseActive(
   }
 
   try {
+    // Update by id ok per toggle isActive (soft-delete via deletedAt è
+    // separato da archive flag isActive). Non filtra deletedAt:null per
+    // permettere reattivazione di corsi ripristinati dal cestino.
     await prisma.course.update({
       where: { id: idParsed.data },
       data: { isActive },

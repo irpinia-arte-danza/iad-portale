@@ -255,7 +255,7 @@ export async function getScadenze(
 export async function listCoursesForFilter() {
   await requireAdmin()
   return prisma.course.findMany({
-    where: { isActive: true },
+    where: { isActive: true, deletedAt: null },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   })

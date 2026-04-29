@@ -84,6 +84,22 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
       },
       orderBy: [{ enrollmentDate: "desc" }],
     },
+    // Sprint 1.B: certificati medici (ultimo + storico). Filtra non-deleted.
+    medicalCertificates: {
+      where: { deletedAt: null },
+      orderBy: [{ issueDate: "desc" }],
+      select: {
+        id: true,
+        type: true,
+        issueDate: true,
+        expiryDate: true,
+        doctorName: true,
+        notes: true,
+        fileUrl: true,
+        filePath: true,
+        createdAt: true,
+      },
+    },
   },
 })
 

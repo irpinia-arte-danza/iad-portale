@@ -354,8 +354,9 @@ model Course {
   enrollments    CourseEnrollment[]
   teacherCourses TeacherCourse[]
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@map("courses")
 }
@@ -853,11 +854,19 @@ model MedicalCertificate {
   issueDate  DateTime @map("issue_date") @db.Date
   expiryDate DateTime @map("expiry_date") @db.Date
   doctorName String?  @map("doctor_name")
+  // Sprint 1.B: enum app-side via Zod (AGONISTICO / NON_AGONISTICO /
+  // IDONEITA_LUDICO / ALTRO). Default DB legacy "non-agonistica" mantenuto
+  // per backward compat — display-time mapping in schemas/medical-certificate.
   type       String   @default("non-agonistica")
   fileUrl    String?  @map("file_url")
+  // Sprint 1.B: filePath separato da fileUrl per retrieve da Supabase
+  // Storage privato (signed URL refresh on demand).
+  filePath   String?  @map("file_path")
+  notes      String?
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@index([athleteId, expiryDate])
   @@map("medical_certificates")
@@ -1219,6 +1228,16 @@ enum AuditAction {
   AY_UPDATE
   AY_SET_CURRENT
   AY_AUTO_SET_CURRENT
+  // Fase 1.B — MedicalCertificate CRUD + Cestino unificato
+  CERT_CREATE
+  CERT_UPDATE
+  CERT_DELETE
+  RESTORE_ATHLETE
+  RESTORE_PARENT
+  RESTORE_TEACHER
+  RESTORE_COURSE
+  RESTORE_EXPENSE
+  RESTORE_CERT
 }
 
 model AuditLog {

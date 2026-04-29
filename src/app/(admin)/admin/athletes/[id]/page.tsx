@@ -14,6 +14,7 @@ import { GuardianListSection } from "../_components/guardian-list-section"
 import { SchedulesSection } from "../_components/schedules-section"
 import { getAthleteById, getAthleteForPDF } from "../queries"
 import { AthletePDFButton } from "./_components/athlete-pdf-button"
+import { MedicalCertSection } from "./_components/medical-cert-section"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -33,7 +34,7 @@ export default async function AthleteDetailPage({ params }: PageProps) {
     getAthleteById(resolvedParams.id),
     getAthleteForPDF(resolvedParams.id),
     prisma.course.findMany({
-      where: { isActive: true },
+      where: { isActive: true, deletedAt: null },
       select: {
         id: true,
         name: true,
@@ -79,6 +80,10 @@ export default async function AthleteDetailPage({ params }: PageProps) {
       <ResourceContent>
         <div className="flex flex-col gap-6">
           <AthleteAnagraficaDisplay athlete={athlete} />
+          <MedicalCertSection
+            athleteId={athlete.id}
+            certificates={athlete.medicalCertificates}
+          />
           <GuardianListSection
             athleteId={athlete.id}
             parentRelations={athlete.parentRelations}

@@ -62,8 +62,8 @@ export async function createEnrollment(
     return { ok: false, error: "Nessun anno accademico corrente configurato" }
   }
 
-  const course = await prisma.course.findUnique({
-    where: { id: parsed.data.courseId },
+  const course = await prisma.course.findFirst({
+    where: { id: parsed.data.courseId, deletedAt: null },
     select: { id: true, name: true, isActive: true },
   })
   if (!course) {

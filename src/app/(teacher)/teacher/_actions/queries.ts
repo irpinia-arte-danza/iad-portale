@@ -22,7 +22,10 @@ export async function getMyCourses(teacherId: string) {
   // Corsi M2M dell'insegnante. Esclude monthlyFeeCents/trimesterFeeCents
   // (no finanze a teacher). Include count allieve attive AY corrente.
   const links = await prisma.teacherCourse.findMany({
-    where: { teacher: { id: teacherId, deletedAt: null } },
+    where: {
+      teacher: { id: teacherId, deletedAt: null },
+      course: { deletedAt: null },
+    },
     select: {
       isPrimary: true,
       course: {
