@@ -213,7 +213,7 @@ export function AcademicYearFormDialog({
                 name="monthlyRenewalDay"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Giorno scadenza mensile</FormLabel>
+                    <FormLabel>Giorno scadenza mensile (31 → ultimo del mese)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"

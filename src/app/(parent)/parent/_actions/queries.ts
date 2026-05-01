@@ -1,6 +1,7 @@
 import "server-only"
 
 import { prisma } from "@/lib/prisma"
+import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tutte le query sono filtrate per parentId per RLS applicativo (defense
@@ -82,7 +83,7 @@ export type MyAthlete = Awaited<ReturnType<typeof getMyAthletes>>[number]
 export async function getMyOpenSchedules(parentId: string) {
   // Scadenze DUE/OVERDUE delle figlie del genitore
   const schedules = await prisma.paymentSchedule.findMany({
-    where: {
+    where: withActiveScheduleFilter({
       status: { in: ["DUE", "OVERDUE"] },
       courseEnrollment: {
         athlete: {
@@ -90,7 +91,7 @@ export async function getMyOpenSchedules(parentId: string) {
           parentRelations: { some: { parentId } },
         },
       },
-    },
+    }),
     select: {
       id: true,
       feeType: true,

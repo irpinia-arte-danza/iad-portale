@@ -35,17 +35,20 @@ function mapPrismaError(error: unknown): string {
   return "Errore interno, riprova"
 }
 
-async function enforcePrimaryFlags(
+async function clearPrimaryFlagsBeforeWrite(
   tx: Prisma.TransactionClient,
   athleteId: string,
-  excludeId: string,
+  excludeId: string | null,
   flags: { isPrimaryContact: boolean; isPrimaryPayer: boolean }
 ) {
   const updates: Promise<unknown>[] = []
   if (flags.isPrimaryContact) {
     updates.push(
       tx.athleteParent.updateMany({
-        where: { athleteId, NOT: { id: excludeId } },
+        where: {
+          athleteId,
+          ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        },
         data: { isPrimaryContact: false },
       })
     )
@@ -53,7 +56,10 @@ async function enforcePrimaryFlags(
   if (flags.isPrimaryPayer) {
     updates.push(
       tx.athleteParent.updateMany({
-        where: { athleteId, NOT: { id: excludeId } },
+        where: {
+          athleteId,
+          ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        },
         data: { isPrimaryPayer: false },
       })
     )
@@ -84,6 +90,12 @@ export async function linkExistingGuardian(
 
   try {
     await prisma.$transaction(async (tx) => {
+      await clearPrimaryFlagsBeforeWrite(
+        tx,
+        athleteIdParsed.data,
+        null,
+        parsed.data
+      )
       const pivot = await tx.athleteParent.create({
         data: {
           athleteId: athleteIdParsed.data,
@@ -92,12 +104,7 @@ export async function linkExistingGuardian(
         },
         select: { id: true },
       })
-      await enforcePrimaryFlags(
-        tx,
-        athleteIdParsed.data,
-        pivot.id,
-        parsed.data
-      )
+      return pivot
     })
     revalidatePath(`${ATHLETES_PATH}/${athleteIdParsed.data}`)
     return { ok: true }
@@ -143,6 +150,12 @@ export async function linkNewGuardian(
         data: cleanedParent,
         select: { id: true },
       })
+      await clearPrimaryFlagsBeforeWrite(
+        tx,
+        athleteIdParsed.data,
+        null,
+        relationParsed.data
+      )
       const pivot = await tx.athleteParent.create({
         data: {
           athleteId: athleteIdParsed.data,
@@ -151,12 +164,6 @@ export async function linkNewGuardian(
         },
         select: { id: true },
       })
-      await enforcePrimaryFlags(
-        tx,
-        athleteIdParsed.data,
-        pivot.id,
-        relationParsed.data
-      )
       return { parentId: parent.id }
     })
     revalidatePath(`${ATHLETES_PATH}/${athleteIdParsed.data}`)
@@ -215,19 +222,31 @@ export async function updateGuardianRelation(
 
   try {
     const athleteId = await prisma.$transaction(async (tx) => {
+      const existing = await tx.athleteParent.findUnique({
+        where: { id: idParsed.data },
+        select: { athleteId: true },
+      })
+      if (!existing) {
+        return null
+      }
+
+      await clearPrimaryFlagsBeforeWrite(
+        tx,
+        existing.athleteId,
+        idParsed.data,
+        parsed.data
+      )
+
       const pivot = await tx.athleteParent.update({
         where: { id: idParsed.data },
         data: parsed.data,
         select: { athleteId: true },
       })
-      await enforcePrimaryFlags(
-        tx,
-        pivot.athleteId,
-        idParsed.data,
-        parsed.data
-      )
       return pivot.athleteId
     })
+    if (!athleteId) {
+      return { ok: false, error: "Record non trovato" }
+    }
     revalidatePath(`${ATHLETES_PATH}/${athleteId}`)
     return { ok: true }
   } catch (error) {

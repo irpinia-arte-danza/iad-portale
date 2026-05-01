@@ -1,12 +1,13 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, ArrowRight, Stethoscope } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/server"
 import { prisma } from "@/lib/prisma"
 
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
+import { getCertificateStatusCounts } from "../medical-certificates/queries"
 
 import {
   getDashboardStats,
@@ -50,6 +51,7 @@ export default async function AdminDashboardPage() {
     popularCourses,
     retention,
     ayCoverage,
+    certCounts,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: authUser.id },
@@ -71,7 +73,30 @@ export default async function AdminDashboardPage() {
       select: { id: true, label: true, isCurrent: true },
       orderBy: { startDate: "desc" },
     }),
+    getCertificateStatusCounts(),
   ])
+
+  const certNeedsAttention =
+    certCounts.expired + certCounts.expiring + certCounts.missing
+  const certHasExpired = certCounts.expired > 0
+  const certPalette = certHasExpired
+    ? {
+        wrap: "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30",
+        title: "text-red-900 dark:text-red-100",
+        text: "text-red-800 dark:text-red-200",
+        icon: "text-red-700 dark:text-red-300",
+      }
+    : {
+        wrap: "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30",
+        title: "text-amber-900 dark:text-amber-100",
+        text: "text-amber-800 dark:text-amber-200",
+        icon: "text-amber-700 dark:text-amber-300",
+      }
+  const certDeepLink = certHasExpired
+    ? "/admin/medical-certificates?status=expired"
+    : certCounts.expiring > 0
+      ? "/admin/medical-certificates?status=expiring"
+      : "/admin/medical-certificates?status=missing"
 
   const ayBanner: { kind: "missing" | "mismatch" | "overlap"; details: string } | null =
     ayCoverage.length === 0
@@ -116,6 +141,43 @@ export default async function AdminDashboardPage() {
                   .
                 </p>
               </div>
+            </div>
+          ) : null}
+          {certNeedsAttention > 0 ? (
+            <div
+              className={`flex items-start gap-3 rounded-md border p-4 text-sm ${certPalette.wrap}`}
+            >
+              <Stethoscope
+                className={`mt-0.5 h-5 w-5 shrink-0 ${certPalette.icon}`}
+              />
+              <div className="flex-1 space-y-1">
+                <p className={`font-semibold ${certPalette.title}`}>
+                  Certificati medici da gestire
+                </p>
+                <p className={certPalette.text}>
+                  {[
+                    certCounts.expired > 0
+                      ? `${certCounts.expired} scaduti`
+                      : null,
+                    certCounts.expiring > 0
+                      ? `${certCounts.expiring} in scadenza`
+                      : null,
+                    certCounts.missing > 0
+                      ? `${certCounts.missing} mancanti`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  .
+                </p>
+              </div>
+              <Link
+                href={certDeepLink}
+                className={`flex shrink-0 items-center gap-1 text-xs font-medium underline underline-offset-4 ${certPalette.title}`}
+              >
+                Vai
+                <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
           ) : null}
           <ScadenzeKpiWidget kpi={scadenzeKpi} />

@@ -1,4 +1,5 @@
 import { createAdminClient } from "./admin-client"
+import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 
 export const MEDICAL_CERT_BUCKET = "medical-certificates"
 
@@ -41,7 +42,13 @@ export async function uploadMedicalCertFile(
   const supabase = createAdminClient()
   const ext = extForMime(file.type)
   const filePath = `${athleteId}/${certId}.${ext}`
-  const buffer = Buffer.from(await file.arrayBuffer())
+  const arrayBuffer = await file.arrayBuffer()
+  const signatureMime = detectMimeFromSignature(arrayBuffer)
+  if (!signatureMime || !ALLOWED_MIME_SET.has(signatureMime)) {
+    throw new Error("Il contenuto del file non corrisponde a un formato ammesso.")
+  }
+
+  const buffer = Buffer.from(arrayBuffer)
 
   const { error: uploadError } = await supabase.storage
     .from(MEDICAL_CERT_BUCKET)
@@ -97,4 +104,47 @@ export async function deleteMedicalCertFile(filePath: string): Promise<void> {
       error: error.message,
     })
   }
+}
+
+// Hard-delete cleanup: rimuove tutti i file presenti nella cartella
+// {athleteId}/ del bucket. Usato durante hard delete dell'allieva per
+// non lasciare file orfani. Errori loggati ma non fatali (file orfani
+// recuperabili manualmente da Supabase Dashboard).
+export async function deleteAllMedicalCertFilesForAthlete(
+  athleteId: string,
+): Promise<{ removed: number; error: string | null }> {
+  if (!athleteId) return { removed: 0, error: null }
+  const supabase = createAdminClient()
+
+  const { data: items, error: listError } = await supabase.storage
+    .from(MEDICAL_CERT_BUCKET)
+    .list(athleteId, { limit: 1000 })
+
+  if (listError) {
+    console.warn("[storage-medical-cert] list failed", {
+      athleteId,
+      error: listError.message,
+    })
+    return { removed: 0, error: listError.message }
+  }
+
+  if (!items || items.length === 0) {
+    return { removed: 0, error: null }
+  }
+
+  const paths = items.map((it) => `${athleteId}/${it.name}`)
+  const { error: removeError } = await supabase.storage
+    .from(MEDICAL_CERT_BUCKET)
+    .remove(paths)
+
+  if (removeError) {
+    console.warn("[storage-medical-cert] bulk delete failed", {
+      athleteId,
+      count: paths.length,
+      error: removeError.message,
+    })
+    return { removed: 0, error: removeError.message }
+  }
+
+  return { removed: paths.length, error: null }
 }

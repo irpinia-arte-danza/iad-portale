@@ -12,6 +12,7 @@ import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { formatMeseIt } from "@/lib/utils/format"
+import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -141,10 +142,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const dayEnd = addDaysUTC(m.targetDueDate, 1)
 
     const candidates = await prisma.paymentSchedule.findMany({
-      where: {
+      where: withActiveScheduleFilter({
         status: ScheduleStatus.DUE,
         dueDate: { gte: dayStart, lt: dayEnd },
-      },
+      }),
       include: {
         courseEnrollment: {
           select: {

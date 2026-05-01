@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { Prisma } from "@prisma/client"
+import { AuditAction, Prisma } from "@prisma/client"
 
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { prisma } from "@/lib/prisma"
@@ -252,6 +252,41 @@ export async function deleteLogo(
 // ============================================================================
 // Ricevute
 // ============================================================================
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function extractReceiptCounter(receiptNumber: string, prefix: string): number | null {
+  const match = receiptNumber.match(
+    new RegExp(`^${escapeRegExp(prefix)}[^/]+/(\\d+)(?:/(?:S|C))?$`),
+  )
+  if (!match) return null
+  const value = Number.parseInt(match[1], 10)
+  return Number.isFinite(value) ? value : null
+}
+
+async function getMaxIssuedReceiptCounter(prefix: string): Promise<{
+  counter: number
+  receiptNumber: string | null
+}> {
+  const receipts = await prisma.receipt.findMany({
+    where: { receiptNumber: { startsWith: prefix } },
+    select: { receiptNumber: true },
+  })
+
+  let max = 0
+  let maxReceipt: string | null = null
+  for (const receipt of receipts) {
+    const counter = extractReceiptCounter(receipt.receiptNumber, prefix)
+    if (counter !== null && counter > max) {
+      max = counter
+      maxReceipt = receipt.receiptNumber
+    }
+  }
+
+  return { counter: max, receiptNumber: maxReceipt }
+}
+
 export async function updateRicevute(
   values: RicevuteValues,
 ): Promise<ActionResult> {
@@ -271,6 +306,16 @@ export async function updateRicevute(
     })
 
     const data = cleanEmpty(parsed.data)
+    const maxIssued = await getMaxIssuedReceiptCounter(parsed.data.receiptPrefix)
+    if (parsed.data.receiptNumber < maxIssued.counter) {
+      return {
+        ok: false,
+        error:
+          "Impossibile abbassare il contatore: ricevute esistenti con numero " +
+          `più alto già emesse (ultimo: ${maxIssued.receiptNumber ?? maxIssued.counter})`,
+      }
+    }
+
     await prisma.receiptSettings.update({
       where: { id: 1 },
       data: { ...data, updatedBy: userId },
@@ -286,6 +331,20 @@ export async function updateRicevute(
         data as Record<string, unknown>,
       ),
     })
+
+    if (before.receiptNumber !== parsed.data.receiptNumber) {
+      await logSettingsChange({
+        userId,
+        action: AuditAction.RECEIPT_COUNTER_UPDATE,
+        entityType: "ReceiptSettings",
+        entityId: "1",
+        changes: {
+          old: before.receiptNumber,
+          new: parsed.data.receiptNumber,
+          prefix: parsed.data.receiptPrefix,
+        },
+      })
+    }
 
     revalidatePath(SETTINGS_PATH)
     return { ok: true }

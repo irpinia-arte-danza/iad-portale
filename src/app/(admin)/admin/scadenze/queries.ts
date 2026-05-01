@@ -2,6 +2,7 @@ import { Prisma, ScheduleStatus } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 export type ScadenzeStatoFilter =
   | "DEFAULT"
@@ -117,7 +118,7 @@ function buildWhere(filter: ScadenzeFilter): Prisma.PaymentScheduleWhereInput {
     }
   }
 
-  return base
+  return withActiveScheduleFilter(base)
 }
 
 function buildOrderBy(

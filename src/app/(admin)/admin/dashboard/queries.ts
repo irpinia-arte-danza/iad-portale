@@ -2,6 +2,7 @@ import { AthleteStatus, ScheduleStatus } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 export async function getDashboardStats() {
   await requireAdmin()
@@ -39,19 +40,22 @@ export async function getDashboardStats() {
     }),
     prisma.parent.count({ where: { deletedAt: null } }),
     prisma.paymentSchedule.count({
-      where: { status: ScheduleStatus.DUE, dueDate: { lt: today } },
+      where: withActiveScheduleFilter({
+        status: ScheduleStatus.DUE,
+        dueDate: { lt: today },
+      }),
     }),
     prisma.paymentSchedule.count({
-      where: {
+      where: withActiveScheduleFilter({
         status: ScheduleStatus.DUE,
         dueDate: { gte: today, lt: nextMonth },
-      },
+      }),
     }),
     prisma.paymentSchedule.count({
-      where: {
+      where: withActiveScheduleFilter({
         status: ScheduleStatus.PAID,
         updatedAt: { gte: firstOfMonth, lt: nextMonth },
-      },
+      }),
     }),
   ])
 
@@ -79,18 +83,18 @@ export async function getScadenzeKPI() {
 
   const [inRitardo, inScadenza7gg] = await Promise.all([
     prisma.paymentSchedule.aggregate({
-      where: {
+      where: withActiveScheduleFilter({
         status: ScheduleStatus.DUE,
         dueDate: { lt: today },
-      },
+      }),
       _sum: { amountCents: true },
       _count: true,
     }),
     prisma.paymentSchedule.aggregate({
-      where: {
+      where: withActiveScheduleFilter({
         status: ScheduleStatus.DUE,
         dueDate: { gte: today, lte: in7days },
-      },
+      }),
       _sum: { amountCents: true },
       _count: true,
     }),

@@ -6,6 +6,7 @@ import { AuditAction, Prisma, ScheduleStatus } from "@prisma/client"
 
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { prisma } from "@/lib/prisma"
+import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
 import type { ActionResult } from "@/lib/schemas/common"
 import {
   reminderConfigSchema,
@@ -201,10 +202,10 @@ export async function previewCronReminders(): Promise<CronPreview> {
     const dayEnd = addDaysUTC(m.targetDueDate, 1)
 
     const candidates = await prisma.paymentSchedule.findMany({
-      where: {
+      where: withActiveScheduleFilter({
         status: ScheduleStatus.DUE,
         dueDate: { gte: dayStart, lt: dayEnd },
-      },
+      }),
       include: {
         courseEnrollment: {
           select: {

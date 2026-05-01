@@ -61,6 +61,18 @@ type Props = {
   hasExistingFile?: boolean
 }
 
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+}
+
+function addOneYearSafe(date: Date): Date {
+  const targetYear = date.getFullYear() + 1
+  if (date.getMonth() === 1 && date.getDate() === 29 && !isLeapYear(targetYear)) {
+    return new Date(targetYear, 1, 28)
+  }
+  return new Date(targetYear, date.getMonth(), date.getDate())
+}
+
 export function MedicalCertFormDialog({
   open,
   onOpenChange,
@@ -81,7 +93,7 @@ export function MedicalCertFormDialog({
       issueDate: defaults?.issueDate ?? new Date(),
       expiryDate:
         defaults?.expiryDate ??
-        new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+        addOneYearSafe(new Date()),
       doctorName: defaults?.doctorName ?? "",
       notes: defaults?.notes ?? "",
     },
@@ -94,7 +106,7 @@ export function MedicalCertFormDialog({
         issueDate: defaults?.issueDate ?? new Date(),
         expiryDate:
           defaults?.expiryDate ??
-          new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+          addOneYearSafe(new Date()),
         doctorName: defaults?.doctorName ?? "",
         notes: defaults?.notes ?? "",
       })
@@ -226,11 +238,7 @@ export function MedicalCertFormDialog({
                             ) {
                               form.setValue(
                                 "expiryDate",
-                                new Date(
-                                  newIssue.getFullYear() + 1,
-                                  newIssue.getMonth(),
-                                  newIssue.getDate(),
-                                ),
+                                addOneYearSafe(newIssue),
                               )
                             }
                           }

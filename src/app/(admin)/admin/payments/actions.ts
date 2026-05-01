@@ -109,6 +109,39 @@ export async function registerPayment(
   const courseEnrollmentId = emptyToNull(parsed.data.courseEnrollmentId)
   const amountCents = Math.round(parsed.data.amountEur * 100)
 
+  const [parentRelation, courseEnrollment] = await Promise.all([
+    parentId
+      ? prisma.athleteParent.findFirst({
+          where: {
+            athleteId: parsed.data.athleteId,
+            parentId,
+            parent: { deletedAt: null },
+          },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    courseEnrollmentId
+      ? prisma.courseEnrollment.findFirst({
+          where: {
+            id: courseEnrollmentId,
+            athleteId: parsed.data.athleteId,
+            withdrawalDate: null,
+            academicYear: { isCurrent: true },
+            athlete: { deletedAt: null },
+            course: { deletedAt: null },
+          },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+  ])
+
+  if (parentId && !parentRelation) {
+    return { ok: false, error: "Pagamento non valido per questa allieva" }
+  }
+  if (courseEnrollmentId && !courseEnrollment) {
+    return { ok: false, error: "Pagamento non valido per questa allieva" }
+  }
+
   try {
     const created = await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
@@ -273,7 +306,11 @@ export async function reversePayment(
 
   const existing = await prisma.payment.findFirst({
     where: { id: idParsed.data, deletedAt: null },
-    select: { athleteId: true, status: true },
+    select: {
+      athleteId: true,
+      status: true,
+      paymentSchedule: { select: { id: true } },
+    },
   })
   if (!existing) {
     return { ok: false, error: "Pagamento non trovato" }
@@ -283,12 +320,21 @@ export async function reversePayment(
   }
 
   try {
-    await prisma.payment.update({
-      where: { id: idParsed.data },
-      data: {
-        status: PaymentStatus.REVERSED,
-        reversalReason: parsed.data.reversalReason,
-      },
+    await prisma.$transaction(async (tx) => {
+      if (existing.paymentSchedule) {
+        await tx.paymentSchedule.update({
+          where: { id: existing.paymentSchedule.id },
+          data: { paymentId: null, status: ScheduleStatus.DUE },
+        })
+      }
+
+      await tx.payment.update({
+        where: { id: idParsed.data },
+        data: {
+          status: PaymentStatus.REVERSED,
+          reversalReason: parsed.data.reversalReason,
+        },
+      })
     })
     revalidatePath("/admin/payments")
     revalidatePath(athletePath(existing.athleteId))

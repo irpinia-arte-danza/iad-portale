@@ -1,14 +1,15 @@
 import { createAdminClient } from "./admin-client"
+import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 
 export const BRAND_BUCKET = "brand"
 
 export type BrandLogoSlot = "logo-light" | "logo-dark" | "favicon" | "logo-svg"
 
 const SLOT_CONTENT_TYPE: Record<BrandLogoSlot, readonly string[]> = {
-  "logo-light": ["image/png", "image/jpeg", "image/webp", "image/svg+xml"],
-  "logo-dark": ["image/png", "image/jpeg", "image/webp", "image/svg+xml"],
-  favicon: ["image/png", "image/x-icon", "image/vnd.microsoft.icon", "image/svg+xml"],
-  "logo-svg": ["image/svg+xml"],
+  "logo-light": ["image/png", "image/jpeg", "image/webp"],
+  "logo-dark": ["image/png", "image/jpeg", "image/webp"],
+  favicon: ["image/png", "image/x-icon", "image/vnd.microsoft.icon"],
+  "logo-svg": [],
 }
 
 const MAX_BYTES = 2 * 1024 * 1024 // 2 MB
@@ -44,6 +45,9 @@ export async function uploadBrandAsset(
   file: File,
 ): Promise<{ publicUrl: string; path: string }> {
   const allowed = SLOT_CONTENT_TYPE[slot]
+  if (slot === "logo-svg") {
+    throw new Error("Upload SVG disattivato per sicurezza. Usa PNG, JPEG o WebP.")
+  }
   if (!allowed.includes(file.type)) {
     throw new Error(
       `Formato non supportato per ${slot}. Ammessi: ${allowed.join(", ")}`,
@@ -59,7 +63,13 @@ export async function uploadBrandAsset(
   const ext = extForMime(file.type)
   const version = Date.now()
   const path = `${slot}-${version}.${ext}`
-  const buffer = Buffer.from(await file.arrayBuffer())
+  const arrayBuffer = await file.arrayBuffer()
+  const signatureMime = detectMimeFromSignature(arrayBuffer)
+  if (!signatureMime || !allowed.includes(signatureMime)) {
+    throw new Error("Il contenuto del file non corrisponde a un formato ammesso.")
+  }
+
+  const buffer = Buffer.from(arrayBuffer)
 
   const { error } = await supabase.storage.from(BRAND_BUCKET).upload(path, buffer, {
     contentType: file.type,

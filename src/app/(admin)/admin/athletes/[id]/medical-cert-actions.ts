@@ -18,6 +18,7 @@ import {
   getMedicalCertSignedUrl as getSignedFromStorage,
   uploadMedicalCertFile,
 } from "@/lib/supabase/storage-medical-cert"
+import { validateFileSignature } from "@/lib/utils/file-signature"
 
 const MAX_BYTES = 3 * 1024 * 1024
 
@@ -68,12 +69,12 @@ function fileFromForm(formData: FormData): File | null {
   return f
 }
 
-function validateFile(file: File): string | null {
+async function validateFile(file: File): Promise<string | null> {
   if (file.size > MAX_BYTES) return "File troppo grande (max 3 MB)"
   if (!(ALLOWED_MIME as readonly string[]).includes(file.type)) {
     return `Formato non supportato (${file.type}). Ammessi: PDF, JPEG, PNG.`
   }
-  return null
+  return validateFileSignature(file, ALLOWED_MIME)
 }
 
 export async function createMedicalCertificate(
@@ -92,7 +93,7 @@ export async function createMedicalCertificate(
 
   const file = fileFromForm(formData)
   if (file) {
-    const fileError = validateFile(file)
+    const fileError = await validateFile(file)
     if (fileError) return { ok: false, error: fileError }
   }
 
@@ -171,7 +172,7 @@ export async function updateMedicalCertificate(
 
   const file = fileFromForm(formData)
   if (file) {
-    const fileError = validateFile(file)
+    const fileError = await validateFile(file)
     if (fileError) return { ok: false, error: fileError }
   }
 

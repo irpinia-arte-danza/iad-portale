@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ArchiveRestore, Loader2 } from "lucide-react"
+import { ArchiveRestore, Loader2, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Tabs,
   TabsContent,
@@ -37,6 +38,12 @@ import {
 } from "@/lib/schemas/medical-certificate"
 
 import {
+  hardDeleteAthlete,
+  hardDeleteCourse,
+  hardDeleteExpense,
+  hardDeleteMedicalCertificate,
+  hardDeleteParent,
+  hardDeleteTeacher,
   restoreAthlete,
   restoreCourse,
   restoreExpense,
@@ -44,6 +51,34 @@ import {
   restoreParent,
   restoreTeacher,
 } from "../actions"
+
+type EntityKind =
+  | "athlete"
+  | "parent"
+  | "teacher"
+  | "course"
+  | "expense"
+  | "cert"
+
+type HardDeleteTarget = {
+  id: string
+  kind: EntityKind
+  label: string
+  confirmExpected: string
+  confirmKind: "name" | "date"
+}
+
+const HARD_DELETE_FN: Record<
+  EntityKind,
+  (id: string, confirm: string) => Promise<{ ok: boolean; error?: string }>
+> = {
+  athlete: hardDeleteAthlete,
+  parent: hardDeleteParent,
+  teacher: hardDeleteTeacher,
+  course: hardDeleteCourse,
+  expense: hardDeleteExpense,
+  cert: hardDeleteMedicalCertificate,
+}
 
 type Counts = {
   athletes: number
@@ -126,7 +161,7 @@ function daysAgo(date: Date | null): string {
 type ConfirmTarget = {
   id: string
   label: string
-  kind: "athlete" | "parent" | "teacher" | "course" | "expense" | "cert"
+  kind: EntityKind
 }
 
 const RESTORE_FN = {
@@ -148,6 +183,9 @@ export function CestinoClient({
   certs,
 }: Props) {
   const [confirm, setConfirm] = React.useState<ConfirmTarget | null>(null)
+  const [hardTarget, setHardTarget] = React.useState<HardDeleteTarget | null>(
+    null,
+  )
   const [busy, setBusy] = React.useState(false)
 
   async function onConfirmRestore() {
@@ -201,8 +239,11 @@ export function CestinoClient({
               ],
               label: `${a.firstName} ${a.lastName}`,
               kind: "athlete" as const,
+              confirmExpected: `${a.firstName} ${a.lastName}`,
+              confirmKind: "name" as const,
             }))}
             onRestore={setConfirm}
+            onHardDelete={setHardTarget}
           />
         </TabsContent>
 
@@ -219,8 +260,11 @@ export function CestinoClient({
               ],
               label: `${p.firstName} ${p.lastName}`,
               kind: "parent" as const,
+              confirmExpected: `${p.firstName} ${p.lastName}`,
+              confirmKind: "name" as const,
             }))}
             onRestore={setConfirm}
+            onHardDelete={setHardTarget}
           />
         </TabsContent>
 
@@ -237,8 +281,11 @@ export function CestinoClient({
               ],
               label: `${t.firstName} ${t.lastName}`,
               kind: "teacher" as const,
+              confirmExpected: `${t.firstName} ${t.lastName}`,
+              confirmKind: "name" as const,
             }))}
             onRestore={setConfirm}
+            onHardDelete={setHardTarget}
           />
         </TabsContent>
 
@@ -262,8 +309,11 @@ export function CestinoClient({
               ],
               label: c.name,
               kind: "course" as const,
+              confirmExpected: c.name,
+              confirmKind: "name" as const,
             }))}
             onRestore={setConfirm}
+            onHardDelete={setHardTarget}
           />
         </TabsContent>
 
@@ -280,10 +330,15 @@ export function CestinoClient({
                 e.description ?? "—",
                 daysAgo(e.deletedAt),
               ],
-              label: `${e.type} · ${euroFormatter.format(e.amountCents / 100)}`,
+              label: `${e.type} · ${euroFormatter.format(e.amountCents / 100)} · ${formatDateShort(new Date(e.expenseDate))}`,
               kind: "expense" as const,
+              confirmExpected: new Date(e.expenseDate)
+                .toISOString()
+                .slice(0, 10),
+              confirmKind: "date" as const,
             }))}
             onRestore={setConfirm}
+            onHardDelete={setHardTarget}
           />
         </TabsContent>
 
@@ -302,11 +357,19 @@ export function CestinoClient({
               ],
               label: `${c.athlete.firstName} ${c.athlete.lastName} · ${MEDICAL_CERT_TYPE_LABELS[normalizeCertType(c.type)]}`,
               kind: "cert" as const,
+              confirmExpected: `${c.athlete.firstName} ${c.athlete.lastName}`,
+              confirmKind: "name" as const,
             }))}
             onRestore={setConfirm}
+            onHardDelete={setHardTarget}
           />
         </TabsContent>
       </Tabs>
+
+      <HardDeleteDialog
+        target={hardTarget}
+        onClose={() => setHardTarget(null)}
+      />
 
       <AlertDialog
         open={confirm !== null}
@@ -350,21 +413,27 @@ export function CestinoClient({
   )
 }
 
+type CestinoRow = {
+  id: string
+  cells: React.ReactNode[]
+  label: string
+  kind: EntityKind
+  confirmExpected: string
+  confirmKind: "name" | "date"
+}
+
 function CestinoTable({
   columns,
   rows,
   empty,
   onRestore,
+  onHardDelete,
 }: {
   columns: string[]
-  rows: Array<{
-    id: string
-    cells: React.ReactNode[]
-    label: string
-    kind: ConfirmTarget["kind"]
-  }>
+  rows: CestinoRow[]
   empty: string
   onRestore: (target: ConfirmTarget) => void
+  onHardDelete: (target: HardDeleteTarget) => void
 }) {
   if (rows.length === 0) {
     return (
@@ -381,7 +450,7 @@ function CestinoTable({
             {columns.map((c) => (
               <TableHead key={c}>{c}</TableHead>
             ))}
-            <TableHead className="w-32 text-right">Azione</TableHead>
+            <TableHead className="w-64 text-right">Azioni</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -391,25 +460,170 @@ function CestinoTable({
                 <TableCell key={i}>{cell}</TableCell>
               ))}
               <TableCell className="text-right">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    onRestore({
-                      id: row.id,
-                      label: row.label,
-                      kind: row.kind,
-                    })
-                  }
-                >
-                  <ArchiveRestore className="mr-1 h-4 w-4" />
-                  Ripristina
-                </Button>
+                <div className="flex justify-end gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      onRestore({
+                        id: row.id,
+                        label: row.label,
+                        kind: row.kind,
+                      })
+                    }
+                  >
+                    <ArchiveRestore className="mr-1 h-4 w-4" />
+                    Ripristina
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() =>
+                      onHardDelete({
+                        id: row.id,
+                        kind: row.kind,
+                        label: row.label,
+                        confirmExpected: row.confirmExpected,
+                        confirmKind: row.confirmKind,
+                      })
+                    }
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" />
+                    Elimina
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
     </div>
+  )
+}
+
+function HardDeleteDialog({
+  target,
+  onClose,
+}: {
+  target: HardDeleteTarget | null
+  onClose: () => void
+}) {
+  const [step, setStep] = React.useState<"warn" | "confirm">("warn")
+  const [input, setInput] = React.useState("")
+  const [busy, setBusy] = React.useState(false)
+
+  React.useEffect(() => {
+    if (target) {
+      setStep("warn")
+      setInput("")
+      setBusy(false)
+    }
+  }, [target])
+
+  if (!target) return null
+
+  const expected = target.confirmExpected
+  const matches =
+    target.confirmKind === "name"
+      ? input.trim().replace(/\s+/g, " ").toLowerCase() ===
+        expected.trim().replace(/\s+/g, " ").toLowerCase()
+      : input.trim() === expected
+
+  const promptLabel =
+    target.confirmKind === "name"
+      ? `Per confermare scrivi: ${expected}`
+      : `Per confermare scrivi la data (${expected})`
+
+  async function onSubmit() {
+    if (!matches || !target) return
+    setBusy(true)
+    const fn = HARD_DELETE_FN[target.kind]
+    const result = await fn(target.id, input)
+    if (result.ok) {
+      toast.success(`${target.label} eliminato definitivamente`)
+      onClose()
+    } else {
+      toast.error(result.error ?? "Errore eliminazione")
+    }
+    setBusy(false)
+  }
+
+  return (
+    <AlertDialog
+      open={target !== null}
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose()
+      }}
+    >
+      <AlertDialogContent>
+        {step === "warn" ? (
+          <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Eliminare PERMANENTEMENTE {target.label}?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Questa azione è{" "}
+                <strong>irreversibile</strong>. Tutti i dati collegati
+                (iscrizioni, presenze, certificati, file allegati) verranno
+                cancellati. I record con dati fiscali (pagamenti, compensi)
+                bloccheranno l&apos;eliminazione per compliance.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={(e) => {
+                  e.preventDefault()
+                  setStep("confirm")
+                }}
+              >
+                Continua
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </>
+        ) : (
+          <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+              <AlertDialogDescription>{promptLabel}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={expected}
+              autoFocus
+              disabled={busy}
+              autoComplete="off"
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={busy}>Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={!matches || busy}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={(e) => {
+                  e.preventDefault()
+                  onSubmit()
+                }}
+              >
+                {busy ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Eliminazione...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Elimina definitivamente
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </>
+        )}
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

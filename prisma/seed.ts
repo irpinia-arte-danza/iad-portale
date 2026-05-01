@@ -223,6 +223,27 @@ A.S.D. IAD Irpinia Arte Danza`,
 <p><small>A.S.D. IAD Irpinia Arte Danza</small></p>`,
     },
     {
+      slug: "cert-reminder",
+      name: "Promemoria certificato medico",
+      description:
+        "Avviso al genitore quando il certificato medico è in scadenza o scaduto",
+      category: EmailCategory.PROMEMORIA,
+      subject:
+        "Certificato medico {tipo_certificato} di {allieva_nome} — scadenza {data_scadenza}",
+      bodyHtml: `<p>Gentile {genitore_nome},</p>
+<p>le ricordiamo che il certificato medico <strong>{tipo_certificato}</strong> di <strong>{allieva_nome}</strong> scade il <strong>{data_scadenza}</strong> ({giorni_scadenza} giorni).</p>
+<p>Per consentire la prosecuzione delle attività in palestra, le chiediamo di provvedere al rinnovo prima della scadenza.</p>
+<p>Una volta effettuata la visita medica, può consegnare il nuovo certificato in segreteria oppure inviarlo via email a <a href="mailto:info@irpiniaartedanza.it">info@irpiniaartedanza.it</a>.</p>
+<p>Grazie per la collaborazione.</p>
+<hr>
+<p><small>A.S.D. IAD Irpinia Arte Danza</small></p>`,
+      bodyText: `Gentile {genitore_nome},
+il certificato medico {tipo_certificato} di {allieva_nome} scade il {data_scadenza} ({giorni_scadenza} giorni).
+Per la prosecuzione delle attività, è necessario il rinnovo prima della scadenza.
+Consegna in segreteria o via email a info@irpiniaartedanza.it.
+A.S.D. IAD Irpinia Arte Danza`,
+    },
+    {
       slug: "conferma-pagamento",
       name: "Conferma pagamento ricevuto",
       description: "Email dopo registrazione pagamento",

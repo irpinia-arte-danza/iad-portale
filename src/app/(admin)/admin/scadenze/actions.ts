@@ -15,6 +15,7 @@ import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { formatMeseIt } from "@/lib/utils/format"
+import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 const DATE_IT = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
@@ -44,10 +45,10 @@ export async function getScadenzeCSVData(
   }
 
   const schedules = await prisma.paymentSchedule.findMany({
-    where: {
+    where: withActiveScheduleFilter({
       id: { in: scheduleIds },
       status: ScheduleStatus.DUE,
-    },
+    }),
     orderBy: { dueDate: "asc" },
     include: {
       courseEnrollment: {
@@ -190,8 +191,10 @@ export async function previewReminder(
 ): Promise<ReminderPreview> {
   await requireAdmin()
 
-  const schedule = await prisma.paymentSchedule.findUnique({
-    where: { id: scheduleId },
+  const schedule = await prisma.paymentSchedule.findFirst({
+    where: withActiveScheduleFilter({
+      id: scheduleId,
+    }),
     include: {
       courseEnrollment: {
         select: {
@@ -302,10 +305,10 @@ export async function sendReminderBatch(
   }
 
   const schedules = await prisma.paymentSchedule.findMany({
-    where: {
+    where: withActiveScheduleFilter({
       id: { in: scheduleIds },
       status: ScheduleStatus.DUE,
-    },
+    }),
     orderBy: { dueDate: "asc" },
     include: {
       courseEnrollment: {

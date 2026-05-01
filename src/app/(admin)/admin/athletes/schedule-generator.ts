@@ -6,14 +6,27 @@ function computeFirstDueDate(enrollmentDate: Date, renewalDay: number): Date {
   const d = enrollmentDate.getUTCDate()
 
   if (d <= renewalDay) {
-    return new Date(Date.UTC(y, m, renewalDay))
+    return new Date(Date.UTC(y, m, clampDayToMonth(y, m, renewalDay)))
   }
-  return new Date(Date.UTC(y, m + 1, renewalDay))
+  const nextMonth = m + 1
+  return new Date(
+    Date.UTC(y, nextMonth, clampDayToMonth(y, nextMonth, renewalDay)),
+  )
 }
 
-function advanceOneMonth(date: Date): Date {
+function lastDayOfMonthUTC(year: number, month: number): number {
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+}
+
+function clampDayToMonth(year: number, month: number, day: number): number {
+  return Math.min(day, lastDayOfMonthUTC(year, month))
+}
+
+function advanceOneMonth(date: Date, renewalDay: number): Date {
+  const y = date.getUTCFullYear()
+  const m = date.getUTCMonth() + 1
   return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()),
+    Date.UTC(y, m, clampDayToMonth(y, m, renewalDay)),
   )
 }
 
@@ -74,7 +87,7 @@ export async function generateMonthlySchedulesForEnrollment(
       status: ScheduleStatus.DUE,
       createdBy,
     })
-    current = advanceOneMonth(current)
+    current = advanceOneMonth(current, academicYear.monthlyRenewalDay)
   }
 
   if (rows.length === 0) return 0

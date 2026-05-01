@@ -1216,6 +1216,7 @@ enum AuditAction {
   INVITE_ADMIN
   LOGO_UPLOAD
   LOGO_DELETE
+  RECEIPT_COUNTER_UPDATE
   // Parent portal (Sprint 4.A)
   INVITE_PARENT
   // Teacher portal (Sprint 5)
@@ -1238,6 +1239,14 @@ enum AuditAction {
   RESTORE_COURSE
   RESTORE_EXPENSE
   RESTORE_CERT
+  // Fase 1.C — Medical certs page + reminder + cestino hard delete
+  MEDICAL_CERT_EMAIL_SENT
+  HARD_DELETE_ATHLETE
+  HARD_DELETE_PARENT
+  HARD_DELETE_TEACHER
+  HARD_DELETE_COURSE
+  HARD_DELETE_EXPENSE
+  HARD_DELETE_MEDICAL_CERT
 }
 
 model AuditLog {

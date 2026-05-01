@@ -29,7 +29,7 @@ export default async function CestinoPage() {
       <ResourceHeader
         breadcrumbs={[{ label: "Cestino" }]}
         title="Cestino"
-        description="Elementi eliminati ripristinabili. La cancellazione definitiva (GDPR) sarà disponibile in fase successiva."
+        description="Elementi eliminati. Puoi ripristinarli o eliminarli definitivamente. L'eliminazione definitiva è irreversibile e blocca i record con dati fiscali (pagamenti, compensi)."
       />
       <ResourceContent>
         <CestinoClient
