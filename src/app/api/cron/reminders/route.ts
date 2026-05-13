@@ -219,6 +219,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         s.skippedAlreadySent++
         continue
       }
+      if (!sched.courseEnrollment) continue // stage: niente cron solleciti
       const athlete = sched.courseEnrollment.athlete
       const parent = athlete.parentRelations[0]?.parent ?? null
       if (!parent || !parent.email) {

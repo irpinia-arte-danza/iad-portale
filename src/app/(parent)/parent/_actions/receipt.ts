@@ -105,6 +105,13 @@ export async function generatePaymentReceipt(
           residenceProvince: true,
         },
       },
+      stageEnrollment: {
+        select: {
+          stage: {
+            select: { title: true, date: true },
+          },
+        },
+      },
       receipt: {
         select: {
           id: true,
@@ -214,6 +221,17 @@ export async function generatePaymentReceipt(
     }
   }
 
+  // Per pagamenti stage: arricchisce automaticamente la causale con
+  // titolo + data dello stage (se non sovrascritto da note manuali)
+  let description = payment.notes
+  if (!description && payment.feeType === "STAGE" && payment.stageEnrollment) {
+    const stageDate = new Date(payment.stageEnrollment.stage.date)
+    const dd = String(stageDate.getUTCDate()).padStart(2, "0")
+    const mm = String(stageDate.getUTCMonth() + 1).padStart(2, "0")
+    const yyyy = stageDate.getUTCFullYear()
+    description = `Iscrizione Stage «${payment.stageEnrollment.stage.title}» del ${dd}/${mm}/${yyyy}`
+  }
+
   const receiptData: ReceiptData = {
     receiptNumber,
     issueDate,
@@ -223,7 +241,7 @@ export async function generatePaymentReceipt(
     athleteName: `${payment.athlete.firstName} ${payment.athlete.lastName}`,
     athleteFiscalCode: payment.athlete.fiscalCode,
     feeType: payment.feeType,
-    description: payment.notes,
+    description,
     periodStart: payment.periodStart,
     periodEnd: payment.periodEnd,
     amountCents: payment.amountCents,

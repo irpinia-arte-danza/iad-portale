@@ -139,6 +139,33 @@ export async function getRecentAthletes(limit = 5) {
   })
 }
 
+export async function getUpcomingStages(limit = 3) {
+  await requireAdmin()
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+
+  return prisma.stage.findMany({
+    where: {
+      deletedAt: null,
+      date: { gte: today },
+    },
+    orderBy: { date: "asc" },
+    take: limit,
+    include: {
+      _count: { select: { enrollments: true } },
+    },
+  })
+}
+
+export async function countUpcomingStages() {
+  await requireAdmin()
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  return prisma.stage.count({
+    where: { deletedAt: null, date: { gte: today } },
+  })
+}
+
 export async function getRecentParents(limit = 5) {
   await requireAdmin()
   return prisma.parent.findMany({

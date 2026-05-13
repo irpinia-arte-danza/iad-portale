@@ -172,6 +172,24 @@ const athleteWithFormRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
         },
       },
     },
+    stageEnrollments: {
+      where: {
+        paid: false,
+        stage: { deletedAt: null },
+      },
+      select: {
+        id: true,
+        stage: {
+          select: {
+            id: true,
+            title: true,
+            date: true,
+            feeCents: true,
+          },
+        },
+      },
+      orderBy: { stage: { date: "asc" } },
+    },
   },
 })
 

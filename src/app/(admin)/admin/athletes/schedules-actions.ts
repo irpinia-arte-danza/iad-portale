@@ -69,7 +69,9 @@ export async function waiveSchedule(
         waiverReason: parsed.data.waiverReason,
       },
     })
-    revalidatePath(athletePath(existing.courseEnrollment.athleteId))
+    if (existing.courseEnrollment) {
+      revalidatePath(athletePath(existing.courseEnrollment.athleteId))
+    }
     return { ok: true }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }
@@ -108,7 +110,9 @@ export async function unwaiveSchedule(
         waiverReason: null,
       },
     })
-    revalidatePath(athletePath(existing.courseEnrollment.athleteId))
+    if (existing.courseEnrollment) {
+      revalidatePath(athletePath(existing.courseEnrollment.athleteId))
+    }
     return { ok: true }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }

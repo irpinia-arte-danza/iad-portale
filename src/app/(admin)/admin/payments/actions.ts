@@ -107,9 +107,17 @@ export async function registerPayment(
 
   const parentId = emptyToNull(parsed.data.parentId)
   const courseEnrollmentId = emptyToNull(parsed.data.courseEnrollmentId)
+  const stageEnrollmentId = emptyToNull(parsed.data.stageEnrollmentId)
   const amountCents = Math.round(parsed.data.amountEur * 100)
 
-  const [parentRelation, courseEnrollment] = await Promise.all([
+  if (courseEnrollmentId && stageEnrollmentId) {
+    return {
+      ok: false,
+      error: "Indica un corso oppure uno stage, non entrambi",
+    }
+  }
+
+  const [parentRelation, courseEnrollment, stageEnrollment] = await Promise.all([
     parentId
       ? prisma.athleteParent.findFirst({
           where: {
@@ -133,6 +141,20 @@ export async function registerPayment(
           select: { id: true },
         })
       : Promise.resolve(null),
+    stageEnrollmentId
+      ? prisma.stageEnrollment.findFirst({
+          where: {
+            id: stageEnrollmentId,
+            athleteId: parsed.data.athleteId,
+            stage: { deletedAt: null },
+          },
+          select: {
+            id: true,
+            paid: true,
+            paymentSchedule: { select: { id: true } },
+          },
+        })
+      : Promise.resolve(null),
   ])
 
   if (parentId && !parentRelation) {
@@ -140,6 +162,12 @@ export async function registerPayment(
   }
   if (courseEnrollmentId && !courseEnrollment) {
     return { ok: false, error: "Pagamento non valido per questa allieva" }
+  }
+  if (stageEnrollmentId && !stageEnrollment) {
+    return { ok: false, error: "Iscrizione stage non valida per questa allieva" }
+  }
+  if (stageEnrollment && stageEnrollment.paid) {
+    return { ok: false, error: "Stage già pagato per questa allieva" }
   }
 
   try {
@@ -183,6 +211,23 @@ export async function registerPayment(
         if (candidates.length === 1) {
           await tx.paymentSchedule.update({
             where: { id: candidates[0].id },
+            data: {
+              paymentId: payment.id,
+              status: ScheduleStatus.PAID,
+            },
+          })
+        }
+      }
+
+      // Stage payment: marca enrollment PAID + chiude PaymentSchedule
+      if (stageEnrollment) {
+        await tx.stageEnrollment.update({
+          where: { id: stageEnrollment.id },
+          data: { paid: true, paymentId: payment.id },
+        })
+        if (stageEnrollment.paymentSchedule) {
+          await tx.paymentSchedule.update({
+            where: { id: stageEnrollment.paymentSchedule.id },
             data: {
               paymentId: payment.id,
               status: ScheduleStatus.PAID,
@@ -257,6 +302,7 @@ export async function deletePayment(
     select: {
       athleteId: true,
       paymentSchedule: { select: { id: true } },
+      stageEnrollment: { select: { id: true } },
     },
   })
   if (!existing) {
@@ -269,6 +315,12 @@ export async function deletePayment(
         await tx.paymentSchedule.update({
           where: { id: existing.paymentSchedule.id },
           data: { paymentId: null, status: ScheduleStatus.DUE },
+        })
+      }
+      if (existing.stageEnrollment) {
+        await tx.stageEnrollment.update({
+          where: { id: existing.stageEnrollment.id },
+          data: { paid: false, paymentId: null },
         })
       }
       await tx.payment.update({
@@ -310,6 +362,7 @@ export async function reversePayment(
       athleteId: true,
       status: true,
       paymentSchedule: { select: { id: true } },
+      stageEnrollment: { select: { id: true } },
     },
   })
   if (!existing) {
@@ -325,6 +378,12 @@ export async function reversePayment(
         await tx.paymentSchedule.update({
           where: { id: existing.paymentSchedule.id },
           data: { paymentId: null, status: ScheduleStatus.DUE },
+        })
+      }
+      if (existing.stageEnrollment) {
+        await tx.stageEnrollment.update({
+          where: { id: existing.stageEnrollment.id },
+          data: { paid: false, paymentId: null },
         })
       }
 

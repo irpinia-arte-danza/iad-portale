@@ -1,4 +1,11 @@
-import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2 } from "lucide-react"
+import Link from "next/link"
+import {
+  AlertCircle,
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Sparkles,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import {
@@ -27,6 +34,7 @@ import {
   type GeneralCourseSchedule,
   type MyAthleteSchedule,
 } from "../_actions/queries"
+import { countOpenStagesForParent } from "../_actions/stages"
 
 import { IbanCard } from "./_components/iban-card"
 import { ReceiptDownloadButton } from "./_components/receipt-download-button"
@@ -78,6 +86,7 @@ export default async function ParentDashboardPage() {
     generalSchedules,
     brand,
     attendance,
+    openStagesCount,
   ] = await Promise.all([
     getParentProfile(parentId),
     getMyAthletes(parentId),
@@ -87,6 +96,7 @@ export default async function ParentDashboardPage() {
     getGeneralCourseSchedules(),
     getBrandIban(),
     getMyAttendanceStats(parentId),
+    countOpenStagesForParent(parentId),
   ])
 
   const overdue = openSchedules.filter((s) => classifySchedule(s) === "overdue")
@@ -137,6 +147,28 @@ export default async function ParentDashboardPage() {
         asdName={brand?.asdName ?? null}
         asdEmail={brand?.asdEmail ?? null}
       />
+
+      {/* Stage aperti */}
+      {openStagesCount > 0 && (
+        <Link
+          href="/parent/stages"
+          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+        >
+          <Card className="border-purple-300 bg-purple-50 text-purple-900 transition-colors hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-100 dark:hover:bg-purple-950/60">
+            <CardContent className="flex items-center gap-3 py-4">
+              <Sparkles className="h-5 w-5 shrink-0" />
+              <div className="flex-1 text-sm">
+                <p className="font-semibold">
+                  {openStagesCount === 1
+                    ? "1 stage aperto all'iscrizione"
+                    : `${openStagesCount} stage aperti all'iscrizione`}
+                </p>
+                <p className="text-xs">Tocca per vedere e iscrivere le tue figlie.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       {/* Sezione Le mie figlie */}
       <section id="figlie" className="space-y-3">

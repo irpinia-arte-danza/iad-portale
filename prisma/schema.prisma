@@ -506,11 +506,18 @@ model Stage {
 
   enrollments StageEnrollment[]
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@index([date])
   @@map("stages")
+}
+
+enum StageAttendanceStatus {
+  PRESENT
+  ABSENT
+  N_A
 }
 
 model StageEnrollment {
@@ -523,11 +530,14 @@ model StageEnrollment {
   paid       Boolean  @default(false)
   paymentId  String?  @unique @map("payment_id") @db.Uuid
 
+  attendance StageAttendanceStatus? // null = non ancora segnata (stage futuro)
+
   notes String?
 
-  stage   Stage    @relation(fields: [stageId], references: [id])
-  athlete Athlete  @relation(fields: [athleteId], references: [id])
-  payment Payment? @relation(fields: [paymentId], references: [id])
+  stage           Stage             @relation(fields: [stageId], references: [id])
+  athlete         Athlete           @relation(fields: [athleteId], references: [id])
+  payment         Payment?          @relation(fields: [paymentId], references: [id])
+  paymentSchedule PaymentSchedule?
 
   @@unique([stageId, athleteId])
   @@map("stage_enrollments")
@@ -700,9 +710,12 @@ enum ScheduleStatus {
 }
 
 model PaymentSchedule {
-  id                 String @id @default(uuid()) @db.Uuid
-  courseEnrollmentId String @map("course_enrollment_id") @db.Uuid
-  academicYearId     String @map("academic_year_id") @db.Uuid
+  id                 String  @id @default(uuid()) @db.Uuid
+  // Una scadenza è collegata a UN solo evento: corso (mensile/trimestrale) o stage.
+  // Esattamente uno dei due FK deve essere valorizzato (vincolo applicativo).
+  courseEnrollmentId String? @map("course_enrollment_id") @db.Uuid
+  stageEnrollmentId  String? @unique @map("stage_enrollment_id") @db.Uuid
+  academicYearId     String  @map("academic_year_id") @db.Uuid
 
   feeType     FeeType  @map("fee_type")
   dueDate     DateTime @map("due_date") @db.Date
@@ -716,14 +729,16 @@ model PaymentSchedule {
   notes        String?
   createdBy    String? @map("created_by") @db.Uuid
 
-  courseEnrollment CourseEnrollment @relation(fields: [courseEnrollmentId], references: [id])
-  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id])
-  payment          Payment?         @relation(fields: [paymentId], references: [id])
+  courseEnrollment CourseEnrollment? @relation(fields: [courseEnrollmentId], references: [id])
+  stageEnrollment  StageEnrollment?  @relation(fields: [stageEnrollmentId], references: [id])
+  academicYear     AcademicYear      @relation(fields: [academicYearId], references: [id])
+  payment          Payment?          @relation(fields: [paymentId], references: [id])
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([courseEnrollmentId, dueDate])
+  @@index([stageEnrollmentId, dueDate])
   @@index([status, dueDate])
   @@index([academicYearId, status])
   @@map("payment_schedules")
@@ -1247,6 +1262,14 @@ enum AuditAction {
   HARD_DELETE_COURSE
   HARD_DELETE_EXPENSE
   HARD_DELETE_MEDICAL_CERT
+  // Sprint 6.A — Stage workshop
+  STAGE_CREATE
+  STAGE_UPDATE
+  STAGE_DELETE
+  STAGE_ENROLLMENT_CREATE
+  STAGE_ENROLLMENT_DELETE
+  STAGE_ATTENDANCE_UPDATE
+  STAGE_EMAIL_SENT
 }
 
 model AuditLog {

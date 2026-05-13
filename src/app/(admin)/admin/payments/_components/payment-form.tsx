@@ -78,6 +78,7 @@ export function PaymentForm({
       athleteId: "",
       parentId: "",
       courseEnrollmentId: "",
+      stageEnrollmentId: "",
       feeType: "MONTHLY",
       method: "CASH",
       amountEur: 0,
@@ -99,6 +100,7 @@ export function PaymentForm({
 
   const needsEnrollmentLink =
     watchedFeeType === "MONTHLY" || watchedFeeType === "TRIMESTER"
+  const isStageFee = watchedFeeType === "STAGE"
 
   function onSubmit(values: PaymentCreateValues) {
     startTransition(async () => {
@@ -128,6 +130,7 @@ export function PaymentForm({
                   field.onChange(value)
                   form.setValue("parentId", "")
                   form.setValue("courseEnrollmentId", "")
+                  form.setValue("stageEnrollmentId", "")
                 }}
               >
                 <FormControl>
@@ -236,6 +239,57 @@ export function PaymentForm({
                         {centsToEur(e.course.monthlyFeeCents)}/mese
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        {isStageFee && selectedAthlete && (
+          <FormField
+            control={form.control}
+            name="stageEnrollmentId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Stage (iscrizione collegata)</FormLabel>
+                <Select
+                  value={field.value || "__none__"}
+                  onValueChange={(value) => {
+                    const nextId = value === "__none__" ? "" : value
+                    field.onChange(nextId)
+                    const stageEnr = selectedAthlete.stageEnrollments.find(
+                      (e) => e.id === nextId,
+                    )
+                    if (stageEnr && form.getValues("amountEur") === 0) {
+                      form.setValue(
+                        "amountEur",
+                        Number(centsToEur(stageEnr.stage.feeCents)),
+                      )
+                    }
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Nessuno (pagamento libero)" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {selectedAthlete.stageEnrollments.length === 0 ? (
+                      <SelectItem value="__none__">
+                        Nessun stage da pagare
+                      </SelectItem>
+                    ) : (
+                      <>
+                        <SelectItem value="__none__">Nessuno</SelectItem>
+                        {selectedAthlete.stageEnrollments.map((e) => (
+                          <SelectItem key={e.id} value={e.id}>
+                            {e.stage.title} — €{centsToEur(e.stage.feeCents)}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
                 <FormMessage />

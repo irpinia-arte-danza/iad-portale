@@ -114,35 +114,40 @@ export async function getScadenzeCSVData(
     "Email inviate",
   ]
 
-  const rows = schedules.map((s) => {
-    const athlete = s.courseEnrollment.athlete
-    const parent = athlete.parentRelations[0]?.parent ?? null
-    const email = emailMap.get(s.id)
-
-    const dueUTC = new Date(
-      Date.UTC(
-        s.dueDate.getUTCFullYear(),
-        s.dueDate.getUTCMonth(),
-        s.dueDate.getUTCDate(),
-      ),
+  const rows = schedules
+    .filter(
+      (s): s is typeof s & { courseEnrollment: NonNullable<typeof s.courseEnrollment> } =>
+        s.courseEnrollment !== null,
     )
-    const giorniRitardo = Math.round(
-      (today.getTime() - dueUTC.getTime()) / (1000 * 60 * 60 * 24),
-    )
+    .map((s) => {
+      const athlete = s.courseEnrollment.athlete
+      const parent = athlete.parentRelations[0]?.parent ?? null
+      const email = emailMap.get(s.id)
 
-    return [
-      `${athlete.lastName} ${athlete.firstName}`,
-      parent ? `${parent.lastName} ${parent.firstName}` : "—",
-      parent?.email ?? "",
-      parent?.phone ?? "",
-      s.courseEnrollment.course?.name ?? "—",
-      CURRENCY_IT.format(s.amountCents / 100),
-      DATE_IT.format(s.dueDate),
-      String(giorniRitardo),
-      email?.lastSent ? DATE_IT.format(email.lastSent) : "",
-      String(email?.count ?? 0),
-    ]
-  })
+      const dueUTC = new Date(
+        Date.UTC(
+          s.dueDate.getUTCFullYear(),
+          s.dueDate.getUTCMonth(),
+          s.dueDate.getUTCDate(),
+        ),
+      )
+      const giorniRitardo = Math.round(
+        (today.getTime() - dueUTC.getTime()) / (1000 * 60 * 60 * 24),
+      )
+
+      return [
+        `${athlete.lastName} ${athlete.firstName}`,
+        parent ? `${parent.lastName} ${parent.firstName}` : "—",
+        parent?.email ?? "",
+        parent?.phone ?? "",
+        s.courseEnrollment.course?.name ?? "—",
+        CURRENCY_IT.format(s.amountCents / 100),
+        DATE_IT.format(s.dueDate),
+        String(giorniRitardo),
+        email?.lastSent ? DATE_IT.format(email.lastSent) : "",
+        String(email?.count ?? 0),
+      ]
+    })
 
   return { headers, rows }
 }
@@ -229,6 +234,9 @@ export async function previewReminder(
 
   if (!schedule) {
     throw new Error("Scadenza non trovata")
+  }
+  if (!schedule.courseEnrollment) {
+    throw new Error("Scadenza non collegata a un corso")
   }
 
   const athlete = schedule.courseEnrollment.athlete
@@ -359,6 +367,7 @@ export async function sendReminderBatch(
   const sendable: SendableItem[] = []
 
   for (const s of schedules) {
+    if (!s.courseEnrollment) continue // stage schedules sono fuori scope solleciti
     const athlete = s.courseEnrollment.athlete
     const parent = athlete.parentRelations[0]?.parent ?? null
 

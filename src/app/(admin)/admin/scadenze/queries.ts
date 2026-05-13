@@ -205,7 +205,12 @@ export async function getScadenze(
 
   const today = startOfUTCToday()
 
-  return schedules.map((s) => {
+  return schedules
+    .filter(
+      (s): s is typeof s & { courseEnrollment: NonNullable<typeof s.courseEnrollment> } =>
+        s.courseEnrollment !== null,
+    )
+    .map((s) => {
     const athlete = s.courseEnrollment.athlete
     const parentRel = athlete.parentRelations[0] ?? null
     const email = emailMap.get(s.id)

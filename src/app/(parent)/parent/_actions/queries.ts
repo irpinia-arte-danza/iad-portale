@@ -1,7 +1,7 @@
 import "server-only"
 
 import { prisma } from "@/lib/prisma"
-import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
+import { withActiveCourseOrStageScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tutte le query sono filtrate per parentId per RLS applicativo (defense
@@ -81,16 +81,28 @@ export async function getMyAthletes(parentId: string) {
 export type MyAthlete = Awaited<ReturnType<typeof getMyAthletes>>[number]
 
 export async function getMyOpenSchedules(parentId: string) {
-  // Scadenze DUE/OVERDUE delle figlie del genitore
+  // Scadenze DUE/OVERDUE delle figlie del genitore (corsi + stage)
   const schedules = await prisma.paymentSchedule.findMany({
-    where: withActiveScheduleFilter({
+    where: withActiveCourseOrStageScheduleFilter({
       status: { in: ["DUE", "OVERDUE"] },
-      courseEnrollment: {
-        athlete: {
-          deletedAt: null,
-          parentRelations: { some: { parentId } },
+      OR: [
+        {
+          courseEnrollment: {
+            athlete: {
+              deletedAt: null,
+              parentRelations: { some: { parentId } },
+            },
+          },
         },
-      },
+        {
+          stageEnrollment: {
+            athlete: {
+              deletedAt: null,
+              parentRelations: { some: { parentId } },
+            },
+          },
+        },
+      ],
     }),
     select: {
       id: true,
@@ -109,20 +121,39 @@ export async function getMyOpenSchedules(parentId: string) {
           },
         },
       },
+      stageEnrollment: {
+        select: {
+          athleteId: true,
+          athlete: {
+            select: { id: true, firstName: true, lastName: true },
+          },
+          stage: {
+            select: { id: true, title: true },
+          },
+        },
+      },
     },
     orderBy: { dueDate: "asc" },
   })
 
-  return schedules.map((s) => ({
-    id: s.id,
-    feeType: s.feeType,
-    dueDate: s.dueDate,
-    amountCents: s.amountCents,
-    status: s.status,
-    athleteId: s.courseEnrollment.athlete.id,
-    athleteName: `${s.courseEnrollment.athlete.firstName} ${s.courseEnrollment.athlete.lastName}`,
-    courseName: s.courseEnrollment.course.name,
-  }))
+  return schedules.map((s) => {
+    const courseAth = s.courseEnrollment?.athlete
+    const stageAth = s.stageEnrollment?.athlete
+    const athlete = courseAth ?? stageAth
+    return {
+      id: s.id,
+      feeType: s.feeType,
+      dueDate: s.dueDate,
+      amountCents: s.amountCents,
+      status: s.status,
+      athleteId: athlete?.id ?? "",
+      athleteName: athlete
+        ? `${athlete.firstName} ${athlete.lastName}`
+        : "—",
+      courseName: s.courseEnrollment?.course.name ?? null,
+      stageName: s.stageEnrollment?.stage.title ?? null,
+    }
+  })
 }
 
 export type MyOpenSchedule = Awaited<

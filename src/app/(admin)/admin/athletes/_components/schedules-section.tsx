@@ -188,7 +188,10 @@ function ScheduleRow({
           id: schedule.id,
           status: schedule.status,
           displayStatus,
-          courseEnrollmentId: schedule.courseEnrollmentId,
+          // Flatten garantisce sempre un courseEnrollment (le scadenze stage non
+          // sono incluse). Cast sicuro: PaymentSchedule.courseEnrollmentId
+          // è diventato nullable Sprint 6.A per supportare stage.
+          courseEnrollmentId: schedule.enrollmentId,
           courseName: schedule.courseName,
           dueDate: schedule.dueDate,
           amountCents: schedule.amountCents,

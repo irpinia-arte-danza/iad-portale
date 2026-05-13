@@ -255,6 +255,7 @@ export async function previewCronReminders(): Promise<CronPreview> {
     let missingEmailCount = 0
     const names: string[] = []
     for (const s of toSend) {
+      if (!s.courseEnrollment) continue // stage: niente sollecito automatico
       const parent = s.courseEnrollment.athlete.parentRelations[0]?.parent
       if (!parent || !parent.email) {
         missingEmailCount++
