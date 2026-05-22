@@ -45,6 +45,7 @@ import {
   hardDeleteParent,
   hardDeleteTeacher,
   restoreAthlete,
+  restoreCostume,
   restoreCourse,
   restoreExpense,
   restoreMedicalCertificate,
@@ -61,6 +62,7 @@ type EntityKind =
   | "expense"
   | "cert"
   | "showcase"
+  | "costume"
 
 type HardDeleteTarget = {
   id: string
@@ -92,6 +94,7 @@ type Counts = {
   expenses: number
   certs: number
   showcases: number
+  costumes: number
 }
 
 type Athlete = {
@@ -145,6 +148,13 @@ type ShowcaseRow = {
   deletedAt: Date | null
   academicYear: { id: string; label: string }
 }
+type CostumeRow = {
+  id: string
+  name: string
+  costCents: number
+  deletedAt: Date | null
+  showcase: { id: string; title: string; deletedAt: Date | null }
+}
 
 type Props = {
   counts: Counts
@@ -155,6 +165,7 @@ type Props = {
   expenses: ExpenseRow[]
   certs: CertRow[]
   showcases: ShowcaseRow[]
+  costumes: CostumeRow[]
 }
 
 const euroFormatter = new Intl.NumberFormat("it-IT", {
@@ -185,6 +196,7 @@ const RESTORE_FN = {
   expense: restoreExpense,
   cert: restoreMedicalCertificate,
   showcase: restoreShowcase,
+  costume: restoreCostume,
 } as const
 
 export function CestinoClient({
@@ -196,6 +208,7 @@ export function CestinoClient({
   expenses,
   certs,
   showcases,
+  costumes,
 }: Props) {
   const [confirm, setConfirm] = React.useState<ConfirmTarget | null>(null)
   const [hardTarget, setHardTarget] = React.useState<HardDeleteTarget | null>(
@@ -220,7 +233,7 @@ export function CestinoClient({
   return (
     <>
       <Tabs defaultValue="athletes" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-7">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-8">
           <TabsTrigger value="athletes">
             Allieve {counts.athletes > 0 ? `(${counts.athletes})` : ""}
           </TabsTrigger>
@@ -241,6 +254,9 @@ export function CestinoClient({
           </TabsTrigger>
           <TabsTrigger value="showcases">
             Saggi {counts.showcases > 0 ? `(${counts.showcases})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="costumes">
+            Costumi {counts.costumes > 0 ? `(${counts.costumes})` : ""}
           </TabsTrigger>
         </TabsList>
 
@@ -404,6 +420,29 @@ export function CestinoClient({
             onHardDelete={setHardTarget}
           />
         </TabsContent>
+
+        <TabsContent value="costumes">
+          <CestinoTable
+            empty="Nessun costume eliminato."
+            columns={["Costume", "Saggio", "Costo", "Eliminato"]}
+            rows={costumes.map((c) => ({
+              id: c.id,
+              cells: [
+                c.name,
+                c.showcase.title +
+                  (c.showcase.deletedAt ? " (cestinato)" : ""),
+                euroFormatter.format(c.costCents / 100),
+                daysAgo(c.deletedAt),
+              ],
+              label: c.name,
+              kind: "costume" as const,
+              confirmExpected: c.name,
+              confirmKind: "name" as const,
+            }))}
+            onRestore={setConfirm}
+            onHardDelete={setHardTarget}
+          />
+        </TabsContent>
       </Tabs>
 
       <HardDeleteDialog
@@ -462,7 +501,7 @@ type CestinoRow = {
   confirmKind: "name" | "date"
 }
 
-const RESTORE_ONLY_KINDS = new Set<EntityKind>(["showcase"])
+const RESTORE_ONLY_KINDS = new Set<EntityKind>(["showcase", "costume"])
 
 function CestinoTable({
   columns,

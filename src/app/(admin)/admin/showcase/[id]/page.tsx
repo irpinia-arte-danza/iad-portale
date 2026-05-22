@@ -5,7 +5,12 @@ import { Badge } from "@/components/ui/badge"
 import { ResourceContent } from "../../_components/resource-content"
 import { ResourceHeader } from "../../_components/resource-header"
 
-import { getShowcaseById, listShowcaseEnrollableAthletes } from "../queries"
+import {
+  getShowcaseById,
+  listShowcaseCostumes,
+  listShowcaseEnrollableAthletes,
+} from "../queries"
+import { ShowcaseCostumesTab } from "./_components/showcase-costumes-tab"
 import { ShowcaseInfoTab } from "./_components/showcase-info-tab"
 import { ShowcaseRosterTab } from "./_components/showcase-roster-tab"
 import { ShowcaseTabsNav } from "./_components/showcase-tabs-nav"
@@ -35,7 +40,7 @@ export default async function ShowcaseDetailPage({
 
   const isCancelled = showcase.deletedAt !== null
 
-  const validTabs = ["info", "partecipanti"] as const
+  const validTabs = ["info", "partecipanti", "costumi"] as const
   type TabKey = (typeof validTabs)[number]
   const activeTab: TabKey = (
     sp.tab && (validTabs as readonly string[]).includes(sp.tab)
@@ -43,9 +48,16 @@ export default async function ShowcaseDetailPage({
       : "info"
   ) as TabKey
 
-  const enrollableAthletes = await listShowcaseEnrollableAthletes(id)
+  const [enrollableAthletes, costumes] = await Promise.all([
+    listShowcaseEnrollableAthletes(id),
+    listShowcaseCostumes(id),
+  ])
 
   const confirmedCount = showcase.participations.filter((p) => p.confirmed).length
+  const totalAssignments = costumes.reduce(
+    (sum, c) => sum + c.assignments.length,
+    0,
+  )
 
   return (
     <>
@@ -77,6 +89,10 @@ export default async function ShowcaseDetailPage({
                 key: "partecipanti",
                 label: `Partecipanti (${showcase.participations.length}${confirmedCount > 0 ? ` · ${confirmedCount} conf.` : ""})`,
               },
+              {
+                key: "costumi",
+                label: `Costumi (${costumes.length}${totalAssignments > 0 ? ` · ${totalAssignments} ass.` : ""})`,
+              },
             ]}
           />
 
@@ -85,6 +101,13 @@ export default async function ShowcaseDetailPage({
             <ShowcaseRosterTab
               showcase={showcase}
               enrollableAthletes={enrollableAthletes}
+            />
+          )}
+          {activeTab === "costumi" && (
+            <ShowcaseCostumesTab
+              showcaseId={showcase.id}
+              costumes={costumes}
+              participations={showcase.participations}
             />
           )}
         </div>

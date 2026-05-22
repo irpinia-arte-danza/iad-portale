@@ -80,6 +80,7 @@ export function PaymentForm({
       courseEnrollmentId: "",
       stageEnrollmentId: "",
       showcaseParticipationId: "",
+      costumeAssignmentId: "",
       paymentScheduleId: "",
       feeType: "MONTHLY",
       method: "CASH",
@@ -105,6 +106,7 @@ export function PaymentForm({
   const isStageFee = watchedFeeType === "STAGE"
   const isShowcaseFee =
     watchedFeeType === "SHOWCASE_1" || watchedFeeType === "SHOWCASE_2"
+  const isCostumeFee = watchedFeeType === "COSTUME"
 
   function onSubmit(values: PaymentCreateValues) {
     startTransition(async () => {
@@ -136,6 +138,7 @@ export function PaymentForm({
                   form.setValue("courseEnrollmentId", "")
                   form.setValue("stageEnrollmentId", "")
                   form.setValue("showcaseParticipationId", "")
+                  form.setValue("costumeAssignmentId", "")
                   form.setValue("paymentScheduleId", "")
                 }}
               >
@@ -328,6 +331,79 @@ export function PaymentForm({
                           <SelectItem value="__none__">Nessuna</SelectItem>
                           {opts.map((o) => (
                             <SelectItem key={o.scheduleId} value={o.scheduleId}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )
+            }}
+          />
+        )}
+
+        {isCostumeFee && selectedAthlete && (
+          <FormField
+            control={form.control}
+            name="costumeAssignmentId"
+            render={({ field }) => {
+              type Opt = {
+                assignmentId: string
+                label: string
+                amountCents: number
+              }
+              const opts: Opt[] = []
+              for (const p of selectedAthlete.showcaseParticipations) {
+                for (const a of p.costumeAssignments) {
+                  if (!a.paymentSchedule) continue
+                  const sizeLabel = a.size ? ` · taglia ${a.size}` : ""
+                  opts.push({
+                    assignmentId: a.id,
+                    label: `${p.showcase.title} — ${a.costume.name}${sizeLabel} (${centsToEur(a.paymentSchedule.amountCents)}€, entro ${new Date(a.paymentSchedule.dueDate).toLocaleDateString("it-IT")})`,
+                    amountCents: a.paymentSchedule.amountCents,
+                  })
+                }
+              }
+              return (
+                <FormItem>
+                  <FormLabel>Costume (assegnazione non pagata)</FormLabel>
+                  <Select
+                    value={field.value || "__none__"}
+                    onValueChange={(value) => {
+                      const next = value === "__none__" ? "" : value
+                      field.onChange(next)
+                      if (next !== "") {
+                        const opt = opts.find((o) => o.assignmentId === next)
+                        if (opt && form.getValues("amountEur") === 0) {
+                          form.setValue(
+                            "amountEur",
+                            Number(centsToEur(opt.amountCents)),
+                          )
+                        }
+                      }
+                    }}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Nessuno (pagamento libero)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {opts.length === 0 ? (
+                        <SelectItem value="__none__">
+                          Nessun costume da pagare
+                        </SelectItem>
+                      ) : (
+                        <>
+                          <SelectItem value="__none__">Nessuno</SelectItem>
+                          {opts.map((o) => (
+                            <SelectItem
+                              key={o.assignmentId}
+                              value={o.assignmentId}
+                            >
                               {o.label}
                             </SelectItem>
                           ))}

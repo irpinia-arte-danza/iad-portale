@@ -109,6 +109,7 @@ export async function registerPayment(
   const courseEnrollmentId = emptyToNull(parsed.data.courseEnrollmentId)
   const stageEnrollmentId = emptyToNull(parsed.data.stageEnrollmentId)
   const showcaseParticipationId = emptyToNull(parsed.data.showcaseParticipationId)
+  const costumeAssignmentId = emptyToNull(parsed.data.costumeAssignmentId)
   const paymentScheduleId = emptyToNull(parsed.data.paymentScheduleId)
   const amountCents = Math.round(parsed.data.amountEur * 100)
 
@@ -116,11 +117,12 @@ export async function registerPayment(
     courseEnrollmentId,
     stageEnrollmentId,
     showcaseParticipationId,
+    costumeAssignmentId,
   ].filter(Boolean).length
   if (linkCount > 1) {
     return {
       ok: false,
-      error: "Indica un solo evento (corso, stage o saggio)",
+      error: "Indica un solo evento (corso, stage, saggio o costume)",
     }
   }
 
@@ -129,6 +131,7 @@ export async function registerPayment(
     courseEnrollment,
     stageEnrollment,
     showcaseParticipation,
+    costumeAssignment,
     explicitSchedule,
   ] = await Promise.all([
     parentId
@@ -190,6 +193,27 @@ export async function registerPayment(
           },
         })
       : Promise.resolve(null),
+    costumeAssignmentId
+      ? prisma.costumeAssignment.findFirst({
+          where: {
+            id: costumeAssignmentId,
+            participation: { athleteId: parsed.data.athleteId },
+            costume: { deletedAt: null, showcase: { deletedAt: null } },
+          },
+          select: {
+            id: true,
+            paid: true,
+            costume: { select: { id: true, name: true, costCents: true } },
+            participation: {
+              select: {
+                id: true,
+                athlete: { select: { firstName: true, lastName: true } },
+              },
+            },
+            paymentSchedule: { select: { id: true, amountCents: true } },
+          },
+        })
+      : Promise.resolve(null),
     paymentScheduleId
       ? prisma.paymentSchedule.findFirst({
           where: {
@@ -203,6 +227,7 @@ export async function registerPayment(
             showcaseParticipationId: true,
             stageEnrollmentId: true,
             courseEnrollmentId: true,
+            costumeAssignmentId: true,
           },
         })
       : Promise.resolve(null),
@@ -236,6 +261,28 @@ export async function registerPayment(
     return {
       ok: false,
       error: "Nessuna scadenza saggio in sospeso per questa allieva",
+    }
+  }
+  if (costumeAssignmentId && !costumeAssignment) {
+    return {
+      ok: false,
+      error: "Assegnazione costume non valida per questa allieva",
+    }
+  }
+  if (costumeAssignment && costumeAssignment.paid) {
+    return { ok: false, error: "Costume già pagato per questa allieva" }
+  }
+  if (costumeAssignment && !costumeAssignment.paymentSchedule) {
+    return {
+      ok: false,
+      error:
+        "Nessuna scadenza pagamento per questo costume (probabile costume gratuito)",
+    }
+  }
+  if (costumeAssignment && parsed.data.feeType !== FeeType.COSTUME) {
+    return {
+      ok: false,
+      error: "Tipo quota deve essere «Costume» per pagare un'assegnazione costume",
     }
   }
 
@@ -352,6 +399,23 @@ export async function registerPayment(
         })
       }
 
+      // Costume payment: marca assignment paid + chiude PaymentSchedule
+      if (costumeAssignment) {
+        await tx.costumeAssignment.update({
+          where: { id: costumeAssignment.id },
+          data: { paid: true, paymentId: payment.id },
+        })
+        if (costumeAssignment.paymentSchedule) {
+          await tx.paymentSchedule.update({
+            where: { id: costumeAssignment.paymentSchedule.id },
+            data: {
+              paymentId: payment.id,
+              status: ScheduleStatus.PAID,
+            },
+          })
+        }
+      }
+
       return payment
     })
 
@@ -421,6 +485,7 @@ export async function deletePayment(
         select: { id: true, showcaseParticipationId: true },
       },
       stageEnrollment: { select: { id: true } },
+      costumeAssignment: { select: { id: true } },
     },
   })
   if (!existing) {
@@ -438,6 +503,12 @@ export async function deletePayment(
       if (existing.stageEnrollment) {
         await tx.stageEnrollment.update({
           where: { id: existing.stageEnrollment.id },
+          data: { paid: false, paymentId: null },
+        })
+      }
+      if (existing.costumeAssignment) {
+        await tx.costumeAssignment.update({
+          where: { id: existing.costumeAssignment.id },
           data: { paid: false, paymentId: null },
         })
       }
@@ -483,6 +554,7 @@ export async function reversePayment(
         select: { id: true, showcaseParticipationId: true },
       },
       stageEnrollment: { select: { id: true } },
+      costumeAssignment: { select: { id: true } },
     },
   })
   if (!existing) {
@@ -503,6 +575,12 @@ export async function reversePayment(
       if (existing.stageEnrollment) {
         await tx.stageEnrollment.update({
           where: { id: existing.stageEnrollment.id },
+          data: { paid: false, paymentId: null },
+        })
+      }
+      if (existing.costumeAssignment) {
+        await tx.costumeAssignment.update({
+          where: { id: existing.costumeAssignment.id },
           data: { paid: false, paymentId: null },
         })
       }

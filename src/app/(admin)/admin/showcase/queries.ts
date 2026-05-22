@@ -88,6 +88,14 @@ const showcaseDetailArgs = Prisma.validator<Prisma.ShowcaseDefaultArgs>()({
           },
           orderBy: { dueDate: "asc" },
         },
+        costumeAssignments: {
+          select: {
+            id: true,
+            size: true,
+            paid: true,
+            costume: { select: { id: true, name: true, costCents: true } },
+          },
+        },
       },
       orderBy: [
         { athlete: { lastName: "asc" } },
@@ -96,6 +104,52 @@ const showcaseDetailArgs = Prisma.validator<Prisma.ShowcaseDefaultArgs>()({
     },
   },
 })
+
+const costumesArgs = Prisma.validator<Prisma.CostumeDefaultArgs>()({
+  select: {
+    id: true,
+    name: true,
+    description: true,
+    costCents: true,
+    deletedAt: true,
+    createdAt: true,
+    assignments: {
+      select: {
+        id: true,
+        size: true,
+        paid: true,
+        participation: {
+          select: {
+            id: true,
+            confirmed: true,
+            athlete: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        paymentSchedule: {
+          select: {
+            id: true,
+            status: true,
+            amountCents: true,
+            dueDate: true,
+            payment: { select: { id: true, paymentDate: true } },
+          },
+        },
+      },
+      orderBy: [
+        { participation: { athlete: { lastName: "asc" } } },
+        { participation: { athlete: { firstName: "asc" } } },
+      ],
+    },
+  },
+})
+
+export type CostumeWithAssignments = Prisma.CostumeGetPayload<typeof costumesArgs>
 
 export type ShowcaseWithDetails = Prisma.ShowcaseGetPayload<
   typeof showcaseDetailArgs
@@ -107,6 +161,16 @@ export async function getShowcaseById(
   return prisma.showcase.findUnique({
     where: { id },
     ...showcaseDetailArgs,
+  })
+}
+
+export async function listShowcaseCostumes(
+  showcaseId: string,
+): Promise<CostumeWithAssignments[]> {
+  return prisma.costume.findMany({
+    where: { showcaseId, deletedAt: null },
+    ...costumesArgs,
+    orderBy: { name: "asc" },
   })
 }
 

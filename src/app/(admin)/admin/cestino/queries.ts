@@ -121,6 +121,24 @@ export async function getDeletedShowcases() {
   })
 }
 
+export async function getDeletedCostumes() {
+  await requireAdmin()
+  return prisma.costume.findMany({
+    where: { deletedAt: { not: null } },
+    select: {
+      id: true,
+      name: true,
+      costCents: true,
+      deletedAt: true,
+      showcase: {
+        select: { id: true, title: true, deletedAt: true },
+      },
+    },
+    orderBy: { deletedAt: "desc" },
+    take: TAKE,
+  })
+}
+
 export async function getCestinoCounts() {
   await requireAdmin()
   const [
@@ -131,6 +149,7 @@ export async function getCestinoCounts() {
     expenses,
     certs,
     showcases,
+    costumes,
   ] = await Promise.all([
     prisma.athlete.count({ where: { deletedAt: { not: null } } }),
     prisma.parent.count({ where: { deletedAt: { not: null } } }),
@@ -141,6 +160,16 @@ export async function getCestinoCounts() {
       where: { deletedAt: { not: null } },
     }),
     prisma.showcase.count({ where: { deletedAt: { not: null } } }),
+    prisma.costume.count({ where: { deletedAt: { not: null } } }),
   ])
-  return { athletes, parents, teachers, courses, expenses, certs, showcases }
+  return {
+    athletes,
+    parents,
+    teachers,
+    courses,
+    expenses,
+    certs,
+    showcases,
+    costumes,
+  }
 }

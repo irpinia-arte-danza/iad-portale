@@ -613,7 +613,9 @@ model Costume {
 
   assignments CostumeAssignment[]
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@map("costumes")
 }
@@ -623,12 +625,21 @@ model CostumeAssignment {
   costumeId       String @map("costume_id") @db.Uuid
   participationId String @map("participation_id") @db.Uuid
 
+  // Taglia: campo libero (es. "M", "42", "bimba 8 anni")
+  size String?
+
+  // Denormalized: aggiornato quando il PaymentSchedule è saldato.
   paid      Boolean @default(false)
   paymentId String? @unique @map("payment_id") @db.Uuid
 
-  costume       Costume               @relation(fields: [costumeId], references: [id])
-  participation ShowcaseParticipation @relation(fields: [participationId], references: [id])
-  payment       Payment?              @relation(fields: [paymentId], references: [id])
+  costume         Costume               @relation(fields: [costumeId], references: [id])
+  participation   ShowcaseParticipation @relation(fields: [participationId], references: [id])
+  payment         Payment?              @relation(fields: [paymentId], references: [id])
+  // Back-rel: PaymentSchedule polimorfico (1:1 via PaymentSchedule.costumeAssignmentId @unique)
+  paymentSchedule PaymentSchedule?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([costumeId, participationId])
   @@map("costume_assignments")
@@ -723,11 +734,12 @@ enum ScheduleStatus {
 model PaymentSchedule {
   id                 String  @id @default(uuid()) @db.Uuid
   // Una scadenza è collegata a UN solo evento: corso (mensile/trimestrale),
-  // stage workshop, o saggio (caparra/saldo).
-  // Esattamente uno dei tre FK deve essere valorizzato (CHECK constraint XOR).
+  // stage workshop, saggio (caparra/saldo) o costume.
+  // Esattamente uno dei quattro FK deve essere valorizzato (CHECK constraint XOR).
   courseEnrollmentId      String? @map("course_enrollment_id") @db.Uuid
   stageEnrollmentId       String? @unique @map("stage_enrollment_id") @db.Uuid
   showcaseParticipationId String? @map("showcase_participation_id") @db.Uuid
+  costumeAssignmentId     String? @unique @map("costume_assignment_id") @db.Uuid
   academicYearId          String  @map("academic_year_id") @db.Uuid
 
   feeType     FeeType  @map("fee_type")
@@ -745,6 +757,7 @@ model PaymentSchedule {
   courseEnrollment      CourseEnrollment?      @relation(fields: [courseEnrollmentId], references: [id])
   stageEnrollment       StageEnrollment?       @relation(fields: [stageEnrollmentId], references: [id])
   showcaseParticipation ShowcaseParticipation? @relation(fields: [showcaseParticipationId], references: [id])
+  costumeAssignment     CostumeAssignment?     @relation(fields: [costumeAssignmentId], references: [id])
   academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id])
   payment               Payment?               @relation(fields: [paymentId], references: [id])
 
@@ -1293,6 +1306,13 @@ enum AuditAction {
   SHOWCASE_PARTICIPATION_CONFIRM
   SHOWCASE_PARTICIPATION_DELETE
   RESTORE_SHOWCASE
+  // Sprint 6.C — Costumi saggio
+  COSTUME_CREATE
+  COSTUME_UPDATE
+  COSTUME_DELETE
+  COSTUME_ASSIGN
+  COSTUME_UNASSIGN
+  RESTORE_COSTUME
 }
 
 model AuditLog {

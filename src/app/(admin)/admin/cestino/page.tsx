@@ -5,6 +5,7 @@ import { CestinoClient } from "./_components/cestino-client"
 import {
   getCestinoCounts,
   getDeletedAthletes,
+  getDeletedCostumes,
   getDeletedCourses,
   getDeletedExpenses,
   getDeletedMedicalCertificates,
@@ -23,6 +24,7 @@ export default async function CestinoPage() {
     expenses,
     certs,
     showcases,
+    costumes,
   ] = await Promise.all([
     getCestinoCounts(),
     getDeletedAthletes(),
@@ -32,6 +34,7 @@ export default async function CestinoPage() {
     getDeletedExpenses(),
     getDeletedMedicalCertificates(),
     getDeletedShowcases(),
+    getDeletedCostumes(),
   ])
 
   return (
@@ -39,7 +42,7 @@ export default async function CestinoPage() {
       <ResourceHeader
         breadcrumbs={[{ label: "Cestino" }]}
         title="Cestino"
-        description="Elementi eliminati. Puoi ripristinarli o eliminarli definitivamente. L'eliminazione definitiva è irreversibile e blocca i record con dati fiscali (pagamenti, compensi). I saggi sono solo ripristinabili (preservano lo storico partecipazioni)."
+        description="Elementi eliminati. Puoi ripristinarli o eliminarli definitivamente. L'eliminazione definitiva è irreversibile e blocca i record con dati fiscali (pagamenti, compensi). Saggi e costumi sono solo ripristinabili (preservano lo storico partecipazioni/assegnazioni)."
       />
       <ResourceContent>
         <CestinoClient
@@ -51,6 +54,7 @@ export default async function CestinoPage() {
           expenses={expenses}
           certs={certs}
           showcases={showcases}
+          costumes={costumes}
         />
       </ResourceContent>
     </>

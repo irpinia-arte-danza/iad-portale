@@ -110,6 +110,16 @@ export async function getMyOpenSchedules(parentId: string) {
             },
           },
         },
+        {
+          costumeAssignment: {
+            participation: {
+              athlete: {
+                deletedAt: null,
+                parentRelations: { some: { parentId } },
+              },
+            },
+          },
+        },
       ],
     }),
     select: {
@@ -152,6 +162,21 @@ export async function getMyOpenSchedules(parentId: string) {
           },
         },
       },
+      costumeAssignment: {
+        select: {
+          size: true,
+          costume: { select: { id: true, name: true } },
+          participation: {
+            select: {
+              athleteId: true,
+              athlete: {
+                select: { id: true, firstName: true, lastName: true },
+              },
+              showcase: { select: { id: true, title: true } },
+            },
+          },
+        },
+      },
     },
     orderBy: { dueDate: "asc" },
   })
@@ -160,7 +185,8 @@ export async function getMyOpenSchedules(parentId: string) {
     const courseAth = s.courseEnrollment?.athlete
     const stageAth = s.stageEnrollment?.athlete
     const showcaseAth = s.showcaseParticipation?.athlete
-    const athlete = courseAth ?? stageAth ?? showcaseAth
+    const costumeAth = s.costumeAssignment?.participation.athlete
+    const athlete = courseAth ?? stageAth ?? showcaseAth ?? costumeAth
     return {
       id: s.id,
       feeType: s.feeType,
@@ -174,7 +200,12 @@ export async function getMyOpenSchedules(parentId: string) {
         : "—",
       courseName: s.courseEnrollment?.course.name ?? null,
       stageName: s.stageEnrollment?.stage.title ?? null,
-      showcaseName: s.showcaseParticipation?.showcase.title ?? null,
+      showcaseName:
+        s.showcaseParticipation?.showcase.title ??
+        s.costumeAssignment?.participation.showcase.title ??
+        null,
+      costumeName: s.costumeAssignment?.costume.name ?? null,
+      costumeSize: s.costumeAssignment?.size ?? null,
     }
   })
 }

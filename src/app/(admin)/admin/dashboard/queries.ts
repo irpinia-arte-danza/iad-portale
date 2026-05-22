@@ -189,7 +189,15 @@ export async function getCurrentShowcaseStats() {
           paymentSchedules: {
             select: { status: true, feeType: true },
           },
+          costumeAssignments: {
+            where: { costume: { deletedAt: null } },
+            select: { id: true, paid: true },
+          },
         },
+      },
+      costumes: {
+        where: { deletedAt: null },
+        select: { id: true },
       },
     },
   })
@@ -202,6 +210,8 @@ export async function getCurrentShowcaseStats() {
   let pending = 0
   let paidFirst = 0
   let paidSecond = 0
+  let costumeAssignments = 0
+  let costumePaid = 0
   for (const p of showcase.participations) {
     totalParticipants += 1
     if (p.confirmed) confirmed += 1
@@ -210,6 +220,10 @@ export async function getCurrentShowcaseStats() {
       if (s.status !== "PAID") continue
       if (s.feeType === "SHOWCASE_1") paidFirst += 1
       else if (s.feeType === "SHOWCASE_2") paidSecond += 1
+    }
+    for (const a of p.costumeAssignments) {
+      costumeAssignments += 1
+      if (a.paid) costumePaid += 1
     }
   }
 
@@ -224,6 +238,9 @@ export async function getCurrentShowcaseStats() {
     pending,
     paidFirst,
     paidSecond,
+    costumesCount: showcase.costumes.length,
+    costumeAssignments,
+    costumePaid,
   }
 }
 

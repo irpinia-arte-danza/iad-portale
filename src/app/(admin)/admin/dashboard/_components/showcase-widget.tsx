@@ -22,6 +22,9 @@ type ExistsStats = {
   pending: number
   paidFirst: number
   paidSecond: number
+  costumesCount: number
+  costumeAssignments: number
+  costumePaid: number
 }
 
 type NotExistsStats = {
@@ -89,6 +92,15 @@ export function ShowcaseWidget({ stats }: Props) {
             label="Pagamenti"
             value={`${stats.paidFirst}/${stats.paidSecond}`}
             hint="Caparra / Saldo"
+          />
+          <Stat
+            label="Costumi"
+            value={stats.costumesCount}
+            hint={
+              stats.costumeAssignments > 0
+                ? `${stats.costumePaid}/${stats.costumeAssignments} pagati`
+                : "Nessuna assegnazione"
+            }
           />
         </div>
       </CardContent>

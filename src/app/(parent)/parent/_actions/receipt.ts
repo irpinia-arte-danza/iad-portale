@@ -121,6 +121,18 @@ export async function generatePaymentReceipt(
               showcase: { select: { title: true, date: true } },
             },
           },
+          costumeAssignment: {
+            select: {
+              size: true,
+              costume: { select: { name: true } },
+            },
+          },
+        },
+      },
+      costumeAssignment: {
+        select: {
+          size: true,
+          costume: { select: { name: true } },
         },
       },
       receipt: {
@@ -255,6 +267,26 @@ export async function generatePaymentReceipt(
       const kind =
         payment.feeType === "SHOWCASE_1" ? "Caparra" : "Saldo"
       description = `Saggio «${showcase.title}» — ${kind}`
+    }
+  }
+  // Per pagamenti costume: usa note PaymentSchedule oppure ricostruisce
+  // dal nome costume + allieva (eventuale taglia)
+  if (!description && payment.feeType === "COSTUME") {
+    description = payment.paymentSchedule?.notes ?? null
+    if (!description) {
+      const costume =
+        payment.costumeAssignment?.costume ??
+        payment.paymentSchedule?.costumeAssignment?.costume
+      const size =
+        payment.costumeAssignment?.size ??
+        payment.paymentSchedule?.costumeAssignment?.size ??
+        null
+      if (costume) {
+        const athleteName =
+          `${payment.athlete.firstName} ${payment.athlete.lastName}`.trim()
+        const sizeLabel = size ? ` · taglia ${size}` : ""
+        description = `Costume «${costume.name}» — ${athleteName}${sizeLabel}`
+      }
     }
   }
 
