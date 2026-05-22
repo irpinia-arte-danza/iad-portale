@@ -108,16 +108,29 @@ export async function registerPayment(
   const parentId = emptyToNull(parsed.data.parentId)
   const courseEnrollmentId = emptyToNull(parsed.data.courseEnrollmentId)
   const stageEnrollmentId = emptyToNull(parsed.data.stageEnrollmentId)
+  const showcaseParticipationId = emptyToNull(parsed.data.showcaseParticipationId)
+  const paymentScheduleId = emptyToNull(parsed.data.paymentScheduleId)
   const amountCents = Math.round(parsed.data.amountEur * 100)
 
-  if (courseEnrollmentId && stageEnrollmentId) {
+  const linkCount = [
+    courseEnrollmentId,
+    stageEnrollmentId,
+    showcaseParticipationId,
+  ].filter(Boolean).length
+  if (linkCount > 1) {
     return {
       ok: false,
-      error: "Indica un corso oppure uno stage, non entrambi",
+      error: "Indica un solo evento (corso, stage o saggio)",
     }
   }
 
-  const [parentRelation, courseEnrollment, stageEnrollment] = await Promise.all([
+  const [
+    parentRelation,
+    courseEnrollment,
+    stageEnrollment,
+    showcaseParticipation,
+    explicitSchedule,
+  ] = await Promise.all([
     parentId
       ? prisma.athleteParent.findFirst({
           where: {
@@ -155,6 +168,44 @@ export async function registerPayment(
           },
         })
       : Promise.resolve(null),
+    showcaseParticipationId
+      ? prisma.showcaseParticipation.findFirst({
+          where: {
+            id: showcaseParticipationId,
+            athleteId: parsed.data.athleteId,
+            showcase: { deletedAt: null },
+          },
+          select: {
+            id: true,
+            confirmed: true,
+            paymentSchedules: {
+              where: { status: ScheduleStatus.DUE },
+              select: {
+                id: true,
+                feeType: true,
+                amountCents: true,
+              },
+              orderBy: { dueDate: "asc" },
+            },
+          },
+        })
+      : Promise.resolve(null),
+    paymentScheduleId
+      ? prisma.paymentSchedule.findFirst({
+          where: {
+            id: paymentScheduleId,
+            status: ScheduleStatus.DUE,
+          },
+          select: {
+            id: true,
+            feeType: true,
+            amountCents: true,
+            showcaseParticipationId: true,
+            stageEnrollmentId: true,
+            courseEnrollmentId: true,
+          },
+        })
+      : Promise.resolve(null),
   ])
 
   if (parentId && !parentRelation) {
@@ -168,6 +219,60 @@ export async function registerPayment(
   }
   if (stageEnrollment && stageEnrollment.paid) {
     return { ok: false, error: "Stage già pagato per questa allieva" }
+  }
+  if (showcaseParticipationId && !showcaseParticipation) {
+    return {
+      ok: false,
+      error: "Partecipazione saggio non valida per questa allieva",
+    }
+  }
+  if (showcaseParticipation && !showcaseParticipation.confirmed) {
+    return {
+      ok: false,
+      error: "Partecipazione saggio non confermata: conferma prima il piano",
+    }
+  }
+  if (showcaseParticipation && showcaseParticipation.paymentSchedules.length === 0) {
+    return {
+      ok: false,
+      error: "Nessuna scadenza saggio in sospeso per questa allieva",
+    }
+  }
+
+  // Risolvi quale schedule saggio chiudere
+  let showcaseScheduleId: string | null = null
+  if (showcaseParticipation) {
+    if (paymentScheduleId) {
+      const match = showcaseParticipation.paymentSchedules.find(
+        (s) => s.id === paymentScheduleId,
+      )
+      if (!match) {
+        return {
+          ok: false,
+          error: "La scadenza selezionata non appartiene alla partecipazione",
+        }
+      }
+      showcaseScheduleId = match.id
+    } else {
+      // Auto-match per feeType: SHOWCASE_1 → caparra/quota unica, SHOWCASE_2 → saldo
+      const match = showcaseParticipation.paymentSchedules.find(
+        (s) => s.feeType === parsed.data.feeType,
+      )
+      if (!match) {
+        return {
+          ok: false,
+          error: "Nessuna scadenza saggio in sospeso col tipo selezionato",
+        }
+      }
+      showcaseScheduleId = match.id
+    }
+  } else if (explicitSchedule && explicitSchedule.showcaseParticipationId) {
+    // Edge: passato paymentScheduleId di un saggio ma senza showcaseParticipationId
+    return {
+      ok: false,
+      error:
+        "Indica la partecipazione saggio insieme alla scadenza selezionata",
+    }
   }
 
   try {
@@ -236,6 +341,17 @@ export async function registerPayment(
         }
       }
 
+      // Showcase payment: chiude la PaymentSchedule selezionata (caparra/saldo/unica)
+      if (showcaseScheduleId) {
+        await tx.paymentSchedule.update({
+          where: { id: showcaseScheduleId },
+          data: {
+            paymentId: payment.id,
+            status: ScheduleStatus.PAID,
+          },
+        })
+      }
+
       return payment
     })
 
@@ -301,7 +417,9 @@ export async function deletePayment(
     where: { id: idParsed.data, deletedAt: null },
     select: {
       athleteId: true,
-      paymentSchedule: { select: { id: true } },
+      paymentSchedule: {
+        select: { id: true, showcaseParticipationId: true },
+      },
       stageEnrollment: { select: { id: true } },
     },
   })
@@ -361,7 +479,9 @@ export async function reversePayment(
     select: {
       athleteId: true,
       status: true,
-      paymentSchedule: { select: { id: true } },
+      paymentSchedule: {
+        select: { id: true, showcaseParticipationId: true },
+      },
       stageEnrollment: { select: { id: true } },
     },
   })

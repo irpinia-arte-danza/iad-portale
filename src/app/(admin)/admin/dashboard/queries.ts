@@ -166,6 +166,67 @@ export async function countUpcomingStages() {
   })
 }
 
+export async function getCurrentShowcaseStats() {
+  await requireAdmin()
+
+  const ay = await prisma.academicYear.findFirst({
+    where: { isCurrent: true },
+    select: { id: true, label: true },
+  })
+  if (!ay) return null
+
+  const showcase = await prisma.showcase.findUnique({
+    where: { academicYearId: ay.id },
+    select: {
+      id: true,
+      title: true,
+      date: true,
+      deletedAt: true,
+      participations: {
+        select: {
+          id: true,
+          confirmed: true,
+          paymentSchedules: {
+            select: { status: true, feeType: true },
+          },
+        },
+      },
+    },
+  })
+  if (!showcase || showcase.deletedAt) {
+    return { exists: false as const, academicYearLabel: ay.label }
+  }
+
+  let totalParticipants = 0
+  let confirmed = 0
+  let pending = 0
+  let paidFirst = 0
+  let paidSecond = 0
+  for (const p of showcase.participations) {
+    totalParticipants += 1
+    if (p.confirmed) confirmed += 1
+    else pending += 1
+    for (const s of p.paymentSchedules) {
+      if (s.status !== "PAID") continue
+      if (s.feeType === "SHOWCASE_1") paidFirst += 1
+      else if (s.feeType === "SHOWCASE_2") paidSecond += 1
+    }
+  }
+
+  return {
+    exists: true as const,
+    id: showcase.id,
+    title: showcase.title,
+    date: showcase.date,
+    academicYearLabel: ay.label,
+    totalParticipants,
+    confirmed,
+    pending,
+    paidFirst,
+    paidSecond,
+  }
+}
+
 export async function getRecentParents(limit = 5) {
   await requireAdmin()
   return prisma.parent.findMany({

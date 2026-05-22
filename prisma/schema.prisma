@@ -566,10 +566,16 @@ model Showcase {
   participations ShowcaseParticipation[]
   costumes       Costume[]
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@map("showcases")
+}
+
+enum PaymentMode {
+  SINGLE // un'unica scadenza con il totale
+  SPLIT // due scadenze (caparra + saldo)
 }
 
 model ShowcaseParticipation {
@@ -577,8 +583,9 @@ model ShowcaseParticipation {
   showcaseId String @map("showcase_id") @db.Uuid
   athleteId  String @map("athlete_id") @db.Uuid
 
-  confirmed    Boolean   @default(false)
-  confirmedAt  DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  confirmed    Boolean      @default(false)
+  confirmedAt  DateTime?    @map("confirmed_at") @db.Timestamptz(6)
+  paymentMode  PaymentMode? @map("payment_mode")
   choreography String?
   notes        String?
 
@@ -586,6 +593,10 @@ model ShowcaseParticipation {
   athlete  Athlete  @relation(fields: [athleteId], references: [id])
 
   costumeAssignments CostumeAssignment[]
+  paymentSchedules   PaymentSchedule[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([showcaseId, athleteId])
   @@map("showcase_participations")
@@ -711,11 +722,13 @@ enum ScheduleStatus {
 
 model PaymentSchedule {
   id                 String  @id @default(uuid()) @db.Uuid
-  // Una scadenza è collegata a UN solo evento: corso (mensile/trimestrale) o stage.
-  // Esattamente uno dei due FK deve essere valorizzato (vincolo applicativo).
-  courseEnrollmentId String? @map("course_enrollment_id") @db.Uuid
-  stageEnrollmentId  String? @unique @map("stage_enrollment_id") @db.Uuid
-  academicYearId     String  @map("academic_year_id") @db.Uuid
+  // Una scadenza è collegata a UN solo evento: corso (mensile/trimestrale),
+  // stage workshop, o saggio (caparra/saldo).
+  // Esattamente uno dei tre FK deve essere valorizzato (CHECK constraint XOR).
+  courseEnrollmentId      String? @map("course_enrollment_id") @db.Uuid
+  stageEnrollmentId       String? @unique @map("stage_enrollment_id") @db.Uuid
+  showcaseParticipationId String? @map("showcase_participation_id") @db.Uuid
+  academicYearId          String  @map("academic_year_id") @db.Uuid
 
   feeType     FeeType  @map("fee_type")
   dueDate     DateTime @map("due_date") @db.Date
@@ -729,16 +742,18 @@ model PaymentSchedule {
   notes        String?
   createdBy    String? @map("created_by") @db.Uuid
 
-  courseEnrollment CourseEnrollment? @relation(fields: [courseEnrollmentId], references: [id])
-  stageEnrollment  StageEnrollment?  @relation(fields: [stageEnrollmentId], references: [id])
-  academicYear     AcademicYear      @relation(fields: [academicYearId], references: [id])
-  payment          Payment?          @relation(fields: [paymentId], references: [id])
+  courseEnrollment      CourseEnrollment?      @relation(fields: [courseEnrollmentId], references: [id])
+  stageEnrollment       StageEnrollment?       @relation(fields: [stageEnrollmentId], references: [id])
+  showcaseParticipation ShowcaseParticipation? @relation(fields: [showcaseParticipationId], references: [id])
+  academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id])
+  payment               Payment?               @relation(fields: [paymentId], references: [id])
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([courseEnrollmentId, dueDate])
   @@index([stageEnrollmentId, dueDate])
+  @@index([showcaseParticipationId, dueDate])
   @@index([status, dueDate])
   @@index([academicYearId, status])
   @@map("payment_schedules")
@@ -1270,6 +1285,14 @@ enum AuditAction {
   STAGE_ENROLLMENT_DELETE
   STAGE_ATTENDANCE_UPDATE
   STAGE_EMAIL_SENT
+  // Sprint 6.B — Saggio annuale
+  SHOWCASE_CREATE
+  SHOWCASE_UPDATE
+  SHOWCASE_DELETE
+  SHOWCASE_PARTICIPATION_CREATE
+  SHOWCASE_PARTICIPATION_CONFIRM
+  SHOWCASE_PARTICIPATION_DELETE
+  RESTORE_SHOWCASE
 }
 
 model AuditLog {

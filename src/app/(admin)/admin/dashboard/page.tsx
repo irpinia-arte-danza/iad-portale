@@ -11,6 +11,7 @@ import { getCertificateStatusCounts } from "../medical-certificates/queries"
 
 import {
   countUpcomingStages,
+  getCurrentShowcaseStats,
   getDashboardStats,
   getRecentAthletes,
   getRecentParents,
@@ -28,6 +29,7 @@ import { KpiCards } from "./_components/kpi-cards"
 import { RecentActivity } from "./_components/recent-activity"
 import { QuickActions } from "./_components/quick-actions"
 import { ScadenzeKpiWidget } from "./_components/scadenze-kpi-widget"
+import { ShowcaseWidget } from "./_components/showcase-widget"
 import { UpcomingStagesWidget } from "./_components/upcoming-stages-widget"
 
 export default async function AdminDashboardPage() {
@@ -57,6 +59,7 @@ export default async function AdminDashboardPage() {
     certCounts,
     upcomingStages,
     upcomingStagesCount,
+    showcaseStats,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: authUser.id },
@@ -81,6 +84,7 @@ export default async function AdminDashboardPage() {
     getCertificateStatusCounts(),
     getUpcomingStages(3),
     countUpcomingStages(),
+    getCurrentShowcaseStats(),
   ])
 
   const certNeedsAttention =
@@ -189,10 +193,13 @@ export default async function AdminDashboardPage() {
           ) : null}
           <ScadenzeKpiWidget kpi={scadenzeKpi} />
           <KpiCards stats={stats} />
-          <UpcomingStagesWidget
-            stages={upcomingStages}
-            totalCount={upcomingStagesCount}
-          />
+          <div className="grid gap-4 md:grid-cols-2">
+            <UpcomingStagesWidget
+              stages={upcomingStages}
+              totalCount={upcomingStagesCount}
+            />
+            <ShowcaseWidget stats={showcaseStats} />
+          </div>
           <AnalyticsSection
             enrollmentsTrend={enrollmentsTrend}
             incomeTrend={incomeTrend}

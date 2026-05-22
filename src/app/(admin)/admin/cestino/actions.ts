@@ -34,6 +34,7 @@ type EntityKind =
   | "course"
   | "expense"
   | "cert"
+  | "showcase"
 
 const REVALIDATE_PATHS: Record<EntityKind, string[]> = {
   athlete: ["/admin/athletes"],
@@ -42,6 +43,7 @@ const REVALIDATE_PATHS: Record<EntityKind, string[]> = {
   course: ["/admin/courses"],
   expense: ["/admin/expenses"],
   cert: [],
+  showcase: ["/admin/showcase"],
 }
 
 const AUDIT_ACTIONS: Record<
@@ -52,6 +54,7 @@ const AUDIT_ACTIONS: Record<
   | "RESTORE_COURSE"
   | "RESTORE_EXPENSE"
   | "RESTORE_CERT"
+  | "RESTORE_SHOWCASE"
 > = {
   athlete: "RESTORE_ATHLETE",
   parent: "RESTORE_PARENT",
@@ -59,6 +62,7 @@ const AUDIT_ACTIONS: Record<
   course: "RESTORE_COURSE",
   expense: "RESTORE_EXPENSE",
   cert: "RESTORE_CERT",
+  showcase: "RESTORE_SHOWCASE",
 }
 
 const ENTITY_TYPE: Record<EntityKind, string> = {
@@ -68,6 +72,7 @@ const ENTITY_TYPE: Record<EntityKind, string> = {
   course: "Course",
   expense: "Expense",
   cert: "MedicalCertificate",
+  showcase: "Showcase",
 }
 
 async function doRestore(
@@ -124,6 +129,12 @@ async function doRestore(
         athleteIdForRevalidate = cert.athleteId
         break
       }
+      case "showcase":
+        await prisma.showcase.update({
+          where: { id: idParsed.data },
+          data: { deletedAt: null },
+        })
+        break
     }
 
     await prisma.auditLog.create({
@@ -173,6 +184,10 @@ export async function restoreMedicalCertificate(
   id: string,
 ): Promise<ActionResult> {
   return doRestore("cert", id)
+}
+
+export async function restoreShowcase(id: string): Promise<ActionResult> {
+  return doRestore("showcase", id)
 }
 
 // ============================================================================

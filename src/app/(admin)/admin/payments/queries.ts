@@ -190,6 +190,38 @@ const athleteWithFormRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
       },
       orderBy: { stage: { date: "asc" } },
     },
+    showcaseParticipations: {
+      where: {
+        confirmed: true,
+        showcase: { deletedAt: null },
+        paymentSchedules: {
+          some: { status: "DUE" },
+        },
+      },
+      select: {
+        id: true,
+        paymentMode: true,
+        showcase: {
+          select: {
+            id: true,
+            title: true,
+            date: true,
+          },
+        },
+        paymentSchedules: {
+          where: { status: "DUE" },
+          select: {
+            id: true,
+            feeType: true,
+            amountCents: true,
+            dueDate: true,
+            notes: true,
+          },
+          orderBy: { dueDate: "asc" },
+        },
+      },
+      orderBy: { showcase: { date: "asc" } },
+    },
   },
 })
 

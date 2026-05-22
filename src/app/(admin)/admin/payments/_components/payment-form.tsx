@@ -79,6 +79,8 @@ export function PaymentForm({
       parentId: "",
       courseEnrollmentId: "",
       stageEnrollmentId: "",
+      showcaseParticipationId: "",
+      paymentScheduleId: "",
       feeType: "MONTHLY",
       method: "CASH",
       amountEur: 0,
@@ -101,6 +103,8 @@ export function PaymentForm({
   const needsEnrollmentLink =
     watchedFeeType === "MONTHLY" || watchedFeeType === "TRIMESTER"
   const isStageFee = watchedFeeType === "STAGE"
+  const isShowcaseFee =
+    watchedFeeType === "SHOWCASE_1" || watchedFeeType === "SHOWCASE_2"
 
   function onSubmit(values: PaymentCreateValues) {
     startTransition(async () => {
@@ -131,6 +135,8 @@ export function PaymentForm({
                   form.setValue("parentId", "")
                   form.setValue("courseEnrollmentId", "")
                   form.setValue("stageEnrollmentId", "")
+                  form.setValue("showcaseParticipationId", "")
+                  form.setValue("paymentScheduleId", "")
                 }}
               >
                 <FormControl>
@@ -244,6 +250,95 @@ export function PaymentForm({
                 <FormMessage />
               </FormItem>
             )}
+          />
+        )}
+
+        {isShowcaseFee && selectedAthlete && (
+          <FormField
+            control={form.control}
+            name="paymentScheduleId"
+            render={({ field }) => {
+              // Costruisce opzioni: per ogni partecipazione attiva, lista delle
+              // PaymentSchedule DUE filtrate per feeType selezionato (SHOWCASE_1 = caparra/quota unica, SHOWCASE_2 = saldo)
+              type Opt = {
+                scheduleId: string
+                participationId: string
+                label: string
+                amountCents: number
+              }
+              const opts: Opt[] = []
+              for (const p of selectedAthlete.showcaseParticipations) {
+                for (const s of p.paymentSchedules) {
+                  if (s.feeType !== watchedFeeType) continue
+                  const labelKind =
+                    s.notes?.includes("Caparra")
+                      ? "Caparra"
+                      : s.notes?.includes("Saldo")
+                        ? "Saldo"
+                        : s.notes?.includes("Quota unica")
+                          ? "Quota unica"
+                          : FEE_TYPE_LABELS[s.feeType]
+                  opts.push({
+                    scheduleId: s.id,
+                    participationId: p.id,
+                    label: `${p.showcase.title} — ${labelKind} (${centsToEur(s.amountCents)}€, entro ${new Date(s.dueDate).toLocaleDateString("it-IT")})`,
+                    amountCents: s.amountCents,
+                  })
+                }
+              }
+              return (
+                <FormItem>
+                  <FormLabel>Saggio (scadenza collegata)</FormLabel>
+                  <Select
+                    value={field.value || "__none__"}
+                    onValueChange={(value) => {
+                      const next = value === "__none__" ? "" : value
+                      field.onChange(next)
+                      if (next === "") {
+                        form.setValue("showcaseParticipationId", "")
+                      } else {
+                        const opt = opts.find((o) => o.scheduleId === next)
+                        if (opt) {
+                          form.setValue(
+                            "showcaseParticipationId",
+                            opt.participationId,
+                          )
+                          if (form.getValues("amountEur") === 0) {
+                            form.setValue(
+                              "amountEur",
+                              Number(centsToEur(opt.amountCents)),
+                            )
+                          }
+                        }
+                      }
+                    }}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Nessuna (pagamento libero)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {opts.length === 0 ? (
+                        <SelectItem value="__none__">
+                          Nessuna scadenza saggio compatibile
+                        </SelectItem>
+                      ) : (
+                        <>
+                          <SelectItem value="__none__">Nessuna</SelectItem>
+                          {opts.map((o) => (
+                            <SelectItem key={o.scheduleId} value={o.scheduleId}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )
+            }}
           />
         )}
 

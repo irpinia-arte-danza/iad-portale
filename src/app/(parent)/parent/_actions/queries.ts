@@ -81,7 +81,7 @@ export async function getMyAthletes(parentId: string) {
 export type MyAthlete = Awaited<ReturnType<typeof getMyAthletes>>[number]
 
 export async function getMyOpenSchedules(parentId: string) {
-  // Scadenze DUE/OVERDUE delle figlie del genitore (corsi + stage)
+  // Scadenze DUE/OVERDUE delle figlie del genitore (corsi + stage + saggio)
   const schedules = await prisma.paymentSchedule.findMany({
     where: withActiveCourseOrStageScheduleFilter({
       status: { in: ["DUE", "OVERDUE"] },
@@ -102,6 +102,14 @@ export async function getMyOpenSchedules(parentId: string) {
             },
           },
         },
+        {
+          showcaseParticipation: {
+            athlete: {
+              deletedAt: null,
+              parentRelations: { some: { parentId } },
+            },
+          },
+        },
       ],
     }),
     select: {
@@ -110,6 +118,7 @@ export async function getMyOpenSchedules(parentId: string) {
       dueDate: true,
       amountCents: true,
       status: true,
+      notes: true,
       courseEnrollment: {
         select: {
           athleteId: true,
@@ -132,6 +141,17 @@ export async function getMyOpenSchedules(parentId: string) {
           },
         },
       },
+      showcaseParticipation: {
+        select: {
+          athleteId: true,
+          athlete: {
+            select: { id: true, firstName: true, lastName: true },
+          },
+          showcase: {
+            select: { id: true, title: true },
+          },
+        },
+      },
     },
     orderBy: { dueDate: "asc" },
   })
@@ -139,19 +159,22 @@ export async function getMyOpenSchedules(parentId: string) {
   return schedules.map((s) => {
     const courseAth = s.courseEnrollment?.athlete
     const stageAth = s.stageEnrollment?.athlete
-    const athlete = courseAth ?? stageAth
+    const showcaseAth = s.showcaseParticipation?.athlete
+    const athlete = courseAth ?? stageAth ?? showcaseAth
     return {
       id: s.id,
       feeType: s.feeType,
       dueDate: s.dueDate,
       amountCents: s.amountCents,
       status: s.status,
+      notes: s.notes,
       athleteId: athlete?.id ?? "",
       athleteName: athlete
         ? `${athlete.firstName} ${athlete.lastName}`
         : "—",
       courseName: s.courseEnrollment?.course.name ?? null,
       stageName: s.stageEnrollment?.stage.title ?? null,
+      showcaseName: s.showcaseParticipation?.showcase.title ?? null,
     }
   })
 }

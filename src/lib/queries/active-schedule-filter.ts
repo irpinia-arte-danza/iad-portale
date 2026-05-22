@@ -33,7 +33,8 @@ export function withActiveScheduleFilter(
 }
 
 // Scadenza valida per gli scopi del parent portal / dashboard:
-// corso attivo OPPURE stage attivo (non soft-deleted) con allieva attiva.
+// corso attivo OPPURE stage attivo OPPURE saggio attivo (non soft-deleted)
+// con allieva attiva.
 export function withActiveCourseOrStageScheduleFilter(
   where: Prisma.PaymentScheduleWhereInput,
 ): Prisma.PaymentScheduleWhereInput {
@@ -51,6 +52,12 @@ export function withActiveCourseOrStageScheduleFilter(
         stageEnrollment: {
           athlete: { deletedAt: null },
           stage: { deletedAt: null },
+        },
+      },
+      {
+        showcaseParticipation: {
+          athlete: { deletedAt: null },
+          showcase: { deletedAt: null },
         },
       },
     ],

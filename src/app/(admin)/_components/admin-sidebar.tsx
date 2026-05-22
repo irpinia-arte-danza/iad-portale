@@ -16,6 +16,7 @@ import {
   Receipt,
   Settings,
   Sparkles,
+  Star,
   Trash2,
   TrendingUp,
   UserCog,
@@ -55,6 +56,7 @@ const NAV_ITEMS = [
   { href: "/admin/teachers", label: "Insegnanti", icon: UserCog },
   { href: "/admin/courses", label: "Corsi", icon: BookOpen },
   { href: "/admin/stages", label: "Stage", icon: Sparkles },
+  { href: "/admin/showcase", label: "Saggio", icon: Star },
   { href: "/admin/academic-years", label: "Anni accademici", icon: Calendar },
   {
     href: "/admin/medical-certificates",

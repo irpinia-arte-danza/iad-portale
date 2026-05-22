@@ -105,18 +105,42 @@ export async function getDeletedMedicalCertificates() {
   })
 }
 
+export async function getDeletedShowcases() {
+  await requireAdmin()
+  return prisma.showcase.findMany({
+    where: { deletedAt: { not: null } },
+    select: {
+      id: true,
+      title: true,
+      date: true,
+      deletedAt: true,
+      academicYear: { select: { id: true, label: true } },
+    },
+    orderBy: { deletedAt: "desc" },
+    take: TAKE,
+  })
+}
+
 export async function getCestinoCounts() {
   await requireAdmin()
-  const [athletes, parents, teachers, courses, expenses, certs] =
-    await Promise.all([
-      prisma.athlete.count({ where: { deletedAt: { not: null } } }),
-      prisma.parent.count({ where: { deletedAt: { not: null } } }),
-      prisma.teacher.count({ where: { deletedAt: { not: null } } }),
-      prisma.course.count({ where: { deletedAt: { not: null } } }),
-      prisma.expense.count({ where: { deletedAt: { not: null } } }),
-      prisma.medicalCertificate.count({
-        where: { deletedAt: { not: null } },
-      }),
-    ])
-  return { athletes, parents, teachers, courses, expenses, certs }
+  const [
+    athletes,
+    parents,
+    teachers,
+    courses,
+    expenses,
+    certs,
+    showcases,
+  ] = await Promise.all([
+    prisma.athlete.count({ where: { deletedAt: { not: null } } }),
+    prisma.parent.count({ where: { deletedAt: { not: null } } }),
+    prisma.teacher.count({ where: { deletedAt: { not: null } } }),
+    prisma.course.count({ where: { deletedAt: { not: null } } }),
+    prisma.expense.count({ where: { deletedAt: { not: null } } }),
+    prisma.medicalCertificate.count({
+      where: { deletedAt: { not: null } },
+    }),
+    prisma.showcase.count({ where: { deletedAt: { not: null } } }),
+  ])
+  return { athletes, parents, teachers, courses, expenses, certs, showcases }
 }

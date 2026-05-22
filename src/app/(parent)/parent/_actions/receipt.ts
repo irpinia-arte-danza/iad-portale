@@ -112,6 +112,17 @@ export async function generatePaymentReceipt(
           },
         },
       },
+      paymentSchedule: {
+        select: {
+          id: true,
+          notes: true,
+          showcaseParticipation: {
+            select: {
+              showcase: { select: { title: true, date: true } },
+            },
+          },
+        },
+      },
       receipt: {
         select: {
           id: true,
@@ -230,6 +241,21 @@ export async function generatePaymentReceipt(
     const mm = String(stageDate.getUTCMonth() + 1).padStart(2, "0")
     const yyyy = stageDate.getUTCFullYear()
     description = `Iscrizione Stage «${payment.stageEnrollment.stage.title}» del ${dd}/${mm}/${yyyy}`
+  }
+  // Per pagamenti saggio: usa la causale già impostata nella PaymentSchedule
+  // (es. "Saggio «X» — Caparra"), che riassume titolo + tipologia rata
+  if (
+    !description &&
+    (payment.feeType === "SHOWCASE_1" || payment.feeType === "SHOWCASE_2") &&
+    payment.paymentSchedule?.showcaseParticipation
+  ) {
+    description = payment.paymentSchedule.notes ?? null
+    if (!description) {
+      const showcase = payment.paymentSchedule.showcaseParticipation.showcase
+      const kind =
+        payment.feeType === "SHOWCASE_1" ? "Caparra" : "Saldo"
+      description = `Saggio «${showcase.title}» — ${kind}`
+    }
   }
 
   const receiptData: ReceiptData = {

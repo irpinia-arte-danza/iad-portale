@@ -9,27 +9,37 @@ import {
   getDeletedExpenses,
   getDeletedMedicalCertificates,
   getDeletedParents,
+  getDeletedShowcases,
   getDeletedTeachers,
 } from "./queries"
 
 export default async function CestinoPage() {
-  const [counts, athletes, parents, teachers, courses, expenses, certs] =
-    await Promise.all([
-      getCestinoCounts(),
-      getDeletedAthletes(),
-      getDeletedParents(),
-      getDeletedTeachers(),
-      getDeletedCourses(),
-      getDeletedExpenses(),
-      getDeletedMedicalCertificates(),
-    ])
+  const [
+    counts,
+    athletes,
+    parents,
+    teachers,
+    courses,
+    expenses,
+    certs,
+    showcases,
+  ] = await Promise.all([
+    getCestinoCounts(),
+    getDeletedAthletes(),
+    getDeletedParents(),
+    getDeletedTeachers(),
+    getDeletedCourses(),
+    getDeletedExpenses(),
+    getDeletedMedicalCertificates(),
+    getDeletedShowcases(),
+  ])
 
   return (
     <>
       <ResourceHeader
         breadcrumbs={[{ label: "Cestino" }]}
         title="Cestino"
-        description="Elementi eliminati. Puoi ripristinarli o eliminarli definitivamente. L'eliminazione definitiva è irreversibile e blocca i record con dati fiscali (pagamenti, compensi)."
+        description="Elementi eliminati. Puoi ripristinarli o eliminarli definitivamente. L'eliminazione definitiva è irreversibile e blocca i record con dati fiscali (pagamenti, compensi). I saggi sono solo ripristinabili (preservano lo storico partecipazioni)."
       />
       <ResourceContent>
         <CestinoClient
@@ -40,6 +50,7 @@ export default async function CestinoPage() {
           courses={courses}
           expenses={expenses}
           certs={certs}
+          showcases={showcases}
         />
       </ResourceContent>
     </>

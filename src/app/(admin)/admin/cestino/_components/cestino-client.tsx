@@ -49,6 +49,7 @@ import {
   restoreExpense,
   restoreMedicalCertificate,
   restoreParent,
+  restoreShowcase,
   restoreTeacher,
 } from "../actions"
 
@@ -59,6 +60,7 @@ type EntityKind =
   | "course"
   | "expense"
   | "cert"
+  | "showcase"
 
 type HardDeleteTarget = {
   id: string
@@ -68,10 +70,12 @@ type HardDeleteTarget = {
   confirmKind: "name" | "date"
 }
 
-const HARD_DELETE_FN: Record<
-  EntityKind,
-  (id: string, confirm: string) => Promise<{ ok: boolean; error?: string }>
-> = {
+type HardDeleteFn = (
+  id: string,
+  confirm: string,
+) => Promise<{ ok: boolean; error?: string }>
+
+const HARD_DELETE_FN: Partial<Record<EntityKind, HardDeleteFn>> = {
   athlete: hardDeleteAthlete,
   parent: hardDeleteParent,
   teacher: hardDeleteTeacher,
@@ -87,6 +91,7 @@ type Counts = {
   courses: number
   expenses: number
   certs: number
+  showcases: number
 }
 
 type Athlete = {
@@ -133,6 +138,13 @@ type CertRow = {
   deletedAt: Date | null
   athlete: { id: string; firstName: string; lastName: string }
 }
+type ShowcaseRow = {
+  id: string
+  title: string
+  date: Date
+  deletedAt: Date | null
+  academicYear: { id: string; label: string }
+}
 
 type Props = {
   counts: Counts
@@ -142,6 +154,7 @@ type Props = {
   courses: CourseRow[]
   expenses: ExpenseRow[]
   certs: CertRow[]
+  showcases: ShowcaseRow[]
 }
 
 const euroFormatter = new Intl.NumberFormat("it-IT", {
@@ -171,6 +184,7 @@ const RESTORE_FN = {
   course: restoreCourse,
   expense: restoreExpense,
   cert: restoreMedicalCertificate,
+  showcase: restoreShowcase,
 } as const
 
 export function CestinoClient({
@@ -181,6 +195,7 @@ export function CestinoClient({
   courses,
   expenses,
   certs,
+  showcases,
 }: Props) {
   const [confirm, setConfirm] = React.useState<ConfirmTarget | null>(null)
   const [hardTarget, setHardTarget] = React.useState<HardDeleteTarget | null>(
@@ -205,7 +220,7 @@ export function CestinoClient({
   return (
     <>
       <Tabs defaultValue="athletes" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-7">
           <TabsTrigger value="athletes">
             Allieve {counts.athletes > 0 ? `(${counts.athletes})` : ""}
           </TabsTrigger>
@@ -223,6 +238,9 @@ export function CestinoClient({
           </TabsTrigger>
           <TabsTrigger value="certs">
             Certificati {counts.certs > 0 ? `(${counts.certs})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="showcases">
+            Saggi {counts.showcases > 0 ? `(${counts.showcases})` : ""}
           </TabsTrigger>
         </TabsList>
 
@@ -364,6 +382,28 @@ export function CestinoClient({
             onHardDelete={setHardTarget}
           />
         </TabsContent>
+
+        <TabsContent value="showcases">
+          <CestinoTable
+            empty="Nessun saggio eliminato."
+            columns={["Saggio", "AA", "Data", "Eliminato"]}
+            rows={showcases.map((s) => ({
+              id: s.id,
+              cells: [
+                s.title,
+                s.academicYear.label,
+                formatDateShort(new Date(s.date)),
+                daysAgo(s.deletedAt),
+              ],
+              label: s.title,
+              kind: "showcase" as const,
+              confirmExpected: s.title,
+              confirmKind: "name" as const,
+            }))}
+            onRestore={setConfirm}
+            onHardDelete={setHardTarget}
+          />
+        </TabsContent>
       </Tabs>
 
       <HardDeleteDialog
@@ -422,6 +462,8 @@ type CestinoRow = {
   confirmKind: "name" | "date"
 }
 
+const RESTORE_ONLY_KINDS = new Set<EntityKind>(["showcase"])
+
 function CestinoTable({
   columns,
   rows,
@@ -475,23 +517,25 @@ function CestinoTable({
                     <ArchiveRestore className="mr-1 h-4 w-4" />
                     Ripristina
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() =>
-                      onHardDelete({
-                        id: row.id,
-                        kind: row.kind,
-                        label: row.label,
-                        confirmExpected: row.confirmExpected,
-                        confirmKind: row.confirmKind,
-                      })
-                    }
-                  >
-                    <Trash2 className="mr-1 h-4 w-4" />
-                    Elimina
-                  </Button>
+                  {RESTORE_ONLY_KINDS.has(row.kind) ? null : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() =>
+                        onHardDelete({
+                          id: row.id,
+                          kind: row.kind,
+                          label: row.label,
+                          confirmExpected: row.confirmExpected,
+                          confirmKind: row.confirmKind,
+                        })
+                      }
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" />
+                      Elimina
+                    </Button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
@@ -539,6 +583,11 @@ function HardDeleteDialog({
     if (!matches || !target) return
     setBusy(true)
     const fn = HARD_DELETE_FN[target.kind]
+    if (!fn) {
+      setBusy(false)
+      toast.error("Eliminazione definitiva non disponibile per questo elemento")
+      return
+    }
     const result = await fn(target.id, input)
     if (result.ok) {
       toast.success(`${target.label} eliminato definitivamente`)

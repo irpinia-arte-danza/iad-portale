@@ -49,6 +49,8 @@ export const paymentCreateSchema = z
     parentId: z.string().uuid().optional().or(z.literal("")),
     courseEnrollmentId: z.string().uuid().optional().or(z.literal("")),
     stageEnrollmentId: z.string().uuid().optional().or(z.literal("")),
+    showcaseParticipationId: z.string().uuid().optional().or(z.literal("")),
+    paymentScheduleId: z.string().uuid().optional().or(z.literal("")),
     feeType: z.enum(FEE_TYPE_VALUES, { message: "Tipo quota non valido" }),
     method: z.enum(PAYMENT_METHOD_VALUES, { message: "Metodo non valido" }),
     amountEur: z
