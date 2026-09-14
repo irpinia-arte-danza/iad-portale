@@ -20,6 +20,7 @@ import {
   AssociationFeeNotSetError,
   ensureAssociationFeeSchedule,
 } from "@/lib/fees/association-fee"
+import { toDateOnly } from "@/lib/utils/date-only"
 
 import { generateMonthlySchedulesForEnrollment } from "./schedule-generator"
 
@@ -92,7 +93,7 @@ export async function createEnrollment(
           athleteId: athleteIdParsed.data,
           courseId: parsed.data.courseId,
           academicYearId: currentAY.id,
-          enrollmentDate: parsed.data.enrollmentDate ?? new Date(),
+          enrollmentDate: toDateOnly(parsed.data.enrollmentDate ?? new Date()),
           notes:
             parsed.data.notes && parsed.data.notes !== ""
               ? parsed.data.notes
@@ -220,7 +221,7 @@ export async function withdrawEnrollment(
   try {
     await prisma.courseEnrollment.update({
       where: { id: idParsed.data },
-      data: { withdrawalDate: parsed.data.withdrawalDate },
+      data: { withdrawalDate: toDateOnly(parsed.data.withdrawalDate) },
     })
     revalidatePath(athletePath(existing.athleteId))
     return { ok: true }

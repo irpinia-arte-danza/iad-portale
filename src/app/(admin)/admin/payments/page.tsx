@@ -1,5 +1,11 @@
+import { redirect } from "next/navigation"
 import { FeeType, PaymentStatus } from "@prisma/client"
 
+import {
+  ListPagination,
+  pageHref,
+  parsePageParam,
+} from "../_components/list-pagination"
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
 
@@ -13,11 +19,15 @@ import { PaymentsFilters } from "./_components/payments-filters"
 import { PaymentsSearch } from "./_components/payments-search"
 import { PaymentsTable } from "./_components/payments-table"
 
+const PAYMENTS_PATH = "/admin/payments"
+const PAGE_SIZE = 50
+
 interface PageProps {
   searchParams: Promise<{
     search?: string
     feeType?: string
     status?: string
+    page?: string
   }>
 }
 
@@ -48,13 +58,32 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
   const search = resolved.search ?? ""
   const feeType = parseFeeType(resolved.feeType)
   const status = parseStatus(resolved.status)
+  const page = parsePageParam(resolved.page)
+
+  // Parametri da conservare nei link di pagina
+  const params: Record<string, string> = {}
+  if (search) params.search = search
+  if (feeType) params.feeType = feeType
+  if (status) params.status = status
 
   const [{ items, totalCount }, athletes, openSchedulesByAthlete] =
     await Promise.all([
-      listPayments({ search, feeType, status }),
+      listPayments({
+        search,
+        feeType,
+        status,
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+      }),
       listAthletesWithRelations(),
       listOpenSchedulesByAthlete(),
     ])
+
+  // Pagina oltre la fine (link vecchio, pagamenti eliminati): all'ultima
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  if (page > totalPages) {
+    redirect(pageHref(PAYMENTS_PATH, params, totalPages))
+  }
 
   return (
     <>
@@ -79,10 +108,14 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
             />
           </div>
           <PaymentsTable payments={items} />
-          <p className="text-xs text-muted-foreground">
-            {totalCount}{" "}
-            {totalCount === 1 ? "pagamento" : "pagamenti"} totali
-          </p>
+          <ListPagination
+            basePath={PAYMENTS_PATH}
+            params={params}
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalCount={totalCount}
+            noun={{ singular: "pagamento", plural: "pagamenti" }}
+          />
         </div>
       </ResourceContent>
     </>

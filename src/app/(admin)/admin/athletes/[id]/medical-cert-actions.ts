@@ -18,6 +18,7 @@ import {
   getMedicalCertSignedUrl as getSignedFromStorage,
   uploadMedicalCertFile,
 } from "@/lib/supabase/storage-medical-cert"
+import { toDateOnly } from "@/lib/utils/date-only"
 import { validateFileSignature } from "@/lib/utils/file-signature"
 
 const MAX_BYTES = 3 * 1024 * 1024
@@ -102,8 +103,8 @@ export async function createMedicalCertificate(
       data: {
         athleteId: idParsed.data,
         type: parsed.type,
-        issueDate: parsed.issueDate,
-        expiryDate: parsed.expiryDate,
+        issueDate: toDateOnly(parsed.issueDate),
+        expiryDate: toDateOnly(parsed.expiryDate),
         doctorName:
           parsed.doctorName && parsed.doctorName !== ""
             ? parsed.doctorName
@@ -205,8 +206,8 @@ export async function updateMedicalCertificate(
       where: { id: existing.id },
       data: {
         type: parsed.type,
-        issueDate: parsed.issueDate,
-        expiryDate: parsed.expiryDate,
+        issueDate: toDateOnly(parsed.issueDate),
+        expiryDate: toDateOnly(parsed.expiryDate),
         doctorName:
           parsed.doctorName && parsed.doctorName !== ""
             ? parsed.doctorName

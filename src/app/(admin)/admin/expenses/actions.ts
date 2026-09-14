@@ -14,6 +14,8 @@ import {
   type ExpenseCreateValues,
   type ExpenseUpdateValues,
 } from "@/lib/schemas/expense"
+import { fiscalYearForDate } from "@/lib/fiscal-years"
+import { toDateOnly } from "@/lib/utils/date-only"
 
 const EXPENSES_PATH = "/admin/expenses"
 
@@ -33,34 +35,27 @@ function emptyToNull(value: string | undefined | null): string | null {
   return trimmed === "" ? null : trimmed
 }
 
-async function resolveYearIds(expenseDate: Date): Promise<
-  | { ok: true; fiscalYearId: string; academicYearId: string | null }
-  | { ok: false; error: string }
-> {
-  const [currentFY, currentAY] = await Promise.all([
-    prisma.fiscalYear.findFirst({
-      where: { isCurrent: true },
-      select: { id: true },
-    }),
+// Anni dalla data della spesa, non dagli anni "correnti": stipendi e F24 di
+// luglio-agosto sono dell'anno fiscale ma di nessun anno accademico
+// (settembre-giugno). `expenseDate` è già un giorno di calendario.
+async function resolveYearIds(
+  expenseDate: Date,
+): Promise<{ fiscalYearId: string; academicYearId: string | null }> {
+  const [fiscalYear, academicYear] = await Promise.all([
+    fiscalYearForDate(expenseDate),
     prisma.academicYear.findFirst({
-      where: { isCurrent: true },
-      select: { id: true, startDate: true, endDate: true },
+      where: {
+        startDate: { lte: expenseDate },
+        endDate: { gte: expenseDate },
+      },
+      orderBy: { startDate: "desc" },
+      select: { id: true },
     }),
   ])
 
-  if (!currentFY) {
-    return { ok: false, error: "Nessun anno fiscale corrente configurato" }
-  }
-
-  const inAyWindow =
-    currentAY !== null &&
-    expenseDate >= currentAY.startDate &&
-    expenseDate <= currentAY.endDate
-
   return {
-    ok: true,
-    fiscalYearId: currentFY.id,
-    academicYearId: inAyWindow ? currentAY!.id : null,
+    fiscalYearId: fiscalYear.id,
+    academicYearId: academicYear?.id ?? null,
   }
 }
 
@@ -77,14 +72,11 @@ export async function registerExpense(
     }
   }
 
-  const years = await resolveYearIds(parsed.data.expenseDate)
-  if (!years.ok) {
-    return { ok: false, error: years.error }
-  }
-
+  const expenseDate = toDateOnly(parsed.data.expenseDate)
   const amountCents = Math.round(parsed.data.amountEur * 100)
 
   try {
+    const years = await resolveYearIds(expenseDate)
     const created = await prisma.expense.create({
       data: {
         fiscalYearId: years.fiscalYearId,
@@ -92,7 +84,7 @@ export async function registerExpense(
         type: parsed.data.type,
         amountCents,
         method: parsed.data.method,
-        expenseDate: parsed.data.expenseDate,
+        expenseDate,
         description: parsed.data.description,
         recipient: emptyToNull(parsed.data.recipient),
         notes: emptyToNull(parsed.data.notes),
@@ -134,14 +126,11 @@ export async function updateExpense(
     return { ok: false, error: "Spesa non trovata" }
   }
 
-  const years = await resolveYearIds(parsed.data.expenseDate)
-  if (!years.ok) {
-    return { ok: false, error: years.error }
-  }
-
+  const expenseDate = toDateOnly(parsed.data.expenseDate)
   const amountCents = Math.round(parsed.data.amountEur * 100)
 
   try {
+    const years = await resolveYearIds(expenseDate)
     await prisma.expense.update({
       where: { id: idParsed.data },
       data: {
@@ -150,7 +139,7 @@ export async function updateExpense(
         type: parsed.data.type,
         amountCents,
         method: parsed.data.method,
-        expenseDate: parsed.data.expenseDate,
+        expenseDate,
         description: parsed.data.description,
         recipient: emptyToNull(parsed.data.recipient),
         notes: emptyToNull(parsed.data.notes),

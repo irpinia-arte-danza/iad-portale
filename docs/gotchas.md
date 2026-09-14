@@ -21,6 +21,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.24 Drop+recreate stub zero-coupling
   - §17.33 Filtri Prisma composti con `{ ...where, OR }` sovrascrivono l'OR del chiamante
   - §17.39 `payment_id` unico su scadenze, stage e costumi: un pagamento chiudeva una sola cosa
+  - §17.40 Colonne `@db.Date` e fuso orario: la mezzanotte di Roma diventa il giorno prima
 - [Next.js](#nextjs)
   - §17.7 Next 16 proxy export naming
   - §17.9 Next dev logga Server Action body
@@ -127,6 +128,18 @@ Vale per qualsiasi chiave logica (`OR`, `AND`, `NOT`) e per le relazioni già fi
 
 Prima di dare per scontato che un FK nullable ammetta più righe, controllare gli indici: `select indexname, indexdef from pg_indexes where indexname like '%payment_id%'`. Scoperto: sprint incasso multiplo, settembre 2026.
 
+**§17.40 Colonne `@db.Date` e fuso orario — la mezzanotte di Roma diventa il giorno prima**: una colonna Postgres `date` conserva solo il giorno **UTC** del valore che Prisma le manda. `new Date("2026-09-01")` (il valore di `<input type="date">`) è mezzanotte UTC → salva 01/09, corretto. `new Date(2026, 8, 1)` nel browser è invece la mezzanotte **locale** di Roma = `2026-08-31T22:00:00.000Z` → salva **31/08**. Nel form la data si vede giusta (il browser la formatta in ora locale): l'errore compare solo dopo il salvataggio. Stesso effetto per `new Date()` salvato tra 00:00 e 02:00 di Roma, e per "oggi" calcolato con `setUTCHours(0, 0, 0, 0)`, che in quella fascia è ancora ieri. Casi reali:
+1. Dialog anno accademico con default `new Date(anno, 8, 1)` / `new Date(anno + 1, 7, 31)`: il 2026-2027 è stato salvato come 31/08/2026 → 30/08/2027 (audit `AY_CREATE` del 14/09/2026 con `startDate: "2026-08-31T22:00:00.000Z"`).
+2. Il default della scadenza nel dialog certificato medico (`new Date(anno + 1, mese, giorno)`) ha lo stesso difetto.
+
+Regole:
+- **Client**: date di calendario costruite con `dateOnly(anno, mese0, giorno)` (`Date.UTC`), mai `new Date(y, m, d)`.
+- **Server**: ogni scrittura su una colonna `@db.Date` passa da `toDateOnly()` / `toDateOnlyOrNull()` (`src/lib/utils/date-only.ts`): prende il giorno di calendario a Roma e restituisce la mezzanotte UTC. È idempotente sui valori già giusti (picker, DB) e corregge mezzanotti locali e `new Date()`. Protegge anche da default client sbagliati che non abbiamo ancora visto.
+- **"Oggi"** da confrontare con colonne date: `todayDateOnly()`, non `new Date()` + `setHours` / `setUTCHours`.
+- **Anno di una data di calendario**: `getUTCFullYear()` dopo `toDateOnly` (vedi `fiscalYearOf` in `src/lib/school-calendar.ts`). Mai `getFullYear()` lato server: su Vercel il processo gira in UTC (§17.10).
+
+Già normalizzati: anni accademici, stage, saggio, certificati medici, orari corso, iscrizioni ai corsi, pagamenti, spese, data ricevuta (`todayInRome`). Non normalizzate, ma corrette finché arrivano dal picker: data di nascita di allieve e genitori. Scoperto: 14 settembre 2026, anno accademico 2026-2027 che partiva dal 31/08.
+
 ---
 
 ## Next.js
@@ -198,7 +211,7 @@ export function endOfToday(): Date {
   return d
 }
 ```
-Poi usa `z.date().max(endOfToday(), { message: "..." })` in tutti gli schemi che validano date da HTML picker (`enrollmentDate`, `withdrawalDate`, `dateOfBirth`). L'upper bound diventa la fine della giornata locale → oggi passa sempre, domani no. Scoperto: Sprint 2.B, 21 aprile 2026, su `enrollmentDate` field in `EnrollCourseDialog`.
+L'upper bound diventa la fine della giornata locale → oggi passa sempre, domani no. **Il limite va calcolato a ogni validazione**: `z.date().refine(isNotInFuture, { message: "..." })` (helper in `common.ts`), non `z.date().max(endOfToday(), ...)`. L'argomento di `.max()` è valutato una sola volta, quando il modulo dello schema viene caricato: un'istanza server rimasta accesa oltre la mezzanotte rifiuta la data di oggi come futura finché non riparte. Con `refine` oggi: `paymentDate`, `expenseDate`, `enrollmentDate`, `withdrawalDate`. `dateOfBirth` (allieve, genitori) usa ancora `.max(endOfToday())`: innocuo, nessuna data di nascita cade oggi (corretto settembre 2026). Scoperto: Sprint 2.B, 21 aprile 2026, su `enrollmentDate` field in `EnrollCourseDialog`.
 
 ---
 
@@ -330,3 +343,5 @@ WHERE EXTRACT(MONTH FROM due_date) IN (7, 8)
   AND status = 'DUE';
 ```
 Se in futuro emergono altre policy stagionali (es. agosto aperto per campus, giugno ridotto per saggio), spostare `COURSE_SEASON_END_MONTH` in `BrandSettings` o in AcademicYear come colonna dedicata (`coursesEndMonth`) invece di hardcode. Scoperto: Sprint 2.C.5, 21 aprile 2026, test visivo auto-gen schedules mostrava luglio+agosto quote fantasma.
+
+Aggiornamento 14 settembre 2026: gli anni accademici finiscono il **30 giugno** (lezioni fino al saggio, luglio e agosto non si pagano): è il default del dialog e il dato in produzione. A luglio e agosto quindi nessun anno copre la data odierna, e il cron `academic-year-rollover` **non azzera più** il corrente: resta l'anno appena concluso finché non parte il successivo. Prima lo azzerava, e dal 1° al 14 settembre 2026 il portale è rimasto senza anno corrente. Il guard `COURSE_SEASON_END_MONTH` del generator resta valido.

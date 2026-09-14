@@ -28,6 +28,7 @@ import {
   type StageEnrollmentCreateValues,
   type StageUpdateValues,
 } from "@/lib/schemas/stage"
+import { toDateOnly, toDateOnlyOrNull } from "@/lib/utils/date-only"
 
 const STAGES_PATH = "/admin/stages"
 const DASHBOARD_PATH = "/admin/dashboard"
@@ -92,14 +93,14 @@ export async function createStage(
         academicYearId: currentAY.id,
         title: parsed.data.title,
         description: emptyToNull(parsed.data.description),
-        date: parsed.data.date,
+        date: toDateOnly(parsed.data.date),
         startTime: parsed.data.startTime,
         endTime: parsed.data.endTime,
         location: emptyToNull(parsed.data.location),
         capacity: parsed.data.capacity,
         feeCents: Math.round(parsed.data.feeEur * 100),
         registrationOpen: parsed.data.registrationOpen,
-        registrationDeadline: parsed.data.registrationDeadline ?? null,
+        registrationDeadline: toDateOnlyOrNull(parsed.data.registrationDeadline),
       },
       select: { id: true },
     })
@@ -158,14 +159,14 @@ export async function updateStage(
       data: {
         title: parsed.data.title,
         description: emptyToNull(parsed.data.description),
-        date: parsed.data.date,
+        date: toDateOnly(parsed.data.date),
         startTime: parsed.data.startTime,
         endTime: parsed.data.endTime,
         location: emptyToNull(parsed.data.location),
         capacity: parsed.data.capacity,
         feeCents: Math.round(parsed.data.feeEur * 100),
         registrationOpen: parsed.data.registrationOpen,
-        registrationDeadline: parsed.data.registrationDeadline ?? null,
+        registrationDeadline: toDateOnlyOrNull(parsed.data.registrationDeadline),
       },
     })
 

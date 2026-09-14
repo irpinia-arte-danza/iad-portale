@@ -584,7 +584,12 @@ USING (
 
 **Cron registrati**:
 - `/api/cron/reminders` — invio automatico promemoria pagamenti (Sprint 3)
-- `/api/cron/academic-year-rollover` — auto-set isCurrent (Fase 1.A)
+- `/api/cron/academic-year-rollover` — ogni notte (03:00 UTC), tre passi indipendenti:
+  - **anno accademico**: se un anno copre la data odierna diventa corrente. Se nessun anno la copre (luglio-agosto, o anno nuovo non ancora creato) il corrente **non viene mai azzerato**: resta l'ultimo anno, con un warning nei log;
+  - **anno fiscale**: crea l'anno solare in corso (a dicembre anche il successivo) e dal 1° gennaio lo imposta come corrente. Pagamenti e spese scelgono comunque l'anno fiscale dalla propria data, e lo creano se manca;
+  - **anno accademico successivo**: da agosto, se non esiste, email agli admin attivi con link ad Anni accademici (una volta per admin e per anno, `email_logs.milestone_key = 'AY_NEXT_MISSING:<anno>'`). Lo stesso avviso resta nella dashboard admin.
+
+  La risposta JSON riporta l'esito di ogni passo (`academicYear`, `fiscalYear`, `nextAcademicYear`); un passo fallito dà HTTP 500 ma non blocca gli altri.
 
 **Verifica**: Vercel Dashboard → Project → Settings → Cron Jobs → log
 ultime 10 esecuzioni.

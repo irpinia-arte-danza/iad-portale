@@ -12,6 +12,7 @@ import {
   courseScheduleSchema,
   type CourseScheduleValues,
 } from "@/lib/schemas/course-schedule"
+import { toDateOnly, toDateOnlyOrNull } from "@/lib/utils/date-only"
 
 function mapPrismaError(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -47,8 +48,9 @@ export async function createSchedule(
       data: {
         ...rest,
         courseId,
+        validFrom: toDateOnly(rest.validFrom),
         location: location && location !== "" ? location : null,
-        validTo: validTo ?? null,
+        validTo: toDateOnlyOrNull(validTo),
       },
       select: { id: true },
     })
@@ -106,8 +108,9 @@ export async function updateSchedule(
       where: { id: idParsed.data },
       data: {
         ...rest,
+        validFrom: toDateOnly(rest.validFrom),
         location: location && location !== "" ? location : null,
-        validTo: validTo ?? null,
+        validTo: toDateOnlyOrNull(validTo),
       },
     })
 

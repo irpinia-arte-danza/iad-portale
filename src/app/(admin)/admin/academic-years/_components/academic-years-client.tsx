@@ -38,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { dateOnly } from "@/lib/utils/date-only"
 import { formatDateShort } from "@/lib/utils/format"
 
 import { setCurrentAcademicYear } from "../actions"
@@ -77,12 +78,14 @@ function deriveSuggestion(years: AYRow[]) {
     )[0] ??
     null
 
+  // Date di calendario UTC (dateOnly): `new Date(y, m, d)` è la mezzanotte
+  // locale e verrebbe salvata come il giorno prima
   if (!reference) {
     const now = new Date().getFullYear()
     return {
       label: `${now}-${now + 1}`,
-      startDate: new Date(now, 8, 1), // 1 settembre
-      endDate: new Date(now + 1, 7, 31), // 31 agosto
+      startDate: dateOnly(now, 8, 1), // 1 settembre
+      endDate: dateOnly(now + 1, 5, 30), // 30 giugno
       feeEur: 0,
     }
   }
@@ -90,8 +93,8 @@ function deriveSuggestion(years: AYRow[]) {
   const [start, end] = reference.label.split("-").map(Number)
   return {
     label: `${start + 1}-${end + 1}`,
-    startDate: new Date(start + 1, 8, 1),
-    endDate: new Date(end + 1, 7, 31),
+    startDate: dateOnly(start + 1, 8, 1),
+    endDate: dateOnly(end + 1, 5, 30),
     feeEur: reference.associationFeeCents / 100,
   }
 }

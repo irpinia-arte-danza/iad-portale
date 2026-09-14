@@ -54,6 +54,8 @@ export function ExpensesFilters({
     const params = new URLSearchParams(searchParams.toString())
     if (value === null || value === ALL) params.delete(key)
     else params.set(key, value)
+    // Filtro cambiato: si riparte dalla prima pagina
+    params.delete("page")
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)
     })

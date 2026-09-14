@@ -4,6 +4,13 @@ import { AlertTriangle, ArrowRight, Stethoscope } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/server"
 import { prisma } from "@/lib/prisma"
+import {
+  fiscalYearOf,
+  isNextFiscalYearDue,
+  isSchoolYearStarted,
+  upcomingAcademicYearLabel,
+} from "@/lib/school-calendar"
+import { todayDateOnly } from "@/lib/utils/date-only"
 
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
@@ -42,8 +49,9 @@ export default async function AdminDashboardPage() {
     redirect("/login")
   }
 
-  const today = new Date()
-  today.setUTCHours(0, 0, 0, 0)
+  const today = todayDateOnly()
+  const upcomingAyLabel = upcomingAcademicYearLabel(today)
+  const fiscalYearNow = fiscalYearOf(today)
 
   const [
     user,
@@ -55,7 +63,8 @@ export default async function AdminDashboardPage() {
     incomeTrend,
     popularCourses,
     retention,
-    ayCoverage,
+    academicYears,
+    fiscalYears,
     certCounts,
     upcomingStages,
     upcomingStagesCount,
@@ -75,11 +84,24 @@ export default async function AdminDashboardPage() {
     getRetentionRate(),
     prisma.academicYear.findMany({
       where: {
-        startDate: { lte: today },
-        endDate: { gte: today },
+        OR: [
+          { startDate: { lte: today }, endDate: { gte: today } },
+          { isCurrent: true },
+          ...(upcomingAyLabel ? [{ label: upcomingAyLabel }] : []),
+        ],
       },
-      select: { id: true, label: true, isCurrent: true },
+      select: {
+        id: true,
+        label: true,
+        isCurrent: true,
+        startDate: true,
+        endDate: true,
+      },
       orderBy: { startDate: "desc" },
+    }),
+    prisma.fiscalYear.findMany({
+      where: { year: { in: [fiscalYearNow, fiscalYearNow + 1] } },
+      select: { year: true, isCurrent: true },
     }),
     getCertificateStatusCounts(),
     getUpcomingStages(3),
@@ -109,20 +131,36 @@ export default async function AdminDashboardPage() {
       ? "/admin/medical-certificates?status=expiring"
       : "/admin/medical-certificates?status=missing"
 
-  const ayBanner: { kind: "missing" | "mismatch" | "overlap"; details: string } | null =
-    ayCoverage.length === 0
-      ? { kind: "missing", details: "Nessun anno accademico copre la data odierna." }
-      : ayCoverage.length > 1
-        ? {
-            kind: "overlap",
-            details: `Anni sovrapposti oggi: ${ayCoverage.map((y) => y.label).join(", ")}.`,
-          }
-        : !ayCoverage[0].isCurrent
-          ? {
-              kind: "mismatch",
-              details: `${ayCoverage[0].label} copre la data odierna ma non è impostato come corrente.`,
-            }
-          : null
+  // Luglio-agosto nessun anno copre la data odierna: il corrente resta l'anno
+  // appena concluso fino all'avvio del successivo, non è un'anomalia.
+  const ayCoverage = academicYears.filter(
+    (y) => y.startDate <= today && y.endDate >= today,
+  )
+  const hasCurrentAy = academicYears.some((y) => y.isCurrent)
+  const upcomingAyMissing =
+    upcomingAyLabel !== null &&
+    !academicYears.some((y) => y.label === upcomingAyLabel)
+
+  const ayBanner: string | null =
+    ayCoverage.length > 1
+      ? `Anni sovrapposti oggi: ${ayCoverage.map((y) => y.label).join(", ")}.`
+      : ayCoverage.length === 1 && !ayCoverage[0].isCurrent
+        ? `${ayCoverage[0].label} copre la data odierna ma non è impostato come corrente: il cambio automatico avviene ogni notte.`
+        : upcomingAyMissing
+          ? isSchoolYearStarted(today)
+            ? `L'anno accademico ${upcomingAyLabel} non è ancora stato creato e settembre è già iniziato: crealo subito.`
+            : `L'anno accademico ${upcomingAyLabel} non è ancora stato creato: crealo prima del 1° settembre.`
+          : !hasCurrentAy
+            ? "Nessun anno accademico è impostato come corrente."
+            : null
+
+  const currentFiscalYear = fiscalYears.find((f) => f.year === fiscalYearNow)
+  const fyBanner: string | null = !currentFiscalYear?.isCurrent
+    ? `L'anno fiscale ${fiscalYearNow} non è ancora attivo.`
+    : isNextFiscalYearDue(today) &&
+        !fiscalYears.some((f) => f.year === fiscalYearNow + 1)
+      ? `L'anno fiscale ${fiscalYearNow + 1} non è ancora stato preparato.`
+      : null
 
   return (
     <>
@@ -141,8 +179,7 @@ export default async function AdminDashboardPage() {
                   Anno accademico da verificare
                 </p>
                 <p className="text-amber-800 dark:text-amber-200">
-                  {ayBanner.details} Il rollover automatico viene eseguito ogni
-                  notte; puoi intervenire subito da{" "}
+                  {ayBanner} Puoi intervenire da{" "}
                   <Link
                     href="/admin/academic-years"
                     className="font-medium underline underline-offset-4"
@@ -150,6 +187,22 @@ export default async function AdminDashboardPage() {
                     Anni accademici
                   </Link>
                   .
+                </p>
+              </div>
+            </div>
+          ) : null}
+          {fyBanner ? (
+            <div className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950/30">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
+              <div className="flex-1 space-y-1">
+                <p className="font-semibold text-amber-900 dark:text-amber-100">
+                  Anno fiscale da verificare
+                </p>
+                <p className="text-amber-800 dark:text-amber-200">
+                  {fyBanner} Il portale lo crea in automatico ogni notte: se
+                  l&apos;avviso resta visibile anche domani, segnalalo a chi
+                  gestisce il portale. Pagamenti e spese vengono comunque
+                  assegnati all&apos;anno fiscale della loro data.
                 </p>
               </div>
             </div>

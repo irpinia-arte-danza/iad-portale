@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { ExpenseType, PaymentMethod } from "@prisma/client"
 
-import { endOfToday } from "./common"
+import { isNotInFuture } from "./common"
 
 const EXPENSE_TYPE_VALUES = [
   "RENT",
@@ -42,7 +42,7 @@ export const expenseCreateSchema = z.object({
     .number({ message: "Importo obbligatorio" })
     .min(0.01, "Importo deve essere positivo")
     .max(100000, "Importo troppo alto"),
-  expenseDate: z.date().max(endOfToday(), {
+  expenseDate: z.date().refine(isNotInFuture, {
     message: "La data della spesa non può essere nel futuro",
   }),
   description: z
