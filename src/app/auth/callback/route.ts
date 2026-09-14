@@ -1,15 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server"
 
-import { prisma } from "@/lib/prisma"
-import { getDashboardPath } from "@/lib/auth/dashboard-path"
+import { NO_ACCESS_PAGE, resolveAccountState } from "@/lib/auth/account-state"
+import { getDashboardPath, getRoleAreaPrefix } from "@/lib/auth/dashboard-path"
+import { safeNextPath } from "@/lib/auth/safe-next"
 import { createClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
-// Standard Supabase OAuth callback:
-// 1. exchange `code` query param per session (cookie set via SSR client)
-// 2. assicura riga User Prisma per l'utente Supabase autenticato
-// 3. redirect role-based via getDashboardPath (override con ?next=/path)
+// Callback OAuth / PKCE Supabase. Il pulsante "Accedi con Google" è stato
+// rimosso (nessun utente lo usava) ma la route resta come difesa: se il
+// provider venisse riattivato in dashboard, qui NON si creano mai utenti.
+// Entra solo chi corrisponde a un account già esistente e utilizzabile
+// (admin, genitore o insegnante con profilo attivo).
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
   const code = searchParams.get("code")
@@ -17,9 +19,7 @@ export async function GET(request: NextRequest) {
   const errorDescription = searchParams.get("error_description")
 
   if (errorDescription) {
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(errorDescription)}`,
-    )
+    return NextResponse.redirect(`${origin}/login?error=oauth_failed`)
   }
 
   if (!code) {
@@ -29,50 +29,19 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-  if (error || !data.session) {
-    console.error("[auth/callback] exchange failed", error)
+  if (error || !data.session || !data.user) {
+    console.error("[auth/callback] exchange failed", { code: error?.code })
     return NextResponse.redirect(`${origin}/login?error=oauth_failed`)
   }
 
-  const authUser = data.user
-  if (!authUser) {
-    return NextResponse.redirect(`${origin}/login?error=no_user`)
-  }
-
-  // Sync Prisma User. Per OAuth-first signup (Google direct, no invite
-  // pre-esistente) creiamo User con role default PARENT. Per invite-first
-  // (admin ha già fatto inviteUserByEmail), il record User esiste già.
-  const existing = await prisma.user.findUnique({
-    where: { id: authUser.id },
-    select: { id: true, role: true, isActive: true },
-  })
-
-  if (!existing) {
-    const meta = (authUser.user_metadata ?? {}) as Record<string, unknown>
-    const fullName =
-      typeof meta.full_name === "string" ? meta.full_name : null
-    const [firstName, ...rest] = (fullName ?? "").trim().split(/\s+/)
-    const lastName = rest.join(" ") || null
-
-    await prisma.user.create({
-      data: {
-        id: authUser.id,
-        email: authUser.email ?? "",
-        role: "PARENT",
-        firstName: firstName || null,
-        lastName: lastName || null,
-        isActive: true,
-      },
-    })
-
-    return NextResponse.redirect(`${origin}/parent/dashboard`)
-  }
-
-  if (!existing.isActive) {
+  const account = await resolveAccountState(data.user.id)
+  if (account.state === "blocked") {
     await supabase.auth.signOut()
-    return NextResponse.redirect(`${origin}/login?error=account_disabled`)
+    return NextResponse.redirect(`${origin}${NO_ACCESS_PAGE}`)
   }
 
-  const target = next && next.startsWith("/") ? next : getDashboardPath(existing.role)
+  const target = safeNextPath(next, getDashboardPath(account.role), [
+    getRoleAreaPrefix(account.role),
+  ])
   return NextResponse.redirect(`${origin}${target}`)
 }

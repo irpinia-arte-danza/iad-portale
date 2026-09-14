@@ -19,6 +19,8 @@ import { ResourceHeader } from "../../_components/resource-header"
 import { ParentAnagraficaDisplay } from "../_components/parent-anagrafica-display"
 import { ParentDetailHeader } from "../_components/parent-detail-header"
 import { getParentById } from "../queries"
+import { AccessStatusCard } from "../../_components/access/access-status-card"
+import { getAccessStatus } from "@/lib/auth/access-status"
 
 const RELATIONSHIP_LABELS: Record<ParentRelationship, string> = {
   MOTHER: "Madre",
@@ -60,6 +62,7 @@ export default async function ParentDetailPage({ params }: PageProps) {
     notFound()
   }
 
+  const accessStatus = await getAccessStatus("PARENT", parent)
   const fullName = `${parent.lastName} ${parent.firstName}`
   const athleteCount = parent.athleteRelations.length
 
@@ -74,6 +77,12 @@ export default async function ParentDetailPage({ params }: PageProps) {
         action={<ParentDetailHeader parent={parent} />}
       />
       <ResourceContent>
+        <AccessStatusCard
+          kind="PARENT"
+          profileId={parent.id}
+          status={accessStatus}
+        />
+
         <div className="grid gap-6 md:grid-cols-2">
           <ParentAnagraficaDisplay parent={parent} />
 

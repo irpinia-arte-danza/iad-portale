@@ -9,7 +9,9 @@ type ListFilters = {
   offset?: number
 }
 
-const DEFAULT_LIMIT = 50
+// ~40 famiglie con entrambi i genitori superano 50 righe: la lista deve
+// mostrarli tutti per selezionarli nell'invio multiplo degli accessi.
+const DEFAULT_LIMIT = 200
 
 export async function listParents(filters: ListFilters = {}) {
   await requireAdmin()

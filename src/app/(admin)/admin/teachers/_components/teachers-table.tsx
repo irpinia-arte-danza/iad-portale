@@ -10,7 +10,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import type { AccessStatus } from "@/lib/auth/access-status-types"
 
+import { AccessStatusBadge } from "../../_components/access/access-status-badge"
+import { SendAccessButton } from "../../_components/access/send-access-button"
 import { TeacherRowActions } from "./teacher-row-actions"
 
 type TeacherRow = {
@@ -26,9 +29,12 @@ type TeacherRow = {
 
 interface TeachersTableProps {
   teachers: TeacherRow[]
+  accessStatuses: Record<string, AccessStatus>
 }
 
-export function TeachersTable({ teachers }: TeachersTableProps) {
+const FALLBACK_STATUS: AccessStatus = { kind: "NO_EMAIL" }
+
+export function TeachersTable({ teachers, accessStatuses }: TeachersTableProps) {
   if (teachers.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center">
@@ -48,49 +54,66 @@ export function TeachersTable({ teachers }: TeachersTableProps) {
             <TableHead>Nome</TableHead>
             <TableHead className="hidden sm:table-cell">Email</TableHead>
             <TableHead className="hidden md:table-cell">Telefono</TableHead>
-            <TableHead className="hidden lg:table-cell">Qualifiche</TableHead>
+            <TableHead className="hidden xl:table-cell">Qualifiche</TableHead>
             <TableHead className="text-center">Corsi</TableHead>
+            <TableHead>Accesso</TableHead>
+            <TableHead className="hidden lg:table-cell">
+              <span className="sr-only">Invio accesso</span>
+            </TableHead>
             <TableHead className="w-[50px]" />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {teachers.map((teacher) => (
-            <TableRow key={teacher.id} className="hover:bg-muted/50">
-              <TableCell>
-                <Link
-                  href={`/admin/teachers/${teacher.id}`}
-                  className="block hover:underline"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium">
-                      {teacher.lastName} {teacher.firstName}
-                    </span>
-                    <span className="sm:hidden truncate max-w-[200px] text-xs text-muted-foreground">
-                      {teacher.email || teacher.phone || "—"}
-                    </span>
-                  </div>
-                </Link>
-              </TableCell>
-              <TableCell className="hidden sm:table-cell max-w-[200px] truncate">
-                {teacher.email || "—"}
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                {teacher.phone || "—"}
-              </TableCell>
-              <TableCell className="hidden lg:table-cell max-w-[240px] truncate text-muted-foreground">
-                {teacher.qualifications || "—"}
-              </TableCell>
-              <TableCell className="text-center">
-                {Math.max(
-                  teacher._count.courses,
-                  teacher._count.teacherCourses ?? 0,
-                )}
-              </TableCell>
-              <TableCell>
-                <TeacherRowActions teacher={teacher} />
-              </TableCell>
-            </TableRow>
-          ))}
+          {teachers.map((teacher) => {
+            const status = accessStatuses[teacher.id] ?? FALLBACK_STATUS
+            return (
+              <TableRow key={teacher.id} className="hover:bg-muted/50">
+                <TableCell>
+                  <Link
+                    href={`/admin/teachers/${teacher.id}`}
+                    className="block hover:underline"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {teacher.lastName} {teacher.firstName}
+                      </span>
+                      <span className="sm:hidden truncate max-w-[200px] text-xs text-muted-foreground">
+                        {teacher.email || teacher.phone || "—"}
+                      </span>
+                    </div>
+                  </Link>
+                </TableCell>
+                <TableCell className="hidden sm:table-cell max-w-[200px] truncate">
+                  {teacher.email || "—"}
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {teacher.phone || "—"}
+                </TableCell>
+                <TableCell className="hidden xl:table-cell max-w-[240px] truncate text-muted-foreground">
+                  {teacher.qualifications || "—"}
+                </TableCell>
+                <TableCell className="text-center">
+                  {Math.max(
+                    teacher._count.courses,
+                    teacher._count.teacherCourses ?? 0,
+                  )}
+                </TableCell>
+                <TableCell>
+                  <AccessStatusBadge status={status} />
+                </TableCell>
+                <TableCell className="hidden lg:table-cell">
+                  <SendAccessButton
+                    kind="TEACHER"
+                    profileId={teacher.id}
+                    status={status}
+                  />
+                </TableCell>
+                <TableCell>
+                  <TeacherRowActions teacher={teacher} accessStatus={status} />
+                </TableCell>
+              </TableRow>
+            )
+          })}
         </TableBody>
       </Table>
     </div>

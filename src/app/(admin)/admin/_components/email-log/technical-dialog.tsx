@@ -68,6 +68,7 @@ function CopyButton({ value }: { value: string }) {
 const TRIGGER_LABEL = {
   ADMIN_MANUAL: "Manuale",
   CRON: "Automatico (cron)",
+  SELF_SERVICE: "Richiesta dall'utente",
 } as const
 
 const MILESTONE_LABEL: Record<string, string> = {

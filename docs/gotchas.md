@@ -19,10 +19,12 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.14 Schema asymmetry tra modelli sibling
   - §17.23 Legacy required + nuovi opzionali → nullable
   - §17.24 Drop+recreate stub zero-coupling
+  - §17.33 Filtri Prisma composti con `{ ...where, OR }` sovrascrivono l'OR del chiamante
 - [Next.js](#nextjs)
   - §17.7 Next 16 proxy export naming
   - §17.9 Next dev logga Server Action body
   - §17.27 Lazy client init per env safety
+  - §17.34 `redirect()` in server action + try/catch lato client → `unstable_rethrow`
 - [Zod / RHF](#zod--rhf)
   - §17.11 Zod `.default()` + RHF generic mismatch
   - §17.12 Zod `z.coerce.date()` input/output mismatch
@@ -39,11 +41,14 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.22 Placeholder ≠ valore default
 - [Settings pattern](#settings-pattern)
   - §17.28 Aggiungere un tab
+- [Supabase Auth](#supabase-auth)
+  - §17.35 Email OTP expiration a 86400: avviso del security advisor voluto
 - [Domain specifico](#domain-specifico)
   - §17.19 `AcademicYear.endDate` ≠ course season end
 
 > NOTA: §17.25-26 sono in `docs/email-system.md` (gotcha specifici sistema email).
 > §17.27 è duplicato qui e in email-system.md perché è regola general-purpose Next.js.
+> §17.29-32 sono numeri già assegnati a gotcha noti ma non ancora trascritti: le nuove voci partono da §17.33.
 
 ---
 
@@ -97,6 +102,18 @@ prisma migrate deploy
 ```
 Bypassa il gate perché non usa `migrate dev` / `db push --force-reset`. Scoperto: Sprint 3.2 `EmailLog` stub drop+recreate, aprile 2026.
 
+**§17.33 Filtri Prisma — `{ ...where, OR }` sovrascrive in silenzio l'OR del chiamante**: un helper che "aggiunge" una condizione a un `where` ricevuto con lo spread perde qualsiasi `OR` già presente, perché la chiave `OR` dell'helper rimpiazza quella del chiamante. TypeScript non segnala nulla e la query resta valida: restituisce semplicemente più righe. Pattern rotto:
+```ts
+// ❌ se where contiene già OR (es. filtro per genitore), viene perso
+return { ...where, OR: [{ courseEnrollment: {...} }, { stageEnrollment: {...} }] }
+```
+Pattern corretto:
+```ts
+// ✅ composizione in AND: nessuna chiave del chiamante può essere sovrascritta
+return { AND: [where, { OR: [{ courseEnrollment: {...} }, { stageEnrollment: {...} }] }] }
+```
+Vale per qualsiasi chiave logica (`OR`, `AND`, `NOT`) e per le relazioni già filtrate dal chiamante. Regola pratica: un helper che riceve un `where` dall'esterno compone sempre con `AND: [where, …]`, mai con lo spread. Bug reale: Sprint 6.A (`withActiveCourseOrStageScheduleFilter` in `src/lib/queries/active-schedule-filter.ts`), il filtro per genitore di `getMyOpenSchedules` veniva sovrascritto e la dashboard genitori mostrava le quote scadute di **tutte** le famiglie. In produzione dal 13 maggio 2026, corretto il 14 settembre 2026 (`49e793d`). Test di regressione manuale: genitore senza figlie collegate → nessuna quota.
+
 ---
 
 ## Next.js
@@ -123,6 +140,20 @@ export function getResend(): Resend {
 }
 ```
 Applicato a `src/lib/resend/client.ts`. Stesso pattern preventivo per ogni SDK nuovo. Scoperto: Sprint 3.1, aprile 2026.
+
+**§17.34 Next.js 16 — `redirect()` in una server action + try/catch lato client = falso errore**: quando una server action chiama `redirect()`, lato client la promise della chiamata viene **rifiutata** con l'errore di redirect (vedi `server-action-reducer.js`, `reject(redirectError)`) mentre Next esegue comunque la navigazione. Un `try/catch` nel client component lo tratta come fallimento: compare il toast "salvataggio non riuscito" e intanto la pagina cambia. Vale anche per i `redirect()` impliciti di `requireAdmin()` / `requireParent()` a sessione scaduta. Pattern corretto:
+```tsx
+import { unstable_rethrow } from "next/navigation"
+
+try {
+  const result = await setOwnPassword(values)
+  if (result && !result.ok) toast.error(result.error)
+} catch (error) {
+  unstable_rethrow(error) // rilancia redirect / notFound, lascia passare il resto
+  toast.error("Salvataggio non riuscito, riprova")
+}
+```
+`unstable_rethrow` è API pubblica di `next/navigation` nonostante il prefisso, e ha una build browser dedicata. **Non** usare `isRedirectError`: si importa solo da `next/dist/client/components/redirect-error`, percorso interno che si rompe agli aggiornamenti di Next. In alternativa, senza try/catch il problema non si presenta (pattern di `login-form.tsx`). Lato server resta valida la regola opposta: `redirect()` sempre fuori dai `try`. Scoperto: Sprint onboarding, `/imposta-password`, settembre 2026.
 
 ---
 
@@ -236,6 +267,12 @@ Stesso pattern applicabile a CSV (`buildCsvString` separato da `downloadCsv`) e 
 7. `DirtyGuardDialog` è già a livello shell → gestito automaticamente per il nuovo tab
 
 Scoperto: Sprint 3.7 Reminder tab, aprile 2026.
+
+---
+
+## Supabase Auth
+
+**§17.35 Email OTP expiration a 86400 — l'avviso del security advisor è voluto**: in Supabase Dashboard → Authentication → Providers → Email, "Email OTP Expiration" è impostato a **86400 secondi (24 ore)**, il massimo consentito. Il security advisor segnala "OTP expiry exceeds recommended threshold": **non va "sistemato" riportandolo a 3600**. Il valore decide la durata dei link di invito e di recupero password generati con `auth.admin.generateLink` (vedi `docs/email-system.md`). Motivo: Giuseppina invia l'accesso a ~40 famiglie in una sera, e molti genitori aprono l'email il giorno dopo; con un link da un'ora la maggior parte degli inviti sarebbe inutilizzabile e diventerebbe una richiesta di supporto. Il rischio residuo è coperto da: link monouso, invalidato da ogni reinvio, e dal tasto "Reinvia accesso" / pagina "Password dimenticata" per i link scaduti. Se l'avviso compare in un audit, rimandare a questa voce. Scoperto: Sprint onboarding, settembre 2026.
 
 ---
 

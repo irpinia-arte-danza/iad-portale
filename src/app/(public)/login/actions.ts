@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { prisma } from "@/lib/prisma";
+import { resolveAccountState } from "@/lib/auth/account-state";
 import { getDashboardPath } from "@/lib/auth/dashboard-path";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,7 +16,7 @@ function mapAuthError(message: string): string {
     return "Email o password non corretti";
   }
   if (message.includes("Email not confirmed")) {
-    return "Email non verificata — contatta l'amministratore";
+    return "Accesso non ancora attivato: usa il link ricevuto via email oppure «Password dimenticata»";
   }
   if (message.includes("Too many requests")) {
     return "Troppi tentativi, riprova tra qualche minuto";
@@ -38,24 +38,21 @@ export async function login(
     return { error: mapAuthError(error.message) };
   }
 
-  const prismaUser = await prisma.user.findUnique({
-    where: { id: authData.user.id },
-    select: { role: true, isActive: true },
-  });
-
-  if (!prismaUser) {
-    // Supabase auth user exists but Prisma User row missing:
-    // misconfiguration — sign out and fail closed
+  // Credenziali valide ma account non utilizzabile (utente disattivato,
+  // genitore/insegnante nel cestino, account senza profilo): logout e
+  // messaggio, invece di mandarlo in una dashboard che lo respingerebbe.
+  const account = await resolveAccountState(authData.user.id);
+  if (account.state === "blocked") {
     await supabase.auth.signOut();
-    return { error: "Account non configurato, contatta l'amministratore" };
+    return {
+      error:
+        account.reason === "no-user"
+          ? "Account non configurato, contatta la segreteria"
+          : "Il tuo accesso all'area riservata non è attivo. Contatta la segreteria",
+    };
   }
 
-  if (!prismaUser.isActive) {
-    await supabase.auth.signOut();
-    return { error: "Account disattivato, contatta l'amministratore" };
-  }
-
-  redirect(getDashboardPath(prismaUser.role));
+  redirect(getDashboardPath(account.role));
 }
 
 export async function logout() {

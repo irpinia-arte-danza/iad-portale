@@ -1,10 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server"
 
-import { prisma } from "@/lib/prisma"
+import { resolveAccountState } from "@/lib/auth/account-state"
 import { getDashboardPath } from "@/lib/auth/dashboard-path"
 import { updateSession } from "@/lib/supabase/middleware"
 
-const PUBLIC_PATHS = ["/", "/login"]
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/password-dimenticata",
+  "/accesso-non-attivo",
+]
 
 // Path interni gestiti senza session (es. callback OAuth crea la session)
 const PUBLIC_PREFIXES = ["/auth/"]
@@ -31,20 +36,17 @@ export async function proxy(request: NextRequest) {
 
   // Step 3: se utente AUTH visita /login → redirect dashboard role-based.
   // Costo: 1 query Prisma SOLO sulla rotta /login, non per ogni request.
-  // Fallback: lascia su /login se User Prisma mancante o disattivo
-  // (login server action o requireXxx helper gestisce signOut).
+  // Solo account utilizzabili (utente attivo + profilo non nel cestino):
+  // gli altri restano su /login, dove la login action spiega il motivo.
+  // Redirigerli alla dashboard riaprirebbe il loop login ↔ dashboard.
   if (user && pathname === "/login") {
-    const prismaUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { role: true, isActive: true },
-    })
+    const account = await resolveAccountState(user.id)
 
-    if (prismaUser && prismaUser.isActive) {
+    if (account.state === "ok") {
       const url = request.nextUrl.clone()
-      url.pathname = getDashboardPath(prismaUser.role)
+      url.pathname = getDashboardPath(account.role)
       return NextResponse.redirect(url)
     }
-    // Auth user orfano: rimane su /login
     return supabaseResponse
   }
 

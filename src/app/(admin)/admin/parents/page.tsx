@@ -1,3 +1,5 @@
+import { getAccessStatuses } from "@/lib/auth/access-status"
+
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
 
@@ -15,21 +17,25 @@ export default async function ParentsPage({ searchParams }: PageProps) {
   const search = resolvedSearchParams.search ?? ""
 
   const { items, totalCount } = await listParents({ search })
+  const accessStatuses = await getAccessStatuses("PARENT", items)
 
   return (
     <>
       <ResourceHeader
         breadcrumbs={[{ label: "Genitori" }]}
         title="Genitori"
-        description="Anagrafica soci genitori/tutori delle allieve."
+        description="Anagrafica soci genitori/tutori delle allieve e accesso all'area genitori."
         action={<ParentCreateDialog />}
       />
       <ResourceContent>
         <div className="flex flex-col gap-4">
           <ParentsSearch defaultValue={search} />
-          <ParentsTable parents={items} />
+          <ParentsTable parents={items} accessStatuses={accessStatuses} />
           <p className="text-xs text-muted-foreground">
             {totalCount} {totalCount === 1 ? "genitore" : "genitori"} totali
+            {totalCount > items.length
+              ? ` · mostrati i primi ${items.length}`
+              : ""}
           </p>
         </div>
       </ResourceContent>

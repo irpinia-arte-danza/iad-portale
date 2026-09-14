@@ -1,44 +1,16 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { requireTeacher } from "@/lib/auth/require-teacher"
-
-import { SetPasswordForm } from "./_components/set-password-form"
+import { redirect } from "next/navigation"
 
 type PageProps = {
-  searchParams: Promise<{ next?: string; recovery?: string }>
+  searchParams: Promise<{ recovery?: string }>
 }
 
-export default async function TeacherSetPasswordPage({
-  searchParams,
-}: PageProps) {
-  await requireTeacher()
-  const { next, recovery } = await searchParams
-
-  const safeNext = next && next.startsWith("/") ? next : "/teacher/dashboard"
-  const isRecovery = recovery === "1"
-
-  return (
-    <div className="mx-auto w-full max-w-md py-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">
-            {isRecovery ? "Reimposta la password" : "Imposta la tua password"}
-          </CardTitle>
-          <CardDescription>
-            {isRecovery
-              ? "Scegli una nuova password per il tuo account."
-              : "Benvenuta nell'area insegnanti. Crea una password per accedere d'ora in avanti."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SetPasswordForm next={safeNext} />
-        </CardContent>
-      </Card>
-    </div>
+// Compatibilità con i link inviati prima dello sprint onboarding: la scelta
+// della password vive ora in /imposta-password (unica per tutti i ruoli).
+export default async function TeacherSetPasswordPage({ searchParams }: PageProps) {
+  const { recovery } = await searchParams
+  redirect(
+    recovery === "1"
+      ? "/imposta-password?tipo=recupero"
+      : "/imposta-password?tipo=benvenuto",
   )
 }

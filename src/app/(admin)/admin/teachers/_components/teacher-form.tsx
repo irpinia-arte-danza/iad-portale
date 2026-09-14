@@ -57,22 +57,10 @@ export function TeacherForm({
       if (mode === "create") {
         const result = await createTeacher(values)
         if (result.ok) {
-          const data = result.data
-          if (data?.invited) {
-            toast.success("Insegnante aggiunto · invito email inviato")
-          } else if (data?.inviteSkipReason === "no-email") {
-            toast.success("Insegnante aggiunto · nessuna email per invito")
-          } else if (data?.inviteSkipReason === "email-in-use") {
-            toast.warning(
-              "Insegnante aggiunto · email già in uso da altro account, invito non inviato",
-            )
-          } else if (data?.inviteSkipReason === "invite-failed") {
-            toast.warning(
-              "Insegnante aggiunto · invito email non riuscito, riprova manualmente",
-            )
-          } else {
-            toast.success("Insegnante aggiunto")
-          }
+          toast.success("Insegnante aggiunto", {
+            description:
+              "Nessuna email è partita: invia l'accesso dalla lista Insegnanti quando i corsi sono assegnati.",
+          })
           form.reset()
           onSuccess?.()
         } else {

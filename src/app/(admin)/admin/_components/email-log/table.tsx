@@ -5,6 +5,7 @@ import {
   Clock,
   Eye,
   Info,
+  KeyRound,
   Loader2,
   MailX,
   MoreHorizontal,
@@ -43,6 +44,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { EmailStatus } from "@prisma/client"
+
+import { isPersonalLinkMilestone } from "@/lib/auth/access-status-types"
 
 import { resendFromLog } from "./actions"
 import { EmailLogPreviewDialog } from "./preview-dialog"
@@ -146,17 +149,23 @@ export function EmailLogTable({ title, description, logs }: Props) {
                 <TableBody>
                   {logs.map((log) => {
                     const isResending = resendingId === log.id
-                    const canResend = log.status === EmailStatus.FAILED
+                    const canResend =
+                      log.status === EmailStatus.FAILED &&
+                      !isPersonalLinkMilestone(log.milestoneKey)
                     const triggerIcon =
                       log.triggeredBy === "CRON" ? (
                         <Clock className="h-3.5 w-3.5" />
+                      ) : log.triggeredBy === "SELF_SERVICE" ? (
+                        <KeyRound className="h-3.5 w-3.5" />
                       ) : (
                         <UserCog className="h-3.5 w-3.5" />
                       )
                     const triggerTooltip =
                       log.triggeredBy === "CRON"
                         ? "Invio automatico (cron)"
-                        : `Invio manuale da ${
+                        : log.triggeredBy === "SELF_SERVICE"
+                          ? "Richiesta dall'utente (password dimenticata)"
+                          : `Invio manuale da ${
                             [
                               log.sentByUser.firstName,
                               log.sentByUser.lastName,

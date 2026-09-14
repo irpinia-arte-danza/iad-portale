@@ -2,27 +2,19 @@ import { redirect } from "next/navigation"
 
 import { UserRole } from "@prisma/client"
 
-import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { NO_ACCESS_ROUTE } from "./account-state"
+import { getCurrentAccount } from "./current-account"
+import { getDashboardPath } from "./dashboard-path"
 
+// Stessa logica di requireParent (vedi commento lì).
 export async function requireAdmin(): Promise<{ userId: string }> {
-  const supabase = await createClient()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
+  const account = await getCurrentAccount()
 
-  if (!authUser) {
-    redirect("/login")
+  if (account.state === "anonymous") redirect("/login")
+  if (account.state === "blocked") redirect(NO_ACCESS_ROUTE)
+  if (account.role !== UserRole.ADMIN) {
+    redirect(getDashboardPath(account.role))
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: authUser.id },
-    select: { isActive: true, role: true },
-  })
-
-  if (!user || !user.isActive || user.role !== UserRole.ADMIN) {
-    redirect("/login")
-  }
-
-  return { userId: authUser.id }
+  return { userId: account.userId }
 }

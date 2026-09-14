@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { MoreHorizontal, Pencil, RefreshCw, Send, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -29,7 +29,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import type { AccessStatus } from "@/lib/auth/access-status-types"
 
+import { useSendAccessInvite } from "../../_components/access/use-send-access-invite"
 import { softDeleteParent } from "../actions"
 import { ParentForm } from "./parent-form"
 
@@ -52,12 +54,14 @@ interface ParentRowActionsProps {
     residenceProvince: string | null
     residenceCap: string | null
   }
+  accessStatus?: AccessStatus
 }
 
-export function ParentRowActions({ parent }: ParentRowActionsProps) {
+export function ParentRowActions({ parent, accessStatus }: ParentRowActionsProps) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const { send, pendingId } = useSendAccessInvite("PARENT")
 
   function handleDelete() {
     startTransition(async () => {
@@ -70,6 +74,8 @@ export function ParentRowActions({ parent }: ParentRowActionsProps) {
       }
     })
   }
+
+  const showAccessItem = accessStatus && accessStatus.kind !== "ACTIVE"
 
   return (
     <>
@@ -89,6 +95,23 @@ export function ParentRowActions({ parent }: ParentRowActionsProps) {
             <Pencil className="h-4 w-4" />
             Modifica
           </DropdownMenuItem>
+          {showAccessItem ? (
+            <DropdownMenuItem
+              disabled={accessStatus.kind === "NO_EMAIL" || pendingId === parent.id}
+              onClick={() => send(parent.id)}
+            >
+              {accessStatus.kind === "INVITED" ? (
+                <RefreshCw className="h-4 w-4" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              {accessStatus.kind === "NO_EMAIL"
+                ? "Invia accesso (manca l'email)"
+                : accessStatus.kind === "INVITED"
+                  ? "Reinvia accesso"
+                  : "Invia accesso"}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => setDeleteOpen(true)}
@@ -140,7 +163,8 @@ export function ParentRowActions({ parent }: ParentRowActionsProps) {
             <AlertDialogDescription>
               Stai per eliminare {parent.firstName} {parent.lastName}.
               L&apos;operazione è reversibile (soft delete) ma il genitore non sarà
-              più visibile nell&apos;elenco.
+              più visibile nell&apos;elenco e non potrà più entrare nell&apos;area
+              genitori finché non viene ripristinato dal Cestino.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

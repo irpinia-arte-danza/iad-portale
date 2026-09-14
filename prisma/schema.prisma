@@ -1081,6 +1081,7 @@ enum EmailStatus {
 enum EmailTrigger {
   ADMIN_MANUAL // invio manuale dal dialog scadenze o comunicazioni
   CRON // invio automatico dal cron /api/cron/reminders
+  SELF_SERVICE // richiesta dell'utente stesso (es. password dimenticata)
 }
 
 model EmailTemplate {

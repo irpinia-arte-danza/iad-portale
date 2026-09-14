@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { EmailStatus, EmailTrigger } from "@prisma/client"
 
+import { isPersonalLinkMilestone } from "@/lib/auth/access-status-types"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { prisma } from "@/lib/prisma"
 import { sendEmail } from "@/lib/resend/send-email"
@@ -31,6 +32,16 @@ export async function resendFromLog(
     return {
       ok: false,
       error: "Solo email con stato FAILED possono essere reinviate",
+    }
+  }
+
+  // Il link personale non è salvato nel log: reinviare il corpo manderebbe
+  // un'email inutilizzabile.
+  if (isPersonalLinkMilestone(log.milestoneKey)) {
+    return {
+      ok: false,
+      error:
+        "Questa email conteneva un link personale non salvato: usa «Reinvia accesso» dalla scheda.",
     }
   }
 
