@@ -35,36 +35,46 @@ export function withActiveScheduleFilter(
 // Scadenza valida per gli scopi del parent portal / dashboard:
 // corso attivo OPPURE stage attivo OPPURE saggio attivo OPPURE costume
 // (non soft-deleted) con allieva attiva.
+//
+// Composizione in AND, mai `{ ...where, OR }`: se il chiamante filtra a sua
+// volta con OR (es. il filtro per genitore del portale), lo spread lo
+// sovrascriverebbe in silenzio e la query restituirebbe le scadenze di
+// tutte le famiglie. Bug reale introdotto in Sprint 6.A, vedi test
+// "genitore senza figlie collegate".
 export function withActiveCourseOrStageScheduleFilter(
   where: Prisma.PaymentScheduleWhereInput,
 ): Prisma.PaymentScheduleWhereInput {
   return {
-    ...where,
-    OR: [
+    AND: [
+      where,
       {
-        courseEnrollment: {
-          withdrawalDate: null,
-          athlete: { deletedAt: null },
-          course: { deletedAt: null },
-        },
-      },
-      {
-        stageEnrollment: {
-          athlete: { deletedAt: null },
-          stage: { deletedAt: null },
-        },
-      },
-      {
-        showcaseParticipation: {
-          athlete: { deletedAt: null },
-          showcase: { deletedAt: null },
-        },
-      },
-      {
-        costumeAssignment: {
-          costume: { deletedAt: null, showcase: { deletedAt: null } },
-          participation: { athlete: { deletedAt: null } },
-        },
+        OR: [
+          {
+            courseEnrollment: {
+              withdrawalDate: null,
+              athlete: { deletedAt: null },
+              course: { deletedAt: null },
+            },
+          },
+          {
+            stageEnrollment: {
+              athlete: { deletedAt: null },
+              stage: { deletedAt: null },
+            },
+          },
+          {
+            showcaseParticipation: {
+              athlete: { deletedAt: null },
+              showcase: { deletedAt: null },
+            },
+          },
+          {
+            costumeAssignment: {
+              costume: { deletedAt: null, showcase: { deletedAt: null } },
+              participation: { athlete: { deletedAt: null } },
+            },
+          },
+        ],
       },
     ],
   }
