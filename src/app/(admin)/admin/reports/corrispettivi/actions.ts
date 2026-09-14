@@ -2,6 +2,7 @@
 
 import { FeeType, PaymentMethod } from "@prisma/client"
 
+import { requireAdmin } from "@/lib/auth/require-admin"
 import type { ActionResult } from "@/lib/schemas/common"
 
 import {
@@ -48,6 +49,10 @@ function parseDateBoundary(iso: string, endOfDay: boolean): Date | null {
 export async function fetchCorrispettivi(
   input: CorrispettiviActionInput,
 ): Promise<ActionResult<{ result: CorrispettiviResult }>> {
+  // Server action = endpoint POST: il controllo del layout admin non la
+  // protegge. Restituisce pagamenti con nomi delle allieve.
+  await requireAdmin()
+
   const from = parseDateBoundary(input.from, false)
   const to = parseDateBoundary(input.to, true)
 

@@ -51,6 +51,9 @@ function monthBoundsUTC(date: Date): { start: Date; nextStart: Date } {
 export async function getPaymentDetail(
   id: string,
 ): Promise<ActionResult<{ payment: PaymentWithRelations }>> {
+  // Server action = endpoint POST: il controllo del layout admin non la protegge.
+  await requireAdmin()
+
   const idParsed = uuidSchema.safeParse(id)
   if (!idParsed.success) {
     return { ok: false, error: "Identificativo non valido" }
