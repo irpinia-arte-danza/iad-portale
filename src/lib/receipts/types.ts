@@ -44,7 +44,14 @@ export type ReceiptIssuePreview = {
 }
 
 export type IssueReceiptResult =
-  | { ok: true; receipt: IssuedReceiptInfo; alreadyIssued: boolean }
+  | {
+      ok: true
+      receipt: IssuedReceiptInfo
+      alreadyIssued: boolean
+      // Emessa ma PDF non archiviato ora (Storage non raggiungibile): si
+      // archivia alla prima apertura o dal cron notturno
+      pdfDeferred?: boolean
+    }
   | { ok: false; error: string }
 
 // URL del PDF: stessa route per admin e genitori, con controlli diversi.

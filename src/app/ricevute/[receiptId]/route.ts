@@ -4,12 +4,16 @@ import { ReceiptStatus, UserRole } from "@prisma/client"
 
 import { NO_ACCESS_ROUTE, resolveAccountState } from "@/lib/auth/account-state"
 import { prisma } from "@/lib/prisma"
+import { stampCancelledReceipt } from "@/lib/receipts/cancelled-stamp"
 import {
   loadReceiptForPdf,
   ReceiptRenderError,
   receiptPdfFileName,
-  renderReceiptPdf,
 } from "@/lib/receipts/receipt-document"
+import {
+  ReceiptArchiveError,
+  readReceiptPdf,
+} from "@/lib/receipts/receipt-pdf-store"
 import { uuidSchema } from "@/lib/schemas/common"
 import { createClient } from "@/lib/supabase/server"
 
@@ -68,11 +72,48 @@ function backHrefFor(role: UserRole): string {
   return "/"
 }
 
+// Messaggio per un PDF che non si può consegnare, in base alla causa
+function pdfFailureMessage(code: string, isAdmin: boolean): {
+  status: number
+  title: string
+  message: string
+} {
+  if (code === "STORAGE_UNAVAILABLE") {
+    return {
+      status: 503,
+      title: "Archivio non raggiungibile",
+      message:
+        "L'archivio delle ricevute non risponde in questo momento. Riprova tra qualche minuto.",
+    }
+  }
+  if (code === "STORED_FILE_MISSING") {
+    return {
+      status: 500,
+      title: "PDF non disponibile",
+      message: isAdmin
+        ? "Il PDF archiviato di questa ricevuta non si trova. Non viene rigenerato per non consegnare un documento diverso dall'originale: segnalalo all'assistenza indicando il numero di ricevuta."
+        : "Il PDF di questa ricevuta non è disponibile al momento. Contatta la segreteria.",
+    }
+  }
+  const message =
+    code === "NO_BRAND" && isAdmin
+      ? "Mancano i dati dell'associazione in Impostazioni → Associazione: senza, il PDF non può essere generato."
+      : code === "NO_PAYMENT" && isAdmin
+        ? "La ricevuta non risulta collegata a un pagamento: il PDF non può essere generato. Segnalalo all'assistenza."
+        : isAdmin
+          ? "La ricevuta esiste ma il PDF non si è potuto generare per un errore tecnico, già registrato. Segnalalo all'assistenza indicando il numero di ricevuta."
+          : "La ricevuta esiste ma il PDF non si è potuto generare per un errore tecnico. Contatta la segreteria."
+  return { status: 500, title: "PDF non generato", message }
+}
+
 // PDF di una ricevuta già emessa, servito inline: si apre nel visualizzatore
 // del telefono (anche dentro Gmail/WhatsApp) e si stampa dal browser.
-// - admin: qualsiasi ricevuta, anche annullata (il PDF lo dichiara)
+// - admin: qualsiasi ricevuta; se annullata, sopra il file originale si
+//   aggiunge al volo la filigrana "ANNULLATA" (il file archiviato non cambia)
 // - genitore: solo ricevute valide di allieve collegate al proprio profilo
 // - altri ruoli: accesso negato
+// Si serve sempre il file archiviato all'emissione. Se non c'è ancora (archivio
+// non riuscito all'emissione) si genera, si archivia e si serve.
 // Il percorso non è pubblico: il proxy manda al login chi non è autenticato.
 // Ogni esito diverso dal PDF viene loggato lato server con la sua causa.
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -90,6 +131,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   const backHref = backHrefFor(account.role)
+  const isAdmin = account.role === UserRole.ADMIN
   const { receiptId } = await params
   const logContext = { receiptId, userId: account.userId, role: account.role }
 
@@ -148,7 +190,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         backHref,
       })
     }
-  } else if (account.role !== UserRole.ADMIN) {
+  } else if (!isAdmin) {
     console.warn("[receipt pdf] access denied: role not allowed", logContext)
     return messagePage({
       status: 403,
@@ -158,30 +200,44 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     })
   }
 
-  // 3) Errore di generazione (non transitorio: va segnalato, non ritentato)
-  let pdf: Buffer
+  // 3) File archiviato (o generato e archiviato ora)
+  let pdf: Uint8Array
   try {
-    pdf = await renderReceiptPdf(receipt)
+    const result = await readReceiptPdf(receipt)
+    pdf = result.pdf
+    if (result.source !== "archive") {
+      console.info("[receipt pdf] served without prior archive", {
+        ...logContext,
+        source: result.source,
+      })
+    }
   } catch (error) {
-    const code = error instanceof ReceiptRenderError ? error.code : "RENDER_FAILED"
-    console.error("[receipt pdf] generation failed", { ...logContext, code }, error)
+    const code =
+      error instanceof ReceiptArchiveError || error instanceof ReceiptRenderError
+        ? error.code
+        : "RENDER_FAILED"
+    console.error("[receipt pdf] delivery failed", { ...logContext, code }, error)
+    return messagePage({ ...pdfFailureMessage(code, isAdmin), backHref })
+  }
 
-    const isAdmin = account.role === UserRole.ADMIN
-    const message =
-      code === "NO_BRAND" && isAdmin
-        ? "Mancano i dati dell'associazione in Impostazioni → Associazione: senza, il PDF non può essere generato."
-        : code === "NO_PAYMENT" && isAdmin
-          ? "La ricevuta non risulta collegata a un pagamento: il PDF non può essere generato. Segnalalo all'assistenza."
-          : isAdmin
-            ? "La ricevuta esiste ma il PDF non si è potuto generare per un errore tecnico, già registrato. Segnalalo all'assistenza indicando il numero di ricevuta."
-            : "La ricevuta esiste ma il PDF non si è potuto generare per un errore tecnico. Contatta la segreteria."
-
-    return messagePage({
-      status: 500,
-      title: "PDF non generato",
-      message,
-      backHref,
-    })
+  // 4) Ricevuta annullata (qui arriva solo l'admin): filigrana sopra l'originale.
+  //    Se non si riesce a segnarla, non si consegna una copia che sembra valida.
+  if (receipt.status === ReceiptStatus.CANCELLED) {
+    try {
+      pdf = await stampCancelledReceipt(pdf, {
+        cancelledAt: receipt.cancelledAt ?? receipt.issueDate,
+        reason: receipt.cancelReason,
+      })
+    } catch (error) {
+      console.error("[receipt pdf] cancelled stamp failed", logContext, error)
+      return messagePage({
+        status: 500,
+        title: "PDF non generato",
+        message:
+          "La ricevuta è annullata ma non è stato possibile segnarla come tale sul PDF, quindi non viene mostrata. Segnalalo all'assistenza indicando il numero di ricevuta.",
+        backHref,
+      })
+    }
   }
 
   const { ascii, utf8 } = receiptPdfFileName(receipt)

@@ -111,11 +111,12 @@ export function ReminderTab({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BellRing className="h-4 w-4" />
-              Reminder automatici
+              Invio automatico dei solleciti: spento
             </CardTitle>
             <CardDescription>
-              Email inviate automaticamente alle 7:00 UTC (8:00 inverno / 9:00 estate a Roma)
-              per quote in scadenza e solleciti su quote non pagate.
+              Da settembre 2026 promemoria e solleciti non partono da soli: si
+              mandano a mano dalla pagina Scadenze. Le impostazioni qui sotto
+              restano salvate per quando l&apos;invio automatico verrà riacceso.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -126,10 +127,12 @@ export function ReminderTab({
                 <FormItem className="flex items-center justify-between rounded-md border p-3">
                   <div className="flex flex-col">
                     <FormLabel className="text-sm font-medium">
-                      Invio automatico attivo
+                      Consenti l&apos;invio automatico
                     </FormLabel>
                     <FormDescription>
-                      Se disattivato, il cron gira ma non invia email.
+                      Blocco di sicurezza: se disattivato, nessuna email
+                      automatica parte nemmeno quando l&apos;invio verrà
+                      riacceso.
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -276,11 +279,12 @@ export function ReminderTab({
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarClock className="h-4 w-4" />
-                  Anteprima invii di oggi
+                  Cosa partirebbe oggi
                 </CardTitle>
                 <CardDescription>
-                  Calcolata in base alla config corrente ({preview.todayUTC} UTC).
-                  Salva per ricalcolare.
+                  Solo un&apos;anteprima con le impostazioni attuali (
+                  {preview.todayUTC} UTC): l&apos;invio automatico è spento e
+                  da qui non parte nessuna email. Salva per ricalcolare.
                 </CardDescription>
               </div>
               <Button
@@ -302,7 +306,7 @@ export function ReminderTab({
           <CardContent className="space-y-3">
             {!enabled ? (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
-                Invio automatico disattivato — il cron non invia email finché non riattivi il toggle sopra.
+                Blocco di sicurezza attivo: anche con l&apos;invio automatico riacceso non partirebbe nessuna email.
               </div>
             ) : preview.isWeekendBlocked ? (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
@@ -316,7 +320,7 @@ export function ReminderTab({
               <div className="flex items-center gap-2 text-sm">
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <span>
-                  <strong>{preview.totalCount}</strong> email totali in coda per oggi
+                  <strong>{preview.totalCount}</strong> email partirebbero oggi con l&apos;invio automatico acceso
                 </span>
               </div>
             )}

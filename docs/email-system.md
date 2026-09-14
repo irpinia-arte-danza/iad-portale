@@ -25,8 +25,10 @@ Chiuso 22 aprile 2026, 9 fasi, commit range `fd17f49..b2aabd6`.
 - Dialog invio bulk: select template + preview live (con dati scadenza reale) + partial success reporting
 - Resend batch API con `batchValidation: "permissive"` (un invio fallito non blocca gli altri)
 
-### Invio automatico (Vercel Cron)
-- Endpoint `/api/cron/reminders` daily `0 7 * * *` UTC (8:00 Roma inverno / 9:00 estate)
+### Invio automatico (Vercel Cron) — SPENTO da settembre 2026
+- **Il cron non è più in `vercel.json`.** Partiva il giorno dopo la scadenza: con l'audit #8 aperto (un pagamento può non chiudere la scadenza giusta) avrebbe scritto a famiglie che hanno pagato in contanti in sala. Da settembre 2026 promemoria e solleciti li manda l'admin a mano da `/admin/scadenze` (anteprima e invio non dipendono dal cron).
+- La route resta nel codice per l'invio manuale: `curl -H "Authorization: Bearer $CRON_SECRET" https://area.irpiniaartedanza.it/api/cron/reminders` **invia davvero** le email delle milestone del giorno (se `ReminderConfig.enabled`). Per riaccenderlo: rimettere in `vercel.json` la voce `{ "path": "/api/cron/reminders", "schedule": "0 7 * * *" }`.
+- Com'era configurato: endpoint `/api/cron/reminders` daily `0 7 * * *` UTC (8:00 Roma inverno / 9:00 estate)
 - 3 milestone: `PROMEMORIA_DUE` (N giorni prima scadenza), `SOLLECITO_FIRST` (N giorni dopo), `SOLLECITO_SECOND` (M giorni dopo, M>N)
 - Dedup via `EmailLog.findFirst({ paymentScheduleId, milestoneKey, status != FAILED })` — vedi §17.25
 - Sender fallback chain: `ReminderConfig.updatedBy` → primo admin by `createdAt asc`

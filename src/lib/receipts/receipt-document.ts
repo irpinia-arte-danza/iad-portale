@@ -1,7 +1,7 @@
 import "server-only"
 
 import { renderToBuffer } from "@react-pdf/renderer"
-import { ReceiptStatus, type FeeType, type Prisma } from "@prisma/client"
+import type { FeeType, Prisma } from "@prisma/client"
 
 import {
   ReceiptPdf,
@@ -13,8 +13,9 @@ import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 
 import type { ReceiptLine } from "./types"
 
-// Caricamento e rendering del PDF di una ricevuta già emessa. Usato dalla
-// route /ricevute/[receiptId] (admin e genitori). Nessuna emissione qui: il
+// Caricamento e rendering del PDF di una ricevuta già emessa. Il rendering
+// produce il file da archiviare (receipt-pdf-store.ts): chi apre la ricevuta
+// riceve il file archiviato, non un PDF rigenerato. Nessuna emissione qui: il
 // numero nasce solo in issue-receipt.ts.
 
 export type ReceiptRenderErrorCode = "NO_PAYMENT" | "NO_BRAND"
@@ -40,6 +41,7 @@ export async function loadReceiptForPdf(receiptId: string) {
       status: true,
       cancelledAt: true,
       cancelReason: true,
+      pdfPath: true,
       payerName: true,
       payerFiscalCode: true,
       payerAddress: true,
@@ -66,7 +68,9 @@ export async function loadReceiptForPdf(receiptId: string) {
   })
 }
 
-type LoadedReceipt = NonNullable<Awaited<ReturnType<typeof loadReceiptForPdf>>>
+export type LoadedReceipt = NonNullable<
+  Awaited<ReturnType<typeof loadReceiptForPdf>>
+>
 
 function athleteNameOf(receipt: LoadedReceipt): string {
   if (receipt.athleteName) return receipt.athleteName
@@ -95,6 +99,8 @@ function parseReceiptLines(value: Prisma.JsonValue | null): ReceiptLine[] | null
   return lines.length >= 2 ? lines : null
 }
 
+// PDF "come emesso": anche per una ricevuta già annullata il documento non
+// riporta l'annullamento, che si aggiunge in lettura (cancelled-stamp.ts).
 // Lancia ReceiptRenderError per dati mancanti, oppure l'errore del renderer.
 export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> {
   const payment = receipt.payment
@@ -150,13 +156,6 @@ export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> 
     method: payment.method,
     paymentDate: payment.paymentDate,
     receiptFooter: settings?.receiptFooter ?? null,
-    cancellation:
-      receipt.status === ReceiptStatus.CANCELLED
-        ? {
-            cancelledAt: receipt.cancelledAt ?? receipt.issueDate,
-            reason: receipt.cancelReason,
-          }
-        : null,
   }
 
   const brandData: ReceiptBrand = brand

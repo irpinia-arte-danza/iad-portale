@@ -21,6 +21,7 @@ export type ReceiptIssueState =
       phase: "issued"
       receipt: IssuedReceiptInfo
       alreadyIssued: boolean
+      pdfDeferred: boolean
     }
 
 // Flusso "Emetti ricevuta" guidato da eventi (niente fetch in useEffect):
@@ -40,7 +41,12 @@ export function useReceiptIssue() {
       }
       const { preview } = result
       if (preview.existing) {
-        setState({ phase: "issued", receipt: preview.existing, alreadyIssued: true })
+        setState({
+          phase: "issued",
+          receipt: preview.existing,
+          alreadyIssued: true,
+          pdfDeferred: false,
+        })
       } else {
         setState({ phase: "preview", preview })
       }
@@ -71,6 +77,7 @@ export function useReceiptIssue() {
         phase: "issued",
         receipt: result.receipt,
         alreadyIssued: result.alreadyIssued,
+        pdfDeferred: result.pdfDeferred ?? false,
       })
     } catch (error) {
       unstable_rethrow(error)

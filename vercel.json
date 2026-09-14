@@ -3,8 +3,8 @@
   "regions": ["dub1"],
   "crons": [
     {
-      "path": "/api/cron/reminders",
-      "schedule": "0 7 * * *"
+      "path": "/api/cron/receipt-pdfs",
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/academic-year-rollover",
