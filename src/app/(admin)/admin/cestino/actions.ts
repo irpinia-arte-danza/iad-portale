@@ -524,12 +524,16 @@ export async function hardDeleteCourse(
       select: { id: true },
     })
     if (enrollmentIds.length > 0) {
-      const paymentCount = await prisma.payment.count({
-        where: {
-          courseEnrollmentId: { in: enrollmentIds.map((e) => e.id) },
-        },
-      })
-      if (paymentCount > 0) {
+      const ids = enrollmentIds.map((e) => e.id)
+      // Contano anche le scadenze pagate: un incasso su più scadenze (es. due
+      // corsi) non indica il corso sul pagamento
+      const [paymentCount, paidScheduleCount] = await Promise.all([
+        prisma.payment.count({ where: { courseEnrollmentId: { in: ids } } }),
+        prisma.paymentSchedule.count({
+          where: { courseEnrollmentId: { in: ids }, paymentId: { not: null } },
+        }),
+      ])
+      if (paymentCount > 0 || paidScheduleCount > 0) {
         return { ok: false, error: COMPLIANCE_BLOCK_PAYMENT }
       }
     }

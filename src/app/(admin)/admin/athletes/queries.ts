@@ -84,6 +84,11 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
       },
       orderBy: [{ enrollmentDate: "desc" }],
     },
+    // Quota associativa annuale: collegata all'allieva, non a un corso
+    paymentSchedules: {
+      where: { feeType: "ASSOCIATION" },
+      orderBy: { dueDate: "desc" },
+    },
     // Sprint 1.B: certificati medici (ultimo + storico). Filtra non-deleted.
     medicalCertificates: {
       where: { deletedAt: null },
@@ -115,6 +120,9 @@ export type AthleteEnrollment =
 
 export type AthletePaymentSchedule =
   AthleteEnrollment["paymentSchedules"][number]
+
+export type AthleteAssociationSchedule =
+  AthleteWithRelations["paymentSchedules"][number]
 
 export async function getAthleteById(
   id: string,
@@ -173,6 +181,8 @@ const athleteForPDF = Prisma.validator<Prisma.AthleteDefaultArgs>()({
             course: { select: { name: true } },
           },
         },
+        // Tipo quota dei pagamenti su più scadenze
+        paymentSchedules: { select: { feeType: true, amountCents: true } },
       },
       orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
     },

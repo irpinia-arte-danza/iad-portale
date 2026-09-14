@@ -15,14 +15,18 @@ import {
 
 import { ReceiptIssuePanel } from "../../receipts/_components/receipt-issue-panel"
 import { useReceiptIssue } from "../../receipts/_components/use-receipt-issue"
-import type { AthleteWithFormRelations } from "../queries"
+import type { AthleteWithFormRelations, OpenScheduleOption } from "../queries"
 import { PaymentForm } from "./payment-form"
 
 interface PaymentCreateDialogProps {
   athletes: AthleteWithFormRelations[]
+  openSchedulesByAthlete: Record<string, OpenScheduleOption[]>
 }
 
-export function PaymentCreateDialog({ athletes }: PaymentCreateDialogProps) {
+export function PaymentCreateDialog({
+  athletes,
+  openSchedulesByAthlete,
+}: PaymentCreateDialogProps) {
   const [open, setOpen] = useState(false)
   const [registered, setRegistered] = useState(false)
   const receipt = useReceiptIssue()
@@ -67,12 +71,14 @@ export function PaymentCreateDialog({ athletes }: PaymentCreateDialogProps) {
             <DialogHeader>
               <DialogTitle>Registra pagamento</DialogTitle>
               <DialogDescription>
-                Seleziona l&apos;allieva, poi scegli il tipo di quota e l&apos;importo.
-                Anno accademico e fiscale sono assegnati automaticamente.
+                Seleziona l&apos;allieva e spunta le scadenze che sta pagando:
+                anche più d&apos;una, con una sola ricevuta. Anno accademico e
+                fiscale sono assegnati automaticamente.
               </DialogDescription>
             </DialogHeader>
             <PaymentForm
               athletes={athletes}
+              openSchedulesByAthlete={openSchedulesByAthlete}
               onSuccess={(paymentId) => {
                 setRegistered(true)
                 void receipt.begin(paymentId)

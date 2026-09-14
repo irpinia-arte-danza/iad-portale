@@ -9,7 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
+import { paymentFeeTypeLabel } from "@/lib/payments/schedule-lines"
+import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { formatDateLong, formatEur } from "@/lib/utils/format"
 
 import type {
@@ -73,8 +74,8 @@ export function CorrispettiviTable({
                       {p.athlete.lastName} {p.athlete.firstName}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">
-                        {FEE_TYPE_LABELS[p.feeType]}
+                      <Badge variant="secondary" className="whitespace-normal">
+                        {paymentFeeTypeLabel(p)}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">

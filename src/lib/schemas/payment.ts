@@ -24,7 +24,7 @@ const PAYMENT_METHOD_VALUES = [
 ] as const satisfies ReadonlyArray<PaymentMethod>
 
 export const FEE_TYPE_LABELS: Record<FeeType, string> = {
-  ASSOCIATION: "Quota iscrizione",
+  ASSOCIATION: "Quota associativa",
   MONTHLY: "Quota mensile",
   TRIMESTER: "Quota trimestrale",
   STAGE: "Stage",
@@ -43,40 +43,26 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   OTHER: "Altro",
 }
 
-export const paymentCreateSchema = z
-  .object({
-    athleteId: uuidSchema,
-    parentId: z.string().uuid().optional().or(z.literal("")),
-    courseEnrollmentId: z.string().uuid().optional().or(z.literal("")),
-    stageEnrollmentId: z.string().uuid().optional().or(z.literal("")),
-    showcaseParticipationId: z.string().uuid().optional().or(z.literal("")),
-    costumeAssignmentId: z.string().uuid().optional().or(z.literal("")),
-    paymentScheduleId: z.string().uuid().optional().or(z.literal("")),
-    feeType: z.enum(FEE_TYPE_VALUES, { message: "Tipo quota non valido" }),
-    method: z.enum(PAYMENT_METHOD_VALUES, { message: "Metodo non valido" }),
-    amountEur: z
-      .number({ message: "Importo obbligatorio" })
-      .min(0.01, "Importo deve essere positivo")
-      .max(10000, "Importo troppo alto"),
-    paymentDate: z.date().max(endOfToday(), {
-      message: "La data di pagamento non può essere nel futuro",
-    }),
-    periodStart: z.date().optional(),
-    periodEnd: z.date().optional(),
-    notes: z.string().trim().max(500).optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.periodStart && data.periodEnd) {
-        return data.periodStart <= data.periodEnd
-      }
-      return true
-    },
-    {
-      message: "Fine periodo deve essere successiva all'inizio",
-      path: ["periodEnd"],
-    },
-  )
+export const paymentCreateSchema = z.object({
+  athleteId: uuidSchema,
+  parentId: z.string().uuid().optional().or(z.literal("")),
+  // Scadenze che il pagamento chiude: anche più d'una, una sola ricevuta.
+  // Vuoto = pagamento libero (es. lezione di prova).
+  paymentScheduleIds: z
+    .array(uuidSchema)
+    .max(24, "Troppe scadenze in un solo pagamento"),
+  // Con scadenze spuntate lo ricalcola il server dalla prima scadenza
+  feeType: z.enum(FEE_TYPE_VALUES, { message: "Tipo quota non valido" }),
+  method: z.enum(PAYMENT_METHOD_VALUES, { message: "Metodo non valido" }),
+  amountEur: z
+    .number({ message: "Importo obbligatorio" })
+    .min(0.01, "Importo deve essere positivo")
+    .max(10000, "Importo troppo alto"),
+  paymentDate: z.date().max(endOfToday(), {
+    message: "La data di pagamento non può essere nel futuro",
+  }),
+  notes: z.string().trim().max(500).optional(),
+})
 
 export const paymentUpdateSchema = z.object({
   notes: z.string().trim().max(500).optional(),

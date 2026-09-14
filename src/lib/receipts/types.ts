@@ -8,6 +8,13 @@ export type ReceiptPayerSource =
   | "GUARDIAN" // primo genitore collegato
   | "ATHLETE" // nessun genitore: allieva stessa
 
+// Riga della causale di una ricevuta che copre più scadenze (dato congelato)
+export type ReceiptLine = {
+  description: string
+  amountCents: number
+  feeType: FeeType
+}
+
 export type IssuedReceiptInfo = {
   id: string
   receiptNumber: string
@@ -28,6 +35,8 @@ export type ReceiptIssuePreview = {
     address: string | null
     source: ReceiptPayerSource
   }
+  // Righe della causale (pagamento su più scadenze); vuoto se causale singola
+  lines: ReceiptLine[]
   // Motivo per cui l'emissione non è possibile (es. pagamento stornato)
   blocker: string | null
   // Dati mancanti o scelte automatiche da far notare prima di emettere

@@ -6,7 +6,10 @@ import { EmailLogTable } from "../../_components/email-log/table"
 import { getAthleteEmailLog } from "../../_components/email-log/queries"
 import { ResourceContent } from "../../_components/resource-content"
 import { ResourceHeader } from "../../_components/resource-header"
-import { listAthletesWithRelations } from "../../payments/queries"
+import {
+  listAthletesWithRelations,
+  listOpenSchedulesByAthlete,
+} from "../../payments/queries"
 import { AthleteAnagraficaDisplay } from "../_components/athlete-anagrafica-display"
 import { AthleteDetailHeader } from "../_components/athlete-detail-header"
 import { EnrollmentsSection } from "../_components/enrollments-section"
@@ -30,6 +33,7 @@ export default async function AthleteDetailPage({ params }: PageProps) {
     currentAcademicYear,
     athletesForPaymentForm,
     emailLog,
+    openSchedulesByAthlete,
   ] = await Promise.all([
     getAthleteById(resolvedParams.id),
     getAthleteForPDF(resolvedParams.id),
@@ -49,6 +53,7 @@ export default async function AthleteDetailPage({ params }: PageProps) {
     }),
     listAthletesWithRelations(),
     getAthleteEmailLog(resolvedParams.id),
+    listOpenSchedulesByAthlete(resolvedParams.id),
   ])
 
   if (!athlete) {
@@ -100,7 +105,9 @@ export default async function AthleteDetailPage({ params }: PageProps) {
             athleteFirstName={athlete.firstName}
             athleteLastName={athlete.lastName}
             enrollments={athlete.enrollments}
+            associationSchedules={athlete.paymentSchedules}
             athletesForPaymentForm={athletesForPaymentForm}
+            openSchedulesByAthlete={openSchedulesByAthlete}
           />
           <EmailLogTable
             title="Storico email"

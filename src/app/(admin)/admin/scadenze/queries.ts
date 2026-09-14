@@ -2,7 +2,7 @@ import { Prisma, ScheduleStatus } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
-import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
+import { withActiveCourseOrAssociationScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 export type ScadenzeStatoFilter =
   | "DEFAULT"
@@ -26,6 +26,8 @@ export type ScadenzaWithDetails = {
   amountCents: number
   status: ScheduleStatus
   feeType: string
+  // Causale della scadenza (es. "Quota associativa 2026/2027")
+  notes: string | null
   giorniRitardo: number // > 0 se scaduta, 0 = oggi, < 0 = in scadenza futura
 
   athlete: {
@@ -40,6 +42,7 @@ export type ScadenzaWithDetails = {
     email: string | null
     phone: string | null
   } | null
+  // null per la quota associativa, che non è legata a un corso
   course: {
     id: string
     name: string
@@ -53,11 +56,56 @@ export type ScadenzaWithDetails = {
   emailCount: number
 }
 
+// Allieva e genitore di riferimento: dall'iscrizione al corso per le mensili,
+// direttamente dall'allieva per la quota associativa.
+const SCHEDULE_ATHLETE_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  parentRelations: {
+    where: { parent: { deletedAt: null } },
+    orderBy: [{ isPrimaryPayer: "desc" }, { isPrimaryContact: "desc" }],
+    take: 1,
+    select: {
+      parent: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.AthleteSelect
+
 function startOfUTCToday(): Date {
   const now = new Date()
   return new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   )
+}
+
+function athleteSearch(q: string): Prisma.AthleteWhereInput {
+  return {
+    OR: [
+      { firstName: { contains: q, mode: "insensitive" } },
+      { lastName: { contains: q, mode: "insensitive" } },
+      {
+        parentRelations: {
+          some: {
+            parent: {
+              OR: [
+                { firstName: { contains: q, mode: "insensitive" } },
+                { lastName: { contains: q, mode: "insensitive" } },
+              ],
+            },
+          },
+        },
+      },
+    ],
+  }
 }
 
 function buildWhere(filter: ScadenzeFilter): Prisma.PaymentScheduleWhereInput {
@@ -87,38 +135,19 @@ function buildWhere(filter: ScadenzeFilter): Prisma.PaymentScheduleWhereInput {
     base.academicYearId = filter.academicYearId
   }
 
+  const conditions: Prisma.PaymentScheduleWhereInput[] = [base]
+
+  // Filtro per corso: la quota associativa non ha corso e resta esclusa
   if (filter.courseId) {
-    base.courseEnrollment = {
-      courseId: filter.courseId,
-    }
+    conditions.push({ courseEnrollment: { courseId: filter.courseId } })
   }
 
   if (filter.search && filter.search.trim().length > 0) {
-    const q = filter.search.trim()
-    base.courseEnrollment = {
-      ...(base.courseEnrollment as Prisma.CourseEnrollmentWhereInput | undefined),
-      athlete: {
-        OR: [
-          { firstName: { contains: q, mode: "insensitive" } },
-          { lastName: { contains: q, mode: "insensitive" } },
-          {
-            parentRelations: {
-              some: {
-                parent: {
-                  OR: [
-                    { firstName: { contains: q, mode: "insensitive" } },
-                    { lastName: { contains: q, mode: "insensitive" } },
-                  ],
-                },
-              },
-            },
-          },
-        ],
-      },
-    }
+    const athlete = athleteSearch(filter.search.trim())
+    conditions.push({ OR: [{ courseEnrollment: { athlete } }, { athlete }] })
   }
 
-  return withActiveScheduleFilter(base)
+  return withActiveCourseOrAssociationScheduleFilter({ AND: conditions })
 }
 
 function buildOrderBy(
@@ -151,34 +180,10 @@ export async function getScadenze(
         select: {
           id: true,
           course: { select: { id: true, name: true } },
-          athlete: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              parentRelations: {
-                where: { parent: { deletedAt: null } },
-                orderBy: [
-                  { isPrimaryPayer: "desc" },
-                  { isPrimaryContact: "desc" },
-                ],
-                take: 1,
-                select: {
-                  parent: {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      email: true,
-                      phone: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
+          athlete: { select: SCHEDULE_ATHLETE_SELECT },
         },
       },
+      athlete: { select: SCHEDULE_ATHLETE_SELECT },
     },
   })
 
@@ -205,13 +210,10 @@ export async function getScadenze(
 
   const today = startOfUTCToday()
 
-  return schedules
-    .filter(
-      (s): s is typeof s & { courseEnrollment: NonNullable<typeof s.courseEnrollment> } =>
-        s.courseEnrollment !== null,
-    )
-    .map((s) => {
-    const athlete = s.courseEnrollment.athlete
+  return schedules.flatMap((s) => {
+    const athlete = s.courseEnrollment?.athlete ?? s.athlete
+    if (!athlete) return []
+
     const parentRel = athlete.parentRelations[0] ?? null
     const email = emailMap.get(s.id)
 
@@ -226,35 +228,38 @@ export async function getScadenze(
       (today.getTime() - dueUTC.getTime()) / (1000 * 60 * 60 * 24),
     )
 
-    return {
-      id: s.id,
-      dueDate: s.dueDate,
-      amountCents: s.amountCents,
-      status: s.status,
-      feeType: s.feeType,
-      giorniRitardo,
-      athlete: {
-        id: athlete.id,
-        firstName: athlete.firstName,
-        lastName: athlete.lastName,
+    return [
+      {
+        id: s.id,
+        dueDate: s.dueDate,
+        amountCents: s.amountCents,
+        status: s.status,
+        feeType: s.feeType,
+        notes: s.notes,
+        giorniRitardo,
+        athlete: {
+          id: athlete.id,
+          firstName: athlete.firstName,
+          lastName: athlete.lastName,
+        },
+        parent: parentRel
+          ? {
+              id: parentRel.parent.id,
+              firstName: parentRel.parent.firstName,
+              lastName: parentRel.parent.lastName,
+              email: parentRel.parent.email,
+              phone: parentRel.parent.phone,
+            }
+          : null,
+        course: s.courseEnrollment?.course ?? null,
+        academicYear: {
+          id: s.academicYear.id,
+          label: s.academicYear.label,
+        },
+        ultimoSollecito: email?.lastSent ?? null,
+        emailCount: email?.count ?? 0,
       },
-      parent: parentRel
-        ? {
-            id: parentRel.parent.id,
-            firstName: parentRel.parent.firstName,
-            lastName: parentRel.parent.lastName,
-            email: parentRel.parent.email,
-            phone: parentRel.parent.phone,
-          }
-        : null,
-      course: s.courseEnrollment.course,
-      academicYear: {
-        id: s.academicYear.id,
-        label: s.academicYear.label,
-      },
-      ultimoSollecito: email?.lastSent ?? null,
-      emailCount: email?.count ?? 0,
-    }
+    ]
   })
 }
 

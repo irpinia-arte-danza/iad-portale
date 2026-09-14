@@ -7,6 +7,13 @@ import {
   ReceiptStatus,
 } from "@prisma/client"
 
+import { associationFeeDescription } from "@/lib/fees/association-fee"
+import {
+  SCHEDULE_LINE_SELECT,
+  compareScheduleLines,
+  describeSchedule,
+  type ScheduleLine,
+} from "@/lib/payments/schedule-lines"
 import { prisma } from "@/lib/prisma"
 
 import {
@@ -18,6 +25,7 @@ import type {
   IssuedReceiptInfo,
   IssueReceiptResult,
   ReceiptIssuePreview,
+  ReceiptLine,
   ReceiptPayerSource,
 } from "./types"
 
@@ -31,6 +39,8 @@ import type {
 //   mantenendo il numero (cancelReceiptForPayment)
 // - pagante, allieva, codici fiscali, causale e importo sono congelati
 //   all'emissione: la ristampa resta identica anche se cambiano i dati
+// - un pagamento che chiude più scadenze ha la causale a righe (una per
+//   scadenza), congelata in Receipt.lines
 // ─────────────────────────────────────────────────────────────────────────
 
 const PERSON_SELECT = {
@@ -74,23 +84,8 @@ const PAYMENT_FOR_RECEIPT_SELECT = {
       },
     },
   },
-  stageEnrollment: {
-    select: { stage: { select: { title: true, date: true } } },
-  },
-  paymentSchedule: {
-    select: {
-      notes: true,
-      showcaseParticipation: {
-        select: { showcase: { select: { title: true } } },
-      },
-      costumeAssignment: {
-        select: { size: true, costume: { select: { name: true } } },
-      },
-    },
-  },
-  costumeAssignment: {
-    select: { size: true, costume: { select: { name: true } } },
-  },
+  // Scadenze chiuse dal pagamento: una → causale come sempre, più → righe
+  paymentSchedules: { select: SCHEDULE_LINE_SELECT },
   receipt: { select: RECEIPT_INFO_SELECT },
 } satisfies Prisma.PaymentSelect
 
@@ -139,42 +134,43 @@ function resolvePayer(payment: PaymentForReceipt): {
   return { person: payment.athlete, source: "ATHLETE" }
 }
 
-function formatDateIt(date: Date): string {
-  const dd = String(date.getUTCDate()).padStart(2, "0")
-  const mm = String(date.getUTCMonth() + 1).padStart(2, "0")
-  return `${dd}/${mm}/${date.getUTCFullYear()}`
+// Righe della causale: solo per un pagamento che chiude più scadenze
+function buildLines(schedules: ScheduleLine[]): ReceiptLine[] | null {
+  if (schedules.length < 2) return null
+  return [...schedules].sort(compareScheduleLines).map((s) => ({
+    description: describeSchedule(s),
+    amountCents: s.amountCents,
+    feeType: s.feeType,
+  }))
 }
 
-// Causale: note del pagamento se presenti, altrimenti ricostruita da stage,
-// saggio o costume collegati.
+// Causale di una ricevuta a scadenza singola, come prima dell'incasso
+// multiplo: quota associativa sempre con l'anno (le note restano interne);
+// per le altre le note del pagamento se presenti, altrimenti ricostruita da
+// stage, saggio o costume. Le mensili bastano tipo quota e periodo.
 function buildDescription(payment: PaymentForReceipt): string | null {
+  const schedules = payment.paymentSchedules
+  if (schedules.length >= 2) return null
+
+  const schedule = schedules[0] ?? null
+  if (payment.feeType === "ASSOCIATION") {
+    return (
+      schedule?.notes ?? associationFeeDescription(payment.academicYear.label)
+    )
+  }
+
   if (payment.notes) return payment.notes
+  if (!schedule) return null
 
-  if (payment.feeType === "STAGE" && payment.stageEnrollment) {
-    const { title, date } = payment.stageEnrollment.stage
-    return `Iscrizione Stage «${title}» del ${formatDateIt(date)}`
+  switch (schedule.feeType) {
+    case "STAGE":
+    case "SHOWCASE_1":
+    case "SHOWCASE_2":
+    case "COSTUME":
+      return describeSchedule(schedule)
+    default:
+      return null
   }
-
-  if (
-    (payment.feeType === "SHOWCASE_1" || payment.feeType === "SHOWCASE_2") &&
-    payment.paymentSchedule?.showcaseParticipation
-  ) {
-    if (payment.paymentSchedule.notes) return payment.paymentSchedule.notes
-    const kind = payment.feeType === "SHOWCASE_1" ? "Caparra" : "Saldo"
-    return `Saggio «${payment.paymentSchedule.showcaseParticipation.showcase.title}» — ${kind}`
-  }
-
-  if (payment.feeType === "COSTUME") {
-    if (payment.paymentSchedule?.notes) return payment.paymentSchedule.notes
-    const assignment =
-      payment.costumeAssignment ?? payment.paymentSchedule?.costumeAssignment
-    if (assignment) {
-      const sizeLabel = assignment.size ? ` · taglia ${assignment.size}` : ""
-      return `Costume «${assignment.costume.name}» — ${fullName(payment.athlete)}${sizeLabel}`
-    }
-  }
-
-  return null
 }
 
 function toInfo(receipt: IssuedReceiptInfo): IssuedReceiptInfo {
@@ -250,6 +246,7 @@ export async function buildIssuePreview(
     amountCents: payment.amountCents,
     feeType: payment.feeType,
     paymentDate: payment.paymentDate,
+    lines: buildLines(payment.paymentSchedules) ?? [],
     existing: payment.receipt ? toInfo(payment.receipt) : null,
     payer: {
       name: fullName(payer.person),
@@ -318,6 +315,8 @@ export async function issueReceiptCore(params: {
         }
 
         const payer = resolvePayer(payment)
+        // Più scadenze sono sempre della stessa numerazione (vincolo di
+        // registrazione): la categoria del tipo principale vale per tutte
         const category = feeTypeToReceiptCategory(payment.feeType)
         const receiptNumber = formatReceiptNumber({
           prefix: settings.receiptPrefix,
@@ -325,6 +324,7 @@ export async function issueReceiptCore(params: {
           sequence,
           category,
         })
+        const lines = buildLines(payment.paymentSchedules)
 
         const receipt = await tx.receipt.create({
           data: {
@@ -342,6 +342,7 @@ export async function issueReceiptCore(params: {
             athleteFiscalCode: payment.athlete.fiscalCode,
             description: buildDescription(payment),
             amountCents: payment.amountCents,
+            lines: lines ?? undefined,
           },
           select: RECEIPT_INFO_SELECT,
         })
@@ -357,6 +358,7 @@ export async function issueReceiptCore(params: {
               sequence,
               paymentId: payment.id,
               payerSource: payer.source,
+              lines: lines?.length ?? 1,
             },
           },
         })

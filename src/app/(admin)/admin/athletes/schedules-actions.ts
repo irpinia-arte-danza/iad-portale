@@ -48,6 +48,7 @@ export async function waiveSchedule(
     where: { id: idParsed.data },
     select: {
       status: true,
+      athleteId: true,
       courseEnrollment: { select: { athleteId: true } },
     },
   })
@@ -69,9 +70,11 @@ export async function waiveSchedule(
         waiverReason: parsed.data.waiverReason,
       },
     })
-    if (existing.courseEnrollment) {
-      revalidatePath(athletePath(existing.courseEnrollment.athleteId))
-    }
+    // Mensili: allieva dall'iscrizione; quota associativa: allieva diretta
+    const athleteId =
+      existing.courseEnrollment?.athleteId ?? existing.athleteId
+    if (athleteId) revalidatePath(athletePath(athleteId))
+    revalidatePath("/admin/scadenze")
     return { ok: true }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }
@@ -92,6 +95,7 @@ export async function unwaiveSchedule(
     where: { id: idParsed.data },
     select: {
       status: true,
+      athleteId: true,
       courseEnrollment: { select: { athleteId: true } },
     },
   })
@@ -110,9 +114,11 @@ export async function unwaiveSchedule(
         waiverReason: null,
       },
     })
-    if (existing.courseEnrollment) {
-      revalidatePath(athletePath(existing.courseEnrollment.athleteId))
-    }
+    // Mensili: allieva dall'iscrizione; quota associativa: allieva diretta
+    const athleteId =
+      existing.courseEnrollment?.athleteId ?? existing.athleteId
+    if (athleteId) revalidatePath(athletePath(athleteId))
+    revalidatePath("/admin/scadenze")
     return { ok: true }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }

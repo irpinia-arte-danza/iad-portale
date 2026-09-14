@@ -109,9 +109,36 @@ export function ReceiptIssuePanel({
         <div className="grid grid-cols-[110px_1fr] gap-2">
           <dt className="text-muted-foreground">Importo</dt>
           <dd className="font-mono">
-            {formatEur(preview.amountCents)} · {FEE_TYPE_LABELS[preview.feeType]}
+            {formatEur(preview.amountCents)} ·{" "}
+            {preview.lines.length > 0
+              ? [
+                  ...new Set(
+                    preview.lines.map((line) => FEE_TYPE_LABELS[line.feeType]),
+                  ),
+                ].join(" + ")
+              : FEE_TYPE_LABELS[preview.feeType]}
           </dd>
         </div>
+        {preview.lines.length > 0 ? (
+          <div className="grid grid-cols-[110px_1fr] gap-2">
+            <dt className="text-muted-foreground">Causale</dt>
+            <dd>
+              <ul className="space-y-0.5">
+                {preview.lines.map((line, index) => (
+                  <li
+                    key={`${index}-${line.description}`}
+                    className="flex justify-between gap-3"
+                  >
+                    <span>{line.description}</span>
+                    <span className="shrink-0 font-mono tabular-nums">
+                      {formatEur(line.amountCents)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        ) : null}
         <div className="grid grid-cols-[110px_1fr] gap-2">
           <dt className="text-muted-foreground">Intestata a</dt>
           <dd>

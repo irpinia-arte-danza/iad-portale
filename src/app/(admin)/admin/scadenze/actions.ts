@@ -6,16 +6,18 @@ import {
   EmailCategory,
   EmailStatus,
   EmailTrigger,
+  Prisma,
   ScheduleStatus,
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { academicYearSlashLabel } from "@/lib/fees/association-fee"
 import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { formatMeseIt } from "@/lib/utils/format"
-import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
+import { withActiveCourseOrAssociationScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 const DATE_IT = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
@@ -35,6 +37,55 @@ function startOfUTCToday(): Date {
   )
 }
 
+// Allieva e genitore di riferimento: dall'iscrizione al corso per le mensili,
+// direttamente dall'allieva per la quota associativa.
+const SCHEDULE_ATHLETE_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  parentRelations: {
+    where: { parent: { deletedAt: null } },
+    orderBy: [{ isPrimaryPayer: "desc" }, { isPrimaryContact: "desc" }],
+    take: 1,
+    select: {
+      parent: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.AthleteSelect
+
+const SCHEDULE_INCLUDE = {
+  courseEnrollment: {
+    select: {
+      course: { select: { name: true } },
+      athlete: { select: SCHEDULE_ATHLETE_SELECT },
+    },
+  },
+  athlete: { select: SCHEDULE_ATHLETE_SELECT },
+  academicYear: { select: { label: true } },
+} satisfies Prisma.PaymentScheduleInclude
+
+// Variabile {mese} dei template ("la quota di {mese} per {allieva_nome}"):
+// il mese della scadenza per le mensili, "associativa 2026/2027" per la quota
+// associativa, così il testo resta corretto senza toccare i template.
+function reminderPeriod(schedule: {
+  feeType: string
+  dueDate: Date
+  academicYear: { label: string }
+}): string {
+  if (schedule.feeType === "ASSOCIATION") {
+    return `associativa ${academicYearSlashLabel(schedule.academicYear.label)}`
+  }
+  return formatMeseIt(schedule.dueDate)
+}
+
 export async function getScadenzeCSVData(
   scheduleIds: string[],
 ): Promise<{ headers: string[]; rows: string[][] }> {
@@ -45,42 +96,12 @@ export async function getScadenzeCSVData(
   }
 
   const schedules = await prisma.paymentSchedule.findMany({
-    where: withActiveScheduleFilter({
+    where: withActiveCourseOrAssociationScheduleFilter({
       id: { in: scheduleIds },
       status: ScheduleStatus.DUE,
     }),
     orderBy: { dueDate: "asc" },
-    include: {
-      courseEnrollment: {
-        select: {
-          course: { select: { name: true } },
-          athlete: {
-            select: {
-              firstName: true,
-              lastName: true,
-              parentRelations: {
-                where: { parent: { deletedAt: null } },
-                orderBy: [
-                  { isPrimaryPayer: "desc" },
-                  { isPrimaryContact: "desc" },
-                ],
-                take: 1,
-                select: {
-                  parent: {
-                    select: {
-                      firstName: true,
-                      lastName: true,
-                      email: true,
-                      phone: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+    include: SCHEDULE_INCLUDE,
   })
 
   const emailAggregates = await prisma.emailLog.groupBy({
@@ -106,7 +127,7 @@ export async function getScadenzeCSVData(
     "Genitore",
     "Email",
     "Telefono",
-    "Corso",
+    "Corso / quota",
     "Importo",
     "Scadenza",
     "Giorni ritardo",
@@ -114,40 +135,39 @@ export async function getScadenzeCSVData(
     "Email inviate",
   ]
 
-  const rows = schedules
-    .filter(
-      (s): s is typeof s & { courseEnrollment: NonNullable<typeof s.courseEnrollment> } =>
-        s.courseEnrollment !== null,
+  const rows = schedules.flatMap((s) => {
+    const athlete = s.courseEnrollment?.athlete ?? s.athlete
+    if (!athlete) return []
+
+    const parent = athlete.parentRelations[0]?.parent ?? null
+    const email = emailMap.get(s.id)
+
+    const dueUTC = new Date(
+      Date.UTC(
+        s.dueDate.getUTCFullYear(),
+        s.dueDate.getUTCMonth(),
+        s.dueDate.getUTCDate(),
+      ),
     )
-    .map((s) => {
-      const athlete = s.courseEnrollment.athlete
-      const parent = athlete.parentRelations[0]?.parent ?? null
-      const email = emailMap.get(s.id)
+    const giorniRitardo = Math.round(
+      (today.getTime() - dueUTC.getTime()) / (1000 * 60 * 60 * 24),
+    )
 
-      const dueUTC = new Date(
-        Date.UTC(
-          s.dueDate.getUTCFullYear(),
-          s.dueDate.getUTCMonth(),
-          s.dueDate.getUTCDate(),
-        ),
-      )
-      const giorniRitardo = Math.round(
-        (today.getTime() - dueUTC.getTime()) / (1000 * 60 * 60 * 24),
-      )
-
-      return [
+    return [
+      [
         `${athlete.lastName} ${athlete.firstName}`,
         parent ? `${parent.lastName} ${parent.firstName}` : "—",
         parent?.email ?? "",
         parent?.phone ?? "",
-        s.courseEnrollment.course?.name ?? "—",
+        s.courseEnrollment?.course.name ?? s.notes ?? "—",
         CURRENCY_IT.format(s.amountCents / 100),
         DATE_IT.format(s.dueDate),
         String(giorniRitardo),
         email?.lastSent ? DATE_IT.format(email.lastSent) : "",
         String(email?.count ?? 0),
-      ]
-    })
+      ],
+    ]
+  })
 
   return { headers, rows }
 }
@@ -197,49 +217,20 @@ export async function previewReminder(
   await requireAdmin()
 
   const schedule = await prisma.paymentSchedule.findFirst({
-    where: withActiveScheduleFilter({
+    where: withActiveCourseOrAssociationScheduleFilter({
       id: scheduleId,
     }),
-    include: {
-      courseEnrollment: {
-        select: {
-          course: { select: { name: true } },
-          athlete: {
-            select: {
-              firstName: true,
-              lastName: true,
-              parentRelations: {
-                where: { parent: { deletedAt: null } },
-                orderBy: [
-                  { isPrimaryPayer: "desc" },
-                  { isPrimaryContact: "desc" },
-                ],
-                take: 1,
-                select: {
-                  parent: {
-                    select: {
-                      firstName: true,
-                      lastName: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+    include: SCHEDULE_INCLUDE,
   })
 
   if (!schedule) {
     throw new Error("Scadenza non trovata")
   }
-  if (!schedule.courseEnrollment) {
-    throw new Error("Scadenza non collegata a un corso")
+  const athlete = schedule.courseEnrollment?.athlete ?? schedule.athlete
+  if (!athlete) {
+    throw new Error("Scadenza non collegata a un'allieva")
   }
 
-  const athlete = schedule.courseEnrollment.athlete
   const parent = athlete.parentRelations[0]?.parent ?? null
   const athleteName = `${athlete.firstName} ${athlete.lastName}`
   const recipientName = parent
@@ -258,8 +249,8 @@ export async function previewReminder(
       month: "2-digit",
       year: "numeric",
     }),
-    mese: formatMeseIt(schedule.dueDate),
-    corso_nome: schedule.courseEnrollment.course?.name ?? "",
+    mese: reminderPeriod(schedule),
+    corso_nome: schedule.courseEnrollment?.course.name ?? "",
     tipo_quota: FEE_TYPE_LABELS[schedule.feeType] ?? "",
   }
 
@@ -313,43 +304,12 @@ export async function sendReminderBatch(
   }
 
   const schedules = await prisma.paymentSchedule.findMany({
-    where: withActiveScheduleFilter({
+    where: withActiveCourseOrAssociationScheduleFilter({
       id: { in: scheduleIds },
       status: ScheduleStatus.DUE,
     }),
     orderBy: { dueDate: "asc" },
-    include: {
-      courseEnrollment: {
-        select: {
-          course: { select: { name: true } },
-          athlete: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              parentRelations: {
-                where: { parent: { deletedAt: null } },
-                orderBy: [
-                  { isPrimaryPayer: "desc" },
-                  { isPrimaryContact: "desc" },
-                ],
-                take: 1,
-                select: {
-                  parent: {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+    include: SCHEDULE_INCLUDE,
   })
 
   type SendableItem = {
@@ -367,8 +327,8 @@ export async function sendReminderBatch(
   const sendable: SendableItem[] = []
 
   for (const s of schedules) {
-    if (!s.courseEnrollment) continue // stage schedules sono fuori scope solleciti
-    const athlete = s.courseEnrollment.athlete
+    const athlete = s.courseEnrollment?.athlete ?? s.athlete
+    if (!athlete) continue // stage, saggio, costumi: fuori dai solleciti
     const parent = athlete.parentRelations[0]?.parent ?? null
 
     if (!parent || !parent.email) {
@@ -398,8 +358,8 @@ export async function sendReminderBatch(
         month: "2-digit",
         year: "numeric",
       }),
-      mese: formatMeseIt(s.dueDate),
-      corso_nome: s.courseEnrollment.course?.name ?? "",
+      mese: reminderPeriod(s),
+      corso_nome: s.courseEnrollment?.course.name ?? "",
       tipo_quota: FEE_TYPE_LABELS[s.feeType] ?? "",
     }
 

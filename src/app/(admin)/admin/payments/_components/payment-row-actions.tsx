@@ -38,6 +38,8 @@ interface PaymentRowActionsProps {
       receiptNumber: string
       status: ReceiptStatus
     } | null
+    // Scadenze chiuse dal pagamento: lo storno le riapre tutte
+    scheduleDescriptions: string[]
   }
 }
 
@@ -134,6 +136,7 @@ export function PaymentRowActions({ payment }: PaymentRowActionsProps) {
           athleteName: payment.athleteName,
           validReceiptNumber:
             receipt && !receiptCancelled ? receipt.receiptNumber : null,
+          reopenSchedules: payment.scheduleDescriptions,
         }}
       />
 

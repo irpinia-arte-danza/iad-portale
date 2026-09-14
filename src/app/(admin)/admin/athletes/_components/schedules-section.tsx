@@ -13,13 +13,22 @@ import {
   type ScheduleDisplayStatus,
 } from "@/lib/utils/schedule-status"
 
-import type { AthleteEnrollment, AthletePaymentSchedule } from "../queries"
-import type { AthleteWithFormRelations } from "../../payments/queries"
+import type {
+  AthleteAssociationSchedule,
+  AthleteEnrollment,
+  AthletePaymentSchedule,
+} from "../queries"
+import type {
+  AthleteWithFormRelations,
+  OpenScheduleOption,
+} from "../../payments/queries"
 import { ScheduleRowActions } from "./schedule-row-actions"
+import { ScheduleSettleProvider } from "./schedule-settle-provider"
 
 type FlattenedSchedule = AthletePaymentSchedule & {
   courseName: string
-  enrollmentId: string
+  // null per la quota associativa, che non è legata a un corso
+  enrollmentId: string | null
 }
 
 interface SchedulesSectionProps {
@@ -27,7 +36,9 @@ interface SchedulesSectionProps {
   athleteFirstName: string
   athleteLastName: string
   enrollments: AthleteEnrollment[]
+  associationSchedules: AthleteAssociationSchedule[]
   athletesForPaymentForm: AthleteWithFormRelations[]
+  openSchedulesByAthlete: Record<string, OpenScheduleOption[]>
 }
 
 function formatDate(date: Date): string {
@@ -45,14 +56,23 @@ function formatEur(cents: number): string {
   }).format(cents / 100)
 }
 
-function flatten(enrollments: AthleteEnrollment[]): FlattenedSchedule[] {
-  return enrollments.flatMap((e) =>
+function flatten(
+  enrollments: AthleteEnrollment[],
+  associationSchedules: AthleteAssociationSchedule[],
+): FlattenedSchedule[] {
+  const association = associationSchedules.map((s) => ({
+    ...s,
+    courseName: s.notes ?? "Quota associativa",
+    enrollmentId: null,
+  }))
+  const monthly = enrollments.flatMap((e) =>
     e.paymentSchedules.map((s) => ({
       ...s,
       courseName: e.course.name,
       enrollmentId: e.id,
     })),
   )
+  return [...association, ...monthly]
 }
 
 export function SchedulesSection({
@@ -60,9 +80,11 @@ export function SchedulesSection({
   athleteFirstName,
   athleteLastName,
   enrollments,
+  associationSchedules,
   athletesForPaymentForm,
+  openSchedulesByAthlete,
 }: SchedulesSectionProps) {
-  const all = flatten(enrollments)
+  const all = flatten(enrollments, associationSchedules)
 
   const overdue = all
     .filter((s) => computeScheduleDisplayStatus(s) === "OVERDUE")
@@ -96,79 +118,69 @@ export function SchedulesSection({
     { key: "WAIVED", label: "Condonate", items: waived },
   ]
 
+  // Il dialog "Salda" sta nel provider, fuori dai gruppi: una scadenza appena
+  // pagata cambia gruppo e la sua riga viene rimontata altrove.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Scadenze</CardTitle>
-        <CardDescription>
-          Quote mensili generate automaticamente per ogni iscrizione attiva.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {all.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-8 text-center">
-            <CalendarDays className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            <h3 className="text-sm font-medium">Nessuna scadenza</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Le scadenze vengono generate automaticamente quando iscrivi
-              l&apos;allieva a un corso.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="mb-4 flex flex-wrap gap-2">
-              <Badge variant="destructive">{overdue.length} In ritardo</Badge>
-              <Badge variant="outline">{due.length} In scadenza</Badge>
-              <Badge variant="outline">{future.length} Prossime</Badge>
-              <Badge variant="secondary">{paid.length} Pagate</Badge>
-              <Badge variant="outline">{waived.length} Condonate</Badge>
+    <ScheduleSettleProvider
+      athleteId={athleteId}
+      athleteFirstName={athleteFirstName}
+      athleteLastName={athleteLastName}
+      athletesForPaymentForm={athletesForPaymentForm}
+      openSchedulesByAthlete={openSchedulesByAthlete}
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>Scadenze</CardTitle>
+          <CardDescription>
+            Quota associativa annuale e quote mensili, generate automaticamente
+            all&apos;iscrizione ai corsi.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {all.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center">
+              <CalendarDays className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+              <h3 className="text-sm font-medium">Nessuna scadenza</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Le scadenze vengono generate automaticamente quando iscrivi
+                l&apos;allieva a un corso.
+              </p>
             </div>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-wrap gap-2">
+                <Badge variant="destructive">{overdue.length} In ritardo</Badge>
+                <Badge variant="outline">{due.length} In scadenza</Badge>
+                <Badge variant="outline">{future.length} Prossime</Badge>
+                <Badge variant="secondary">{paid.length} Pagate</Badge>
+                <Badge variant="outline">{waived.length} Condonate</Badge>
+              </div>
 
-            <div className="space-y-6">
-              {groups
-                .filter((g) => g.items.length > 0)
-                .map((group) => (
-                  <section key={group.key} className="space-y-2">
-                    <h4 className="text-xs font-semibold uppercase text-muted-foreground">
-                      {group.label}
-                    </h4>
-                    <ul className="space-y-2">
-                      {group.items.map((s) => (
-                        <ScheduleRow
-                          key={s.id}
-                          schedule={s}
-                          athleteId={athleteId}
-                          athleteFirstName={athleteFirstName}
-                          athleteLastName={athleteLastName}
-                          athletesForPaymentForm={athletesForPaymentForm}
-                        />
-                      ))}
-                    </ul>
-                  </section>
-                ))}
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+              <div className="space-y-6">
+                {groups
+                  .filter((g) => g.items.length > 0)
+                  .map((group) => (
+                    <section key={group.key} className="space-y-2">
+                      <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+                        {group.label}
+                      </h4>
+                      <ul className="space-y-2">
+                        {group.items.map((s) => (
+                          <ScheduleRow key={s.id} schedule={s} />
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </ScheduleSettleProvider>
   )
 }
 
-interface ScheduleRowProps {
-  schedule: FlattenedSchedule
-  athleteId: string
-  athleteFirstName: string
-  athleteLastName: string
-  athletesForPaymentForm: AthleteWithFormRelations[]
-}
-
-function ScheduleRow({
-  schedule,
-  athleteId,
-  athleteFirstName,
-  athleteLastName,
-  athletesForPaymentForm,
-}: ScheduleRowProps) {
+function ScheduleRow({ schedule }: { schedule: FlattenedSchedule }) {
   const displayStatus = computeScheduleDisplayStatus(schedule)
 
   return (
@@ -188,9 +200,7 @@ function ScheduleRow({
           id: schedule.id,
           status: schedule.status,
           displayStatus,
-          // Flatten garantisce sempre un courseEnrollment (le scadenze stage non
-          // sono incluse). Cast sicuro: PaymentSchedule.courseEnrollmentId
-          // è diventato nullable Sprint 6.A per supportare stage.
+          feeType: schedule.feeType,
           courseEnrollmentId: schedule.enrollmentId,
           courseName: schedule.courseName,
           dueDate: schedule.dueDate,
@@ -198,10 +208,6 @@ function ScheduleRow({
           waiverReason: schedule.waiverReason,
           paymentId: schedule.paymentId,
         }}
-        athleteId={athleteId}
-        athleteFirstName={athleteFirstName}
-        athleteLastName={athleteLastName}
-        athletesForPaymentForm={athletesForPaymentForm}
       />
     </li>
   )

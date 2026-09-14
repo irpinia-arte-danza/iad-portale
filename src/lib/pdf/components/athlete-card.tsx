@@ -4,6 +4,7 @@ import type {
   AthleteForPDF,
   BrandForPDF,
 } from "@/app/(admin)/admin/athletes/queries"
+import { paymentFeeTypeLabel } from "@/lib/payments/schedule-lines"
 import { relationshipOptions } from "@/lib/schemas/guardian"
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 
@@ -270,7 +271,7 @@ export function AthleteCardPDF({ data, brand }: Props) {
                     {formatDateIt(p.paymentDate)}
                   </Text>
                   <Text style={[pdfStyles.td, { width: "22%" }]}>
-                    {FEE_TYPE_LABELS[p.feeType]}
+                    {paymentFeeTypeLabel(p)}
                   </Text>
                   <Text style={[pdfStyles.tdMuted, { width: "28%" }]}>
                     {p.courseEnrollment?.course.name ?? "—"}

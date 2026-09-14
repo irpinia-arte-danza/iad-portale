@@ -1,7 +1,7 @@
 import "server-only"
 
 import { renderToBuffer } from "@react-pdf/renderer"
-import { ReceiptStatus } from "@prisma/client"
+import { ReceiptStatus, type FeeType, type Prisma } from "@prisma/client"
 
 import {
   ReceiptPdf,
@@ -9,6 +9,9 @@ import {
   type ReceiptData,
 } from "@/lib/pdf/components/receipt"
 import { prisma } from "@/lib/prisma"
+import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
+
+import type { ReceiptLine } from "./types"
 
 // Caricamento e rendering del PDF di una ricevuta già emessa. Usato dalla
 // route /ricevute/[receiptId] (admin e genitori). Nessuna emissione qui: il
@@ -44,6 +47,7 @@ export async function loadReceiptForPdf(receiptId: string) {
       athleteFiscalCode: true,
       description: true,
       amountCents: true,
+      lines: true,
       payment: {
         select: {
           athleteId: true,
@@ -68,6 +72,27 @@ function athleteNameOf(receipt: LoadedReceipt): string {
   if (receipt.athleteName) return receipt.athleteName
   const athlete = receipt.payment?.athlete
   return athlete ? `${athlete.firstName} ${athlete.lastName}`.trim() : ""
+}
+
+// Righe congelate all'emissione (JSON): se non hanno la forma attesa si torna
+// alla causale singola invece di rompere il PDF
+function parseReceiptLines(value: Prisma.JsonValue | null): ReceiptLine[] | null {
+  if (!Array.isArray(value)) return null
+  const lines: ReceiptLine[] = []
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return null
+    const { description, amountCents, feeType } = item
+    if (
+      typeof description !== "string" ||
+      typeof amountCents !== "number" ||
+      typeof feeType !== "string" ||
+      !(feeType in FEE_TYPE_LABELS)
+    ) {
+      return null
+    }
+    lines.push({ description, amountCents, feeType: feeType as FeeType })
+  }
+  return lines.length >= 2 ? lines : null
 }
 
 // Lancia ReceiptRenderError per dati mancanti, oppure l'errore del renderer.
@@ -118,6 +143,7 @@ export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> 
       receipt.athleteFiscalCode ?? payment.athlete.fiscalCode ?? null,
     feeType: payment.feeType,
     description: receipt.description,
+    lines: parseReceiptLines(receipt.lines),
     periodStart: payment.periodStart,
     periodEnd: payment.periodEnd,
     amountCents: receipt.amountCents ?? payment.amountCents,

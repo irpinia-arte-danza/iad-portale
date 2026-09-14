@@ -13,9 +13,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  FEE_TYPE_LABELS,
-  PAYMENT_METHOD_LABELS,
-} from "@/lib/schemas/payment"
+  compareScheduleLines,
+  describeSchedule,
+  paymentFeeTypeLabel,
+} from "@/lib/payments/schedule-lines"
+import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 
 import type { PaymentListItem } from "../queries"
 import { PaymentDetailSheet } from "./payment-detail-sheet"
@@ -91,6 +93,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
             <TableHead className="text-right">Importo</TableHead>
             <TableHead className="hidden md:table-cell">Metodo</TableHead>
             <TableHead className="hidden lg:table-cell">Periodo</TableHead>
+            <TableHead className="hidden lg:table-cell">Scadenze</TableHead>
             <TableHead className="hidden md:table-cell">Ricevuta</TableHead>
             <TableHead>Stato</TableHead>
             <TableHead className="w-[50px]" />
@@ -100,6 +103,9 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
           {payments.map((p) => {
             const period = formatPeriod(p.periodStart, p.periodEnd)
             const receiptCancelled = p.receipt?.status === "CANCELLED"
+            const scheduleDescriptions = [...p.paymentSchedules]
+              .sort(compareScheduleLines)
+              .map(describeSchedule)
             return (
               <TableRow
                 key={p.id}
@@ -119,8 +125,8 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
                   </Link>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
-                  <Badge variant="secondary">
-                    {FEE_TYPE_LABELS[p.feeType]}
+                  <Badge variant="secondary" className="whitespace-normal">
+                    {paymentFeeTypeLabel(p)}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right font-mono">
@@ -131,6 +137,20 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
                 </TableCell>
                 <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                   {period ?? "—"}
+                </TableCell>
+                <TableCell
+                  className="hidden lg:table-cell text-sm text-muted-foreground"
+                  title={
+                    scheduleDescriptions.length > 0
+                      ? scheduleDescriptions.join("\n")
+                      : undefined
+                  }
+                >
+                  {scheduleDescriptions.length === 0
+                    ? "—"
+                    : scheduleDescriptions.length === 1
+                      ? "1 scadenza"
+                      : `${scheduleDescriptions.length} scadenze`}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {p.receipt ? (
@@ -171,6 +191,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
                       notes: p.notes,
                       athleteName: `${p.athlete.firstName} ${p.athlete.lastName}`,
                       receipt: p.receipt,
+                      scheduleDescriptions,
                     }}
                   />
                 </TableCell>

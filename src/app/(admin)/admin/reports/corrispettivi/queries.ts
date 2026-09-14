@@ -2,6 +2,10 @@ import { FeeType, PaymentMethod, Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import {
+  ACCOUNTING_SCHEDULE_SELECT,
+  accountingLines,
+} from "@/lib/payments/schedule-lines"
 import { dayKey } from "@/lib/utils/format"
 
 export type CorrispettiviFilters = {
@@ -21,6 +25,8 @@ const corrispettivoItem = Prisma.validator<Prisma.PaymentDefaultArgs>()({
         course: { select: { name: true } },
       },
     },
+    // Ripartizione per tipo quota dei pagamenti su più scadenze
+    paymentSchedules: { select: ACCOUNTING_SCHEDULE_SELECT },
   },
 })
 
@@ -73,7 +79,10 @@ export async function getCorrispettivi(
     deletedAt: null,
     status: "PAID",
     paymentDate: { gte: from, lte: to },
-    ...(feeType ? { feeType } : {}),
+    // Un pagamento su più scadenze compare sotto ciascuno dei suoi tipi quota
+    ...(feeType
+      ? { OR: [{ feeType }, { paymentSchedules: { some: { feeType } } }] }
+      : {}),
     ...(method ? { method } : {}),
   }
 
@@ -106,11 +115,13 @@ export async function getCorrispettivi(
     byMethod[item.method].count += 1
     byMethod[item.method].totalCents += item.amountCents
 
-    if (!byFeeType[item.feeType]) {
-      byFeeType[item.feeType] = { count: 0, totalCents: 0 }
+    for (const line of accountingLines(item)) {
+      if (!byFeeType[line.feeType]) {
+        byFeeType[line.feeType] = { count: 0, totalCents: 0 }
+      }
+      byFeeType[line.feeType].count += 1
+      byFeeType[line.feeType].totalCents += line.amountCents
     }
-    byFeeType[item.feeType].count += 1
-    byFeeType[item.feeType].totalCents += item.amountCents
 
     grandTotalCents += item.amountCents
   }
