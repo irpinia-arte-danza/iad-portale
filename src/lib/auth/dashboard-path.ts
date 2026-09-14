@@ -14,3 +14,19 @@ export function getDashboardPath(role: UserRole): string {
     }
   }
 }
+
+// Prefisso dell'area di un ruolo: allow-list per i redirect "next".
+export function getRoleAreaPrefix(role: UserRole): string {
+  switch (role) {
+    case UserRole.ADMIN:
+      return "/admin"
+    case UserRole.TEACHER:
+      return "/teacher"
+    case UserRole.PARENT:
+      return "/parent"
+    default: {
+      const _exhaustive: never = role
+      throw new Error(`Unhandled UserRole: ${_exhaustive}`)
+    }
+  }
+}

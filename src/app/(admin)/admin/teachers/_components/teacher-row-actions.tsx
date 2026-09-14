@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { MoreHorizontal, Pencil, RefreshCw, Send, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -29,7 +29,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import type { AccessStatus } from "@/lib/auth/access-status-types"
 
+import { useSendAccessInvite } from "../../_components/access/use-send-access-invite"
 import { softDeleteTeacher } from "../actions"
 import { TeacherForm } from "./teacher-form"
 
@@ -43,12 +45,14 @@ interface TeacherRowActionsProps {
     fiscalCode: string | null
     qualifications: string | null
   }
+  accessStatus?: AccessStatus
 }
 
-export function TeacherRowActions({ teacher }: TeacherRowActionsProps) {
+export function TeacherRowActions({ teacher, accessStatus }: TeacherRowActionsProps) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const { send, pendingId } = useSendAccessInvite("TEACHER")
 
   function handleDelete() {
     startTransition(async () => {
@@ -61,6 +65,8 @@ export function TeacherRowActions({ teacher }: TeacherRowActionsProps) {
       }
     })
   }
+
+  const showAccessItem = accessStatus && accessStatus.kind !== "ACTIVE"
 
   return (
     <>
@@ -80,6 +86,23 @@ export function TeacherRowActions({ teacher }: TeacherRowActionsProps) {
             <Pencil className="h-4 w-4" />
             Modifica
           </DropdownMenuItem>
+          {showAccessItem ? (
+            <DropdownMenuItem
+              disabled={accessStatus.kind === "NO_EMAIL" || pendingId === teacher.id}
+              onClick={() => send(teacher.id)}
+            >
+              {accessStatus.kind === "INVITED" ? (
+                <RefreshCw className="h-4 w-4" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              {accessStatus.kind === "NO_EMAIL"
+                ? "Invia accesso (manca l'email)"
+                : accessStatus.kind === "INVITED"
+                  ? "Reinvia accesso"
+                  : "Invia accesso"}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => setDeleteOpen(true)}
@@ -122,7 +145,8 @@ export function TeacherRowActions({ teacher }: TeacherRowActionsProps) {
             <AlertDialogDescription>
               Stai per eliminare {teacher.firstName} {teacher.lastName}.
               L&apos;operazione è reversibile (soft delete) ma l&apos;insegnante
-              non sarà più visibile nell&apos;elenco.
+              non sarà più visibile nell&apos;elenco e non potrà più entrare
+              nell&apos;area insegnanti finché non viene ripristinato dal Cestino.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

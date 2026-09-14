@@ -1,8 +1,6 @@
 import Image from "next/image"
-import { redirect } from "next/navigation"
-import { UserRole } from "@prisma/client"
 
-import { createClient } from "@/lib/supabase/server"
+import { requireParent } from "@/lib/auth/require-parent"
 import { prisma } from "@/lib/prisma"
 import { LogoutButton } from "@/components/auth/logout-button"
 
@@ -13,29 +11,12 @@ export default async function ParentLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
+  await requireParent()
 
-  if (!authUser) {
-    redirect("/login")
-  }
-
-  const [user, brand] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: authUser.id },
-      select: { isActive: true, role: true },
-    }),
-    prisma.brandSettings.findUnique({
-      where: { id: 1 },
-      select: { logoUrl: true, logoDarkUrl: true, asdName: true },
-    }),
-  ])
-
-  if (!user || !user.isActive || user.role !== UserRole.PARENT) {
-    redirect("/login")
-  }
+  const brand = await prisma.brandSettings.findUnique({
+    where: { id: 1 },
+    select: { logoUrl: true, logoDarkUrl: true, asdName: true },
+  })
 
   const asdName = brand?.asdName ?? "IAD Portale"
 

@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache"
 
-import { Prisma } from "@prisma/client"
+import { Prisma, UserRole } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { sendAccessInviteCore } from "@/lib/auth/access-emails"
+import type { AccessInviteResult } from "@/lib/auth/access-status-types"
 import { requireAdmin } from "@/lib/auth/require-admin"
-import { createAdminClient } from "@/lib/supabase/admin-client"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
 import {
@@ -41,96 +42,12 @@ function mapPrismaError(error: unknown): string {
   return "Errore interno, riprova"
 }
 
-type CreateTeacherResult = {
-  id: string
-  invited: boolean
-  inviteSkipReason?: "no-email" | "email-in-use" | "invite-failed"
-}
-
-async function inviteTeacherUser(
-  teacherId: string,
-  email: string,
-  firstName: string | null,
-  lastName: string | null,
-  inviterId: string,
-): Promise<CreateTeacherResult["inviteSkipReason"] | null> {
-  // Skip se utente con quella email esiste già (qualunque ruolo): admin
-  // gestisce manualmente collisioni
-  const existing = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, deletedAt: true },
-  })
-  if (existing && existing.deletedAt === null) {
-    return "email-in-use"
-  }
-
-  // Invite teacher: stesso pattern parent (Sprint 4.A). Custom email
-  // template Supabase usa {{ .SiteURL }} + token_hash + type=invite.
-  // redirectTo qui è FALLBACK se template default attivo.
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-  if (!appUrl) {
-    console.error("[teachers] NEXT_PUBLIC_APP_URL missing — invite redirect malformato")
-    return "invite-failed"
-  }
-
-  try {
-    const admin = createAdminClient()
-    const redirectTo = `${appUrl}/auth/confirm?type=invite&next=/teacher/dashboard`
-
-    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo,
-    })
-    if (error || !data?.user) {
-      console.error("[teachers] invite failed", { email, error: error?.message })
-      return "invite-failed"
-    }
-
-    await prisma.user.upsert({
-      where: { id: data.user.id },
-      update: {
-        email,
-        role: "TEACHER",
-        firstName,
-        lastName,
-        isActive: true,
-        deletedAt: null,
-      },
-      create: {
-        id: data.user.id,
-        email,
-        role: "TEACHER",
-        firstName,
-        lastName,
-        isActive: true,
-      },
-    })
-
-    await prisma.teacher.update({
-      where: { id: teacherId },
-      data: { userId: data.user.id },
-    })
-
-    await prisma.auditLog.create({
-      data: {
-        userId: inviterId,
-        action: "INVITE_TEACHER",
-        entityType: "Teacher",
-        entityId: teacherId,
-        changes: { email, firstName, lastName, authUserId: data.user.id },
-      },
-    })
-
-    return null
-  } catch (error) {
-    console.error("[teachers] invite unexpected error", { email, error })
-    return "invite-failed"
-  }
-}
-
+// Creare un insegnante NON invia nulla: l'accesso al portale è un'azione
+// esplicita e ripetibile (sendTeacherAccessInvite).
 export async function createTeacher(
   values: TeacherCreateValues,
-): Promise<ActionResult<CreateTeacherResult>> {
-  const { userId } = await requireAdmin()
+): Promise<ActionResult<{ id: string }>> {
+  await requireAdmin()
 
   const parsed = teacherCreateSchema.safeParse(values)
   if (!parsed.success) {
@@ -141,37 +58,13 @@ export async function createTeacher(
   }
 
   try {
-    const cleaned = cleanEmptyStrings(parsed.data)
     const teacher = await prisma.teacher.create({
-      data: cleaned,
-      select: { id: true, email: true, firstName: true, lastName: true },
+      data: cleanEmptyStrings(parsed.data),
+      select: { id: true },
     })
 
-    let invited = false
-    let inviteSkipReason: CreateTeacherResult["inviteSkipReason"]
-
-    if (teacher.email && teacher.email.length > 0) {
-      const reason = await inviteTeacherUser(
-        teacher.id,
-        teacher.email,
-        teacher.firstName,
-        teacher.lastName,
-        userId,
-      )
-      if (reason === null) {
-        invited = true
-      } else {
-        inviteSkipReason = reason
-      }
-    } else {
-      inviteSkipReason = "no-email"
-    }
-
     revalidatePath(TEACHERS_PATH)
-    return {
-      ok: true,
-      data: { id: teacher.id, invited, inviteSkipReason },
-    }
+    return { ok: true, data: { id: teacher.id } }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }
   }
@@ -221,6 +114,7 @@ export async function softDeleteTeacher(id: string): Promise<ActionResult> {
       where: { id: idParsed.data },
       select: {
         deletedAt: true,
+        userId: true,
         _count: { select: { courses: true, teacherCourses: true } },
       },
     })
@@ -243,14 +137,49 @@ export async function softDeleteTeacher(id: string): Promise<ActionResult> {
       }
     }
 
-    await prisma.teacher.update({
-      where: { id: idParsed.data },
-      data: { deletedAt: new Date() },
-    })
+    await prisma.$transaction([
+      prisma.teacher.update({
+        where: { id: idParsed.data },
+        data: { deletedAt: new Date() },
+      }),
+      // Nel cestino = niente accesso al portale. L'utente viene riattivato
+      // al ripristino (cestino/actions.ts).
+      ...(teacher.userId
+        ? [
+            prisma.user.updateMany({
+              where: { id: teacher.userId, role: UserRole.TEACHER },
+              data: { isActive: false },
+            }),
+          ]
+        : []),
+    ])
 
     revalidatePath(TEACHERS_PATH)
     return { ok: true }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }
   }
+}
+
+// "Invia accesso" / "Reinvia accesso" per insegnanti (vedi sendAccessInvite
+// dei genitori).
+export async function sendTeacherAccessInvite(
+  teacherId: string,
+): Promise<AccessInviteResult> {
+  const { userId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(teacherId)
+  if (!idParsed.success) {
+    return { ok: false, code: "NOT_FOUND", error: "Identificativo non valido" }
+  }
+
+  const result = await sendAccessInviteCore({
+    kind: "TEACHER",
+    profileId: idParsed.data,
+    adminUserId: userId,
+  })
+
+  revalidatePath(TEACHERS_PATH)
+  revalidatePath(`${TEACHERS_PATH}/${idParsed.data}`)
+  return result
 }

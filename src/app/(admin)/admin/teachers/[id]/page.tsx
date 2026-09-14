@@ -17,6 +17,8 @@ import { ResourceHeader } from "../../_components/resource-header"
 import { TeacherAnagraficaDisplay } from "../_components/teacher-anagrafica-display"
 import { TeacherDetailHeader } from "../_components/teacher-detail-header"
 import { getTeacherById } from "../queries"
+import { AccessStatusCard } from "../../_components/access/access-status-card"
+import { getAccessStatus } from "@/lib/auth/access-status"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -30,6 +32,7 @@ export default async function TeacherDetailPage({ params }: PageProps) {
     notFound()
   }
 
+  const accessStatus = await getAccessStatus("TEACHER", teacher)
   const fullName = `${teacher.lastName} ${teacher.firstName}`
 
   // Sprint 5: M2M via teacherCourses (con isPrimary). Lista deduplicata
@@ -62,6 +65,12 @@ export default async function TeacherDetailPage({ params }: PageProps) {
         action={<TeacherDetailHeader teacher={teacher} />}
       />
       <ResourceContent>
+        <AccessStatusCard
+          kind="TEACHER"
+          profileId={teacher.id}
+          status={accessStatus}
+        />
+
         <div className="grid gap-6 md:grid-cols-2">
           <TeacherAnagraficaDisplay teacher={teacher} />
 

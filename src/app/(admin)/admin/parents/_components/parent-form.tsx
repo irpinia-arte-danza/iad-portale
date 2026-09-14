@@ -68,22 +68,10 @@ export function ParentForm({
       if (mode === "create") {
         const result = await createParent(values)
         if (result.ok) {
-          const data = result.data
-          if (data?.invited) {
-            toast.success("Genitore aggiunto · invito email inviato")
-          } else if (data?.inviteSkipReason === "no-email") {
-            toast.success("Genitore aggiunto · nessuna email per invito")
-          } else if (data?.inviteSkipReason === "email-in-use") {
-            toast.warning(
-              "Genitore aggiunto · email già in uso da altro account, invito non inviato",
-            )
-          } else if (data?.inviteSkipReason === "invite-failed") {
-            toast.warning(
-              "Genitore aggiunto · invito email non riuscito, riprova manualmente",
-            )
-          } else {
-            toast.success("Genitore aggiunto")
-          }
+          toast.success("Genitore aggiunto", {
+            description:
+              "Nessuna email è partita: invia l'accesso dalla lista Genitori quando i dati sono completi.",
+          })
           form.reset()
           onSuccess?.()
         } else {

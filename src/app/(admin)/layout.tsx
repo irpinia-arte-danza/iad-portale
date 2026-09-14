@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
-import { UserRole } from "@prisma/client"
 
-import { createClient } from "@/lib/supabase/server"
+import { NO_ACCESS_ROUTE } from "@/lib/auth/account-state"
+import { requireAdmin } from "@/lib/auth/require-admin"
 import { prisma } from "@/lib/prisma"
 import {
   SidebarProvider,
@@ -16,24 +16,15 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
-
-  if (!authUser) {
-    redirect("/login")
-  }
+  const { userId } = await requireAdmin()
 
   const [user, brand] = await Promise.all([
     prisma.user.findUnique({
-      where: { id: authUser.id },
+      where: { id: userId },
       select: {
         firstName: true,
         lastName: true,
         email: true,
-        role: true,
-        isActive: true,
       },
     }),
     prisma.brandSettings.findUnique({
@@ -46,8 +37,8 @@ export default async function AdminLayout({
     }),
   ])
 
-  if (!user || !user.isActive || user.role !== UserRole.ADMIN) {
-    redirect("/login")
+  if (!user) {
+    redirect(NO_ACCESS_ROUTE)
   }
 
   return (

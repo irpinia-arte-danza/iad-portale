@@ -8,4 +8,4 @@ export type EmailPayload = {
 
 export type EmailSendResult =
   | { success: true; providerId: string }
-  | { success: false; error: string };
+  | { success: false; error: string; code?: string };

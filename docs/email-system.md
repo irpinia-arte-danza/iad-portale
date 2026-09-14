@@ -17,6 +17,7 @@ Chiuso 22 aprile 2026, 9 fasi, commit range `fd17f49..b2aabd6`.
 - Panel variabili inserimento at-cursor (`{{genitore_nome}}`, `{{allieva_nome}}`, `{{importo}}`, `{{data_scadenza}}`, `{{mese}}`, `{{corso_nome}}`, `{{tipo_quota}}`)
 - Live preview con sostituzione variabili
 - Seed iniziale 4 template: `sollecito-scadenza`, `promemoria-scadenza`, `benvenuto-iscrizione`, `conferma-pagamento`
+- Template aggiunti via migration: `cert-reminder` (Fase 1.C), `stage-invite` (Sprint 6.A), `accesso-portale` e `recupero-password` (Sprint onboarding, vedi sezione dedicata sotto)
 - Categorie (`EmailCategory`): `SOLLECITO`, `PROMEMORIA`, `BENVENUTO`, `CONFERMA`, `COMUNICAZIONE`
 
 ### Invio manuale bulk
@@ -46,7 +47,9 @@ Chiuso 22 aprile 2026, 9 fasi, commit range `fd17f49..b2aabd6`.
 - `email_id` sconosciuto → 200 skip (no retry storm); DB update fail → 500 (Resend retry)
 
 ### Audit e storico
-- `EmailLog` record completo: `providerId` (Resend UUID), `triggeredBy` (`ADMIN_MANUAL` | `CRON`), `milestoneKey` (nullable), `bodyHtml` snapshot, `recipientEmail`, refs `athleteId` / `parentId` / `paymentScheduleId`
+- `EmailLog` record completo: `providerId` (Resend UUID), `triggeredBy` (`ADMIN_MANUAL` | `CRON` | `SELF_SERVICE`), `milestoneKey` (nullable), `bodyHtml` snapshot, `recipientEmail`, refs `athleteId` / `parentId` / `paymentScheduleId`
+- `triggeredBy = SELF_SERVICE`: email richiesta dall'utente stesso (oggi solo "Password dimenticata"); `sentBy` è l'utente che ha fatto la richiesta
+- `milestoneKey` in uso: `PROMEMORIA_DUE` / `SOLLECITO_FIRST` / `SOLLECITO_SECOND` (cron), `STAGE_INVITE:{stageId}` (inviti stage), `ACCESS_INVITE` / `ACCESS_REINVITE` / `PASSWORD_RESET` (link personali, vedi sotto)
 - Storico in detail `/admin/athletes/[id]` + `/admin/parents/[id]`: Card "Storico email" con table (Data, Oggetto, Template, Destinatario, Stato badge 7 colori, Trigger badge)
 - Dropdown per riga: Anteprima contenuto · Dettagli tecnici · Reinvia (solo `FAILED`)
 - Reinvio crea NUOVO `EmailLog` (no update dell'esistente — audit trail coerente)
@@ -55,6 +58,50 @@ Chiuso 22 aprile 2026, 9 fasi, commit range `fd17f49..b2aabd6`.
 - Lingua italiana, tono caldo ma professionale
 - Logo IAD in header (dal `BrandSettings` caricato da admin)
 - Dati ASD in footer (ragione sociale, CF, indirizzo)
+
+---
+
+## Email con link personale — accesso e recupero password (Sprint onboarding, settembre 2026)
+
+### Perché non passano dall'SMTP di Supabase
+Inviti e recupero password **non** usano più `inviteUserByEmail` / `resetPasswordForEmail` (SMTP Supabase + template della dashboard Supabase). Il flusso è:
+
+1. `auth.admin.generateLink({ type: "invite" | "recovery", email })` → restituisce `hashed_token`, **non invia email e non applica rate limit Supabase**
+2. Link costruito da `NEXT_PUBLIC_APP_URL` (mai dall'header Host: eviterebbe il password-reset poisoning): `/auth/confirm?token_hash=…&type=invite|recovery[&intent=access]`
+3. Invio con Resend (`sendEmail`) + riga `EmailLog`
+
+Vantaggi: template modificabili in `/admin/email-templates`, storico e delivery tracking (bounce visibili), nessuna dipendenza dai template della dashboard Supabase, nessun limite "30 email/ora" dello SMTP Supabase.
+
+Scelta del tipo di link: account Supabase mai confermato → `invite` (sovrascrive il token precedente: il vecchio link smette di funzionare); account confermato ma senza password → `recovery`. La **durata** del link resta quella di "Email OTP Expiration" in Supabase (impostata a 86400, vedi gotcha §17.35).
+
+### Template
+| Slug | Categoria | Uso | Variabili |
+|---|---|---|---|
+| `accesso-portale` | `BENVENUTO` | "Invia / Reinvia accesso" admin (genitori e insegnanti) | `destinatario_nome`, `area_nome`, `descrizione_area`, `link_accesso`, `link_recupero`, `asd_nome`, `asd_email` |
+| `recupero-password` | `COMUNICAZIONE` | `/password-dimenticata` | `destinatario_nome`, `link_accesso`, `link_recupero`, `asd_nome`, `asd_email` |
+
+- Seed nella migration `20260915090100_onboarding_access_email_templates` (idempotente, `ON CONFLICT DO NOTHING`)
+- Default identici in `src/lib/auth/access-emails.ts`: usati se il template manca, è disattivato o non contiene più `{link_accesso}` (l'accesso non si blocca per una modifica al template)
+- Valori delle variabili escapati in HTML prima della sostituzione
+
+### milestoneKey e stato accesso
+| milestoneKey | Quando | `parentId` |
+|---|---|---|
+| `ACCESS_INVITE` | primo invio riuscito all'indirizzo attuale | valorizzato per genitori, `null` per insegnanti |
+| `ACCESS_REINVITE` | invii successivi | idem |
+| `PASSWORD_RESET` | richiesta da "Password dimenticata" (`triggeredBy = SELF_SERVICE`) | valorizzato se l'utente è un genitore |
+
+- Lo stato **Invitato (data)** di genitori e insegnanti è ricavato dall'ultimo log `ACCESS_*` non `FAILED` all'indirizzo attuale (`src/lib/auth/access-status.ts`): nessun campo `invitedAt` su Parent/Teacher. Un log `BOUNCED`/`COMPLAINED` mostra "email non consegnata".
+- **Il link non viene salvato**: in `bodyHtml`/`bodyText` del log è sostituito da `[link personale non salvato]`. Per questo le email con questi milestone **non** sono reinviabili dal menu "Reinvia" dello storico (bloccato in UI e in `resendFromLog`): si usa "Reinvia accesso".
+
+### Limiti di invio (Resend)
+- **10 richieste/secondo** per team
+- **Quota giornaliera sul piano Free** (100 email/giorno, 3.000/mese): invii massivi di accessi + solleciti cron dello stesso giorno contano insieme
+- Invio multiplo accessi (`bulk-access-invite-dialog.tsx`): sequenziale lato client, ~1 invio/secondo. Su `rate_limit_exceeded` / `daily_quota_exceeded` / `monthly_quota_exceeded` si ferma con messaggio esplicito. Nessuna coda né retry: chi non riceve l'email resta nello stato precedente e si rilancia l'invio sui restanti.
+
+### Anti-abuso "Password dimenticata"
+- Risposta identica per email registrate e non; l'invio avviene dopo la risposta con `after()` (nemmeno i tempi rivelano se l'account esiste)
+- Invia solo a utenti attivi con profilo attivo; max 3 email/ora e 1/minuto per indirizzo (conteggio su `EmailLog`)
 
 ---
 
@@ -122,6 +169,10 @@ Applicato a `src/lib/resend/client.ts`. Stesso pattern preventivo per ogni SDK n
 - `src/app/(admin)/admin/scadenze/` — pagina + dialog invio
 - `src/app/(admin)/admin/settings/_components/reminder-tab.tsx` — config cron
 - `src/app/(admin)/admin/_components/email-log/` — storico condiviso athletes/parents
+- `src/lib/auth/access-emails.ts` — link personali (generateLink) + invio e log di accesso/recupero password
+- `src/lib/auth/access-status.ts` — stato accesso a 4 valori da `auth.users` + `EmailLog`
+- `src/app/(admin)/admin/_components/access/` — badge stato, bottone invio, card scheda, dialog invio multiplo
+- `src/app/(public)/password-dimenticata/` e `src/app/(account)/imposta-password/` — recupero e scelta password
 
 ---
 
@@ -130,3 +181,5 @@ Applicato a `src/lib/resend/client.ts`. Stesso pattern preventivo per ogni SDK n
 - `RESEND_API_KEY` — API key Resend
 - `RESEND_WEBHOOK_SECRET` — signing secret svix (`whsec_...`)
 - `CRON_SECRET` — auth curl manuale cron (Vercel Cron usa header `x-vercel-cron` automatico)
+- `NEXT_PUBLIC_APP_URL` — base dei link personali di accesso/recupero. In locale va sovrascritta (es. `.env.development.local` con `http://localhost:3000`), altrimenti i link dei test puntano alla produzione
+- `SUPABASE_SERVICE_ROLE_KEY` — necessaria per `auth.admin.generateLink`

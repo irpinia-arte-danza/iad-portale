@@ -2,39 +2,25 @@ import { redirect } from "next/navigation"
 
 import { UserRole } from "@prisma/client"
 
-import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { NO_ACCESS_ROUTE } from "./account-state"
+import { getCurrentAccount } from "./current-account"
+import { getDashboardPath } from "./dashboard-path"
 
+// - non autenticato → /login
+// - autenticato ma senza accesso utilizzabile → logout + pagina esplicativa
+//   (mai /login: il proxy rimanderebbe alla dashboard, loop infinito)
+// - autenticato con altro ruolo → la propria dashboard
 export async function requireParent(): Promise<{
   userId: string
   parentId: string
 }> {
-  const supabase = await createClient()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
+  const account = await getCurrentAccount()
 
-  if (!authUser) {
-    redirect("/login")
+  if (account.state === "anonymous") redirect("/login")
+  if (account.state === "blocked") redirect(NO_ACCESS_ROUTE)
+  if (account.role !== UserRole.PARENT || !account.parentId) {
+    redirect(getDashboardPath(account.role))
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: authUser.id },
-    select: { isActive: true, role: true },
-  })
-
-  if (!user || !user.isActive || user.role !== UserRole.PARENT) {
-    redirect("/login")
-  }
-
-  const parent = await prisma.parent.findFirst({
-    where: { userId: authUser.id, deletedAt: null },
-    select: { id: true },
-  })
-
-  if (!parent) {
-    redirect("/login")
-  }
-
-  return { userId: authUser.id, parentId: parent.id }
+  return { userId: account.userId, parentId: account.parentId }
 }

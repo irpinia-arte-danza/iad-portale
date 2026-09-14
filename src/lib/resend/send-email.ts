@@ -15,7 +15,8 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailSendResult>
     });
 
     if (error) {
-      return { success: false, error: error.message };
+      // error.name = codice Resend (es. rate_limit_exceeded, daily_quota_exceeded)
+      return { success: false, error: error.message, code: error.name };
     }
 
     if (!data?.id) {

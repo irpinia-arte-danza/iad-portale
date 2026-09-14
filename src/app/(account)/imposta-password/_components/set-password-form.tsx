@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { unstable_rethrow } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2 } from "lucide-react"
@@ -21,13 +22,9 @@ import {
   type ChangePasswordValues,
 } from "@/lib/schemas/admin-settings"
 
-import { updateParentPassword } from "../../_actions/auth"
+import { setOwnPassword } from "../actions"
 
-type Props = {
-  next: string
-}
-
-export function SetPasswordForm({ next }: Props) {
+export function SetPasswordForm() {
   const [busy, setBusy] = React.useState(false)
 
   const form = useForm<ChangePasswordValues>({
@@ -40,12 +37,21 @@ export function SetPasswordForm({ next }: Props) {
 
   async function onSubmit(values: ChangePasswordValues) {
     setBusy(true)
-    const result = await updateParentPassword(values, next)
-    if (result && !result.ok) {
-      toast.error(result.error)
+    try {
+      const result = await setOwnPassword(values)
+      if (result && !result.ok) {
+        toast.error(result.error)
+        setBusy(false)
+      }
+      // on success: server action redirects, component unmounts
+    } catch (error) {
+      // Dopo il salvataggio la action fa redirect(): lato client la chiamata
+      // viene rifiutata con l'errore NEXT_REDIRECT mentre Next naviga. Va
+      // rilanciato, altrimenti compare un falso "salvataggio non riuscito".
+      unstable_rethrow(error)
+      toast.error("Salvataggio non riuscito: controlla la connessione e riprova")
       setBusy(false)
     }
-    // on success: server action redirects, component unmounts
   }
 
   return (
@@ -66,6 +72,7 @@ export function SetPasswordForm({ next }: Props) {
                   type="password"
                   autoComplete="new-password"
                   disabled={busy}
+                  className="min-h-11"
                   {...field}
                 />
               </FormControl>
@@ -78,12 +85,13 @@ export function SetPasswordForm({ next }: Props) {
           name="confirmPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Conferma password</FormLabel>
+              <FormLabel>Ripeti la password</FormLabel>
               <FormControl>
                 <Input
                   type="password"
                   autoComplete="new-password"
                   disabled={busy}
+                  className="min-h-11"
                   {...field}
                 />
               </FormControl>
@@ -92,7 +100,7 @@ export function SetPasswordForm({ next }: Props) {
           )}
         />
         <p className="text-xs text-muted-foreground">
-          Minimo 10 caratteri. Scegli una password che non usi su altri siti.
+          Almeno 10 caratteri. Scegli una password che non usi su altri siti.
         </p>
         <Button type="submit" className="w-full min-h-11" disabled={busy}>
           {busy ? (

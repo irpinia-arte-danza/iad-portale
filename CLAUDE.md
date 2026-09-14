@@ -153,7 +153,7 @@ Vedi `prisma/schema.prisma` per lo schema completo. In sintesi:
 | ORM | **Prisma 6.x** (pin — NON 7.x, vedi 17.2) | Schema-first, type-safe, eccellente DX |
 | Env loading (Prisma CLI) | **dotenv-cli** (wrap script `db:*`, vedi 17.3) | Prisma CLI legge solo `.env`, non `.env.local` |
 | DB | **Supabase Postgres** (Ireland eu-west-1) | Piano Free, GDPR-compliant |
-| Auth | **Supabase Auth + Resend SMTP** | Sicurezza gestita + email affidabili |
+| Auth | **Supabase Auth** (link di accesso via `auth.admin.generateLink`, inviati con Resend) | Sicurezza gestita + email tracciate in `EmailLog`. SMTP Resend in Supabase resta solo per l'invito admin da Impostazioni |
 | Storage | **Supabase Storage** | Logo, certificati medici, moduli scansionati, ricevute PDF |
 | Email | **Resend** | Transazionali + notifiche |
 | PDF | **@react-pdf/renderer** | Ricevute, moduli precompilati, export tesseramento |
@@ -332,6 +332,22 @@ Per dettagli architettura, cronologia 9 fasi, gotcha specifici (§17.25-27), fil
 
 ### WhatsApp (MVP = link manuale)
 Per ora NON integriamo WhatsApp Business API. Però ogni pagina rilevante ha un bottone "Invia via WhatsApp" che apre `wa.me/NUMERO?text=MESSAGGIO_PRECOMPILATO`. Giuseppina clicca → si apre WhatsApp Web → manda.
+
+---
+
+## 🔑 Accesso all'area riservata (genitori e insegnanti)
+
+Sprint onboarding (settembre 2026). Regole stabili:
+
+- **Inviti espliciti**: `createParent` e `createTeacher` **non inviano email**. L'accesso si manda con "Invia accesso" / "Reinvia accesso" (singolo da lista o scheda, multiplo dalla lista genitori). Ogni invio genera un link nuovo e invalida il precedente.
+- **Stato accesso a 4 valori**, ricavato senza campi duplicati (`auth.users` + `EmailLog`): Senza email · Mai invitato · Invitato (data) · Attivo (ultimo accesso). Logica in `src/lib/auth/access-status.ts`.
+- **Link personali** (invito e recupero) generati con `auth.admin.generateLink` e inviati con Resend, mai con l'SMTP di Supabase. Destinazione `/auth/confirm`. Dettagli e limiti in `docs/email-system.md`.
+- **Impostazione password**: `/imposta-password`, unica per tutti i ruoli (primo accesso e recupero). `/parent/set-password` e `/teacher/set-password` restano solo come redirect per i link vecchi.
+- **Recupero password**: `/password-dimenticata`, risposta identica per email registrate e non.
+- **Account senza profilo attivo** (utente disattivato, genitore/insegnante nel Cestino, utente senza profilo): `requireXxx()` manda a `/auth/no-access` (logout) → `/accesso-non-attivo`. **Mai** `redirect("/login")`: il proxy rimanda gli autenticati alla dashboard e si crea un loop.
+- **Cestino**: spostare un genitore/insegnante nel Cestino disattiva l'utente collegato; il ripristino lo riattiva.
+- **Google sign-in rimosso**. `/auth/callback` e `/auth/confirm` non creano mai utenti: gli utenti nascono solo dall'invito admin.
+- **Redirect `next`**: sempre validati con `safeNextPath` (`src/lib/auth/safe-next.ts`), allow-list per area del ruolo.
 
 ---
 
@@ -517,6 +533,7 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 15. **Solleciti = 3 livelli di controllo**: config globale + override per-genitore + tasto manuale
 16. **Mobile-first per /parent e /teacher**: queste aree sono pensate primariamente per smartphone. Tutti i componenti devono partire da mobile (375px base) e espandersi verso desktop. Area /admin è desktop-first. Touch target ≥44×44px ovunque. Testare sempre su viewport 375×667 prima di chiudere un task.
 17. **Gotcha tecnici §17.x**: la collezione completa (28+ gotcha da Sprint 0 → Sprint 3 — Prisma, Next.js, Zod/RHF, shadcn, PDF, Vercel, UX, Settings, Domain) è in **`docs/gotchas.md`** con TOC per topic. Claude Code deve consultare `docs/gotchas.md` quando: (a) aggiunge feature con tecnologia già associata a un gotcha noto (Prisma migration, Next.js async API, Zod+RHF, ecc.), (b) sta per fare refactor su area nota per gotcha, (c) indaga un bug che potrebbe essere già documentato. §17.25-27 specifici del sistema email vivono in `docs/email-system.md`.
+18. **Accesso area riservata**: creare un genitore o un insegnante non manda email (inviti espliciti); utenti senza profilo attivo vanno a `/auth/no-access`, mai a `/login`. Vedi sezione "🔑 Accesso all'area riservata".
 
 <!-- gotcha §17.1-17.28 migrati in docs/gotchas.md (v4.0, 2026-04-22) -->
 
@@ -544,4 +561,4 @@ Mai pushare su `main` senza test verde. CI via GitHub Actions.
 
 ---
 
-_Ultimo aggiornamento: 2026-04-24 · Versione 4.0 — Split tematico: gotcha §17.x migrati in `docs/gotchas.md` con TOC per topic, sistema email Sprint 3 in `docs/email-system.md`, cronologia sprint + roadmap in `docs/sprints.md`. CLAUDE.md ridotto da ~56k a ~18-20k chars, struttura cartelle rimossa (derivabile da `ls -R src/`). `AGENTS.md` aggiornato con nuovi puntatori. Nessun contenuto perso — tutto migrato e puntato dall'index "Documenti di riferimento"._
+_Ultimo aggiornamento: 2026-09-14 · Versione 4.1 — Sprint onboarding: nuova sezione "🔑 Accesso all'area riservata" (inviti espliciti, `/imposta-password`, `/password-dimenticata`, `/accesso-non-attivo`, Google rimosso), riga Auth dello stack aggiornata. Versione 4.0 (2026-04-24) — Split tematico: gotcha §17.x migrati in `docs/gotchas.md` con TOC per topic, sistema email Sprint 3 in `docs/email-system.md`, cronologia sprint + roadmap in `docs/sprints.md`. CLAUDE.md ridotto da ~56k a ~18-20k chars, struttura cartelle rimossa (derivabile da `ls -R src/`). `AGENTS.md` aggiornato con nuovi puntatori. Nessun contenuto perso — tutto migrato e puntato dall'index "Documenti di riferimento"._

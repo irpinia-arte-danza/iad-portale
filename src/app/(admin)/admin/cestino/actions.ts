@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { AuditAction, Prisma } from "@prisma/client"
+import { AuditAction, Prisma, UserRole } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
@@ -80,6 +80,16 @@ const ENTITY_TYPE: Record<EntityKind, string> = {
   costume: "Costume",
 }
 
+// Ripristino dal cestino = accesso al portale di nuovo utilizzabile (il
+// soft delete di genitore/insegnante disattiva l'utente collegato). Gli
+// utenti "ritirati" (deletedAt valorizzato) restano disattivi.
+async function reactivateProfileUser(userId: string, role: UserRole) {
+  await prisma.user.updateMany({
+    where: { id: userId, role, deletedAt: null },
+    data: { isActive: true },
+  })
+}
+
 async function doRestore(
   kind: EntityKind,
   id: string,
@@ -101,18 +111,28 @@ async function doRestore(
           data: { deletedAt: null },
         })
         break
-      case "parent":
-        await prisma.parent.update({
+      case "parent": {
+        const parent = await prisma.parent.update({
           where: { id: idParsed.data },
           data: { deletedAt: null },
+          select: { userId: true },
         })
+        if (parent.userId) {
+          await reactivateProfileUser(parent.userId, UserRole.PARENT)
+        }
         break
-      case "teacher":
-        await prisma.teacher.update({
+      }
+      case "teacher": {
+        const teacher = await prisma.teacher.update({
           where: { id: idParsed.data },
           data: { deletedAt: null },
+          select: { userId: true },
         })
+        if (teacher.userId) {
+          await reactivateProfileUser(teacher.userId, UserRole.TEACHER)
+        }
         break
+      }
       case "course":
         await prisma.course.update({
           where: { id: idParsed.data },
@@ -335,6 +355,7 @@ export async function hardDeleteParent(
         firstName: true,
         lastName: true,
         deletedAt: true,
+        userId: true,
       },
     })
     if (!parent) return { ok: false, error: "Genitore non trovato" }
@@ -358,6 +379,16 @@ export async function hardDeleteParent(
     }
 
     await prisma.$transaction([
+      // Genitori finiti nel cestino prima dello sprint onboarding possono
+      // avere ancora l'utente attivo: senza profilo non deve poter entrare.
+      ...(parent.userId
+        ? [
+            prisma.user.updateMany({
+              where: { id: parent.userId, role: UserRole.PARENT },
+              data: { isActive: false },
+            }),
+          ]
+        : []),
       prisma.consent.deleteMany({ where: { parentId: parent.id } }),
       prisma.athleteParent.deleteMany({ where: { parentId: parent.id } }),
       prisma.parent.delete({ where: { id: parent.id } }),
@@ -400,6 +431,7 @@ export async function hardDeleteTeacher(
         firstName: true,
         lastName: true,
         deletedAt: true,
+        userId: true,
       },
     })
     if (!teacher) return { ok: false, error: "Insegnante non trovato" }
@@ -423,6 +455,14 @@ export async function hardDeleteTeacher(
     }
 
     await prisma.$transaction([
+      ...(teacher.userId
+        ? [
+            prisma.user.updateMany({
+              where: { id: teacher.userId, role: UserRole.TEACHER },
+              data: { isActive: false },
+            }),
+          ]
+        : []),
       // TeacherCourse ha onDelete: Cascade → si pulisce da sé alla delete
       // del Teacher. Course.teacherId è 1:N legacy nullable: lo nullifichiamo
       // prima per evitare violazione FK (default RESTRICT).

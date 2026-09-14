@@ -2,39 +2,22 @@ import { redirect } from "next/navigation"
 
 import { UserRole } from "@prisma/client"
 
-import { prisma } from "@/lib/prisma"
-import { createClient } from "@/lib/supabase/server"
+import { NO_ACCESS_ROUTE } from "./account-state"
+import { getCurrentAccount } from "./current-account"
+import { getDashboardPath } from "./dashboard-path"
 
+// Stessa logica di requireParent (vedi commento lì).
 export async function requireTeacher(): Promise<{
   userId: string
   teacherId: string
 }> {
-  const supabase = await createClient()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
+  const account = await getCurrentAccount()
 
-  if (!authUser) {
-    redirect("/login")
+  if (account.state === "anonymous") redirect("/login")
+  if (account.state === "blocked") redirect(NO_ACCESS_ROUTE)
+  if (account.role !== UserRole.TEACHER || !account.teacherId) {
+    redirect(getDashboardPath(account.role))
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: authUser.id },
-    select: { isActive: true, role: true },
-  })
-
-  if (!user || !user.isActive || user.role !== UserRole.TEACHER) {
-    redirect("/login")
-  }
-
-  const teacher = await prisma.teacher.findFirst({
-    where: { userId: authUser.id, deletedAt: null },
-    select: { id: true },
-  })
-
-  if (!teacher) {
-    redirect("/login")
-  }
-
-  return { userId: authUser.id, teacherId: teacher.id }
+  return { userId: account.userId, teacherId: account.teacherId }
 }
