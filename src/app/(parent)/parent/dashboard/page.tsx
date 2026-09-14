@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CalendarClock,
   CheckCircle2,
+  FileText,
   Sparkles,
 } from "lucide-react"
 
@@ -16,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { requireParent } from "@/lib/auth/require-parent"
+import { receiptPdfHref } from "@/lib/receipts/types"
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { formatDateShort, formatEur } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
@@ -37,7 +39,6 @@ import {
 import { countOpenStagesForParent } from "../_actions/stages"
 
 import { IbanCard } from "./_components/iban-card"
-import { ReceiptDownloadButton } from "./_components/receipt-download-button"
 
 const DAY_OF_WEEK_LABELS = [
   "Domenica",
@@ -275,9 +276,16 @@ export default async function ParentDashboardPage() {
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {formatDateShort(p.paymentDate)}
+                                {p.status === "REVERSED" ? " · stornato" : ""}
                               </p>
                             </div>
-                            <span className="shrink-0 font-mono text-sm tabular-nums">
+                            <span
+                              className={cn(
+                                "shrink-0 font-mono text-sm tabular-nums",
+                                p.status === "REVERSED" &&
+                                  "text-muted-foreground line-through",
+                              )}
+                            >
                               {formatEur(p.amountCents)}
                             </span>
                           </li>
@@ -379,16 +387,45 @@ export default async function ParentDashboardPage() {
                       <p className="text-xs text-muted-foreground">
                         {formatDateShort(p.paymentDate)} ·{" "}
                         {PAYMENT_METHOD_LABELS[p.method]}
+                        {p.receipt ? (
+                          <>
+                            {" "}·{" "}
+                            <span className="font-mono">
+                              ricevuta n. {p.receipt.receiptNumber}
+                            </span>
+                          </>
+                        ) : null}
                       </p>
+                      {p.status === "REVERSED" ? (
+                        <Badge variant="destructive" className="mt-1">
+                          Pagamento stornato
+                        </Badge>
+                      ) : !p.receipt ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Ricevuta non ancora emessa: sarà disponibile qui
+                          appena la segreteria la prepara.
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex items-center justify-between gap-3 sm:justify-end">
-                      <span className="font-mono text-sm tabular-nums">
+                      <span
+                        className={cn(
+                          "font-mono text-sm tabular-nums",
+                          p.status === "REVERSED" &&
+                            "text-muted-foreground line-through",
+                        )}
+                      >
                         {formatEur(p.amountCents)}
                       </span>
-                      <ReceiptDownloadButton
-                        paymentId={p.id}
-                        receiptNumber={p.receiptNumber}
-                      />
+                      {p.receipt ? (
+                        <a
+                          href={receiptPdfHref(p.receipt.id)}
+                          className="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm font-medium hover:bg-muted"
+                        >
+                          <FileText className="h-4 w-4" />
+                          Ricevuta PDF
+                        </a>
+                      ) : null}
                     </div>
                   </li>
                 ))}

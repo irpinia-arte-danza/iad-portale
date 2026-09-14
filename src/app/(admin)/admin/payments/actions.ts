@@ -2,10 +2,17 @@
 
 import { revalidatePath } from "next/cache"
 
-import { FeeType, PaymentStatus, Prisma, ScheduleStatus } from "@prisma/client"
+import {
+  AuditAction,
+  FeeType,
+  PaymentStatus,
+  Prisma,
+  ScheduleStatus,
+} from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { cancelReceiptForPayment } from "@/lib/receipts/issue-receipt"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
 import {
@@ -489,10 +496,19 @@ export async function deletePayment(
       },
       stageEnrollment: { select: { id: true } },
       costumeAssignment: { select: { id: true } },
+      receipt: { select: { receiptNumber: true } },
     },
   })
   if (!existing) {
     return { ok: false, error: "Pagamento non trovato" }
+  }
+  // Numerazione fiscale senza buchi: con una ricevuta emessa (anche
+  // annullata) il pagamento non si elimina, si storna.
+  if (existing.receipt) {
+    return {
+      ok: false,
+      error: `Il pagamento ha la ricevuta n. ${existing.receipt.receiptNumber}: non si può eliminare. Usa «Storna pagamento», che annulla la ricevuta mantenendo il numero.`,
+    }
   }
 
   try {
@@ -532,8 +548,8 @@ export async function deletePayment(
 export async function reversePayment(
   paymentId: string,
   values: PaymentReverseValues,
-): Promise<ActionResult> {
-  await requireAdmin()
+): Promise<ActionResult<{ cancelledReceiptNumber: string | null }>> {
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(paymentId)
   if (!idParsed.success) {
@@ -568,7 +584,8 @@ export async function reversePayment(
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const cancelledReceiptNumber = await prisma.$transaction(async (tx) => {
+      // Riapre la scadenza collegata (comportamento già presente da maggio)
       if (existing.paymentSchedule) {
         await tx.paymentSchedule.update({
           where: { id: existing.paymentSchedule.id },
@@ -595,10 +612,33 @@ export async function reversePayment(
           reversalReason: parsed.data.reversalReason,
         },
       })
+
+      // Ricevuta emessa → annullata, con numero e data di emissione invariati
+      const cancelled = await cancelReceiptForPayment(tx, {
+        paymentId: idParsed.data,
+        userId,
+        reason: parsed.data.reversalReason,
+      })
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: AuditAction.REVERSE_PAYMENT,
+          entityType: "Payment",
+          entityId: idParsed.data,
+          changes: {
+            reason: parsed.data.reversalReason,
+            cancelledReceiptNumber: cancelled,
+          },
+        },
+      })
+
+      return cancelled
     })
     revalidatePath("/admin/payments")
+    revalidatePath("/admin/receipts")
     revalidatePath(athletePath(existing.athleteId))
-    return { ok: true }
+    return { ok: true, data: { cancelledReceiptNumber } }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }
   }

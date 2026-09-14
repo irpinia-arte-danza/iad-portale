@@ -91,6 +91,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
             <TableHead className="text-right">Importo</TableHead>
             <TableHead className="hidden md:table-cell">Metodo</TableHead>
             <TableHead className="hidden lg:table-cell">Periodo</TableHead>
+            <TableHead className="hidden md:table-cell">Ricevuta</TableHead>
             <TableHead>Stato</TableHead>
             <TableHead className="w-[50px]" />
           </TableRow>
@@ -98,6 +99,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
         <TableBody>
           {payments.map((p) => {
             const period = formatPeriod(p.periodStart, p.periodEnd)
+            const receiptCancelled = p.receipt?.status === "CANCELLED"
             return (
               <TableRow
                 key={p.id}
@@ -130,6 +132,28 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
                 <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                   {period ?? "—"}
                 </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {p.receipt ? (
+                    <span className="flex flex-col">
+                      <span
+                        className={
+                          receiptCancelled
+                            ? "font-mono text-xs text-muted-foreground line-through"
+                            : "font-mono text-xs"
+                        }
+                      >
+                        {p.receipt.receiptNumber}
+                      </span>
+                      {receiptCancelled ? (
+                        <span className="text-xs text-destructive">annullata</span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {p.status === "PAID" ? "da emettere" : "—"}
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell>
                   {p.status === "PAID" ? (
                     <Badge className="bg-emerald-600 hover:bg-emerald-600">
@@ -146,6 +170,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
                       status: p.status,
                       notes: p.notes,
                       athleteName: `${p.athlete.firstName} ${p.athlete.lastName}`,
+                      receipt: p.receipt,
                     }}
                   />
                 </TableCell>

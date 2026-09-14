@@ -8,6 +8,7 @@ import {
   Calendar,
   CalendarClock,
   FileSpreadsheet,
+  FileText,
   FileWarning,
   FolderArchive,
   GraduationCap,
@@ -64,6 +65,7 @@ const NAV_ITEMS = [
     icon: FileWarning,
   },
   { href: "/admin/payments", label: "Pagamenti", icon: Receipt },
+  { href: "/admin/receipts", label: "Ricevute", icon: FileText },
   { href: "/admin/scadenze", label: "Scadenze", icon: CalendarClock },
   { href: "/admin/expenses", label: "Spese", icon: Wallet },
   {

@@ -62,13 +62,28 @@ Un solo progetto Supabase `iad-portale`, condiviso tra dev e produzione. No bran
 
 ---
 
-## ADR-004: Auth tramite Supabase Auth + Resend SMTP custom
+## ADR-004: Auth tramite Supabase Auth, link di accesso inviati con Resend
 
-**Data**: 2026-04-19
-**Status**: ✅ Accettata
+**Data**: 2026-04-19 · **Aggiornata**: 2026-09-14 (sprint onboarding)
+**Status**: ✅ Accettata (rivista)
 
-### Decisione
+### Decisione originale (aprile 2026)
 Supabase Auth con Resend come SMTP custom (bypass limite 2 email/ora nativo).
+
+### Decisione attuale
+- **Supabase Auth** resta il sistema di autenticazione (sessioni, password, verifica dei link).
+- **Inviti e recupero password di genitori e insegnanti non passano più dall'SMTP di Supabase**: il token si genera con `auth.admin.generateLink` (nessuna email inviata da Supabase, nessun rate limit Supabase) e l'email parte da Resend con i template `accesso-portale` e `recupero-password`, tracciata in `EmailLog`. Il link punta a `/auth/confirm` e poi a `/imposta-password`.
+- **Inviti espliciti**: creare un genitore o un insegnante non manda email; l'accesso si invia e reinvia dall'admin. Stato accesso a 4 valori ricavato da `auth.users` + `EmailLog`.
+- **Nessuna creazione di utenti** fuori dall'invito admin: Google sign-in rimosso, `/auth/callback` e `/auth/confirm` non creano utenti.
+- L'SMTP Resend configurato in Supabase resta in uso solo per l'invito admin da Impostazioni.
+- Durata dei link: "Email OTP Expiration" di Supabase a 86400 secondi (vedi `docs/gotchas.md` §17.35).
+
+### Motivazione della revisione
+- Il limite SMTP di Supabase (circa 30 email/ora) rendeva inaffidabile l'invio a ~40 famiglie in una sera, senza un modo di ripetere gli inviti falliti.
+- Con Resend i template sono modificabili da `/admin/email-templates`, lo storico è leggibile e i rimbalzi sono visibili.
+- Nessuna dipendenza dai template della dashboard Supabase.
+
+Dettagli: `docs/email-system.md` (sezione "Email con link personale") e `CLAUDE.md` (sezione "Accesso all'area riservata").
 
 ---
 
@@ -202,6 +217,14 @@ Enum `ReceiptCategory` con numerazione separata per categoria:
 - Permette report distinti per tipologia
 - Separa contabilmente compensi (prestazione occasionale) da ricevute sportive
 
+### Aggiornamento 2026-09-16 (sprint ricevuta lato admin)
+Come implementato oggi, per le ricevute dei pagamenti:
+- **Contatore unico** in Impostazioni → Ricevute condiviso da tutte le categorie; la categoria cambia solo il suffisso (`/S` saggio, `/C` costume). Formato `{prefisso}{AA compatto}/{progressivo a 3 cifre}{suffisso}`, es. `IAD/2026-27/007`.
+- **Il numero nasce solo con "Emetti ricevuta"** dell'admin, in una transazione che blocca il contatore (nessun doppione, nessun buco). Mai in automatico, mai da un'azione del genitore.
+- **Dati congelati sulla ricevuta** all'emissione (pagante, allieva, codici fiscali, causale, importo): la ristampa è identica a numero e data invariati.
+- **Una ricevuta non si cancella**: allo storno del pagamento diventa ANNULLATA mantenendo il numero; un pagamento con ricevuta non si può eliminare.
+- Registro in `/admin/receipts`, ordinato per numero dentro l'anno di emissione. Compensi e ricevute in bianco non sono ancora implementati.
+
 ---
 
 ## ADR-013: Solleciti con 3 livelli di controllo ⭐ NUOVO
@@ -314,4 +337,4 @@ Nell'MVP i pagamenti sono **offline-only** (admin registra contanti/bonifico/POS
 
 ---
 
-_Ultimo aggiornamento: 2026-04-19_
+_Ultimo aggiornamento: 2026-09-16 — ADR-004 rivista (sprint onboarding: inviti via generateLink + Resend), ADR-012 aggiornata (sprint ricevuta lato admin)._
