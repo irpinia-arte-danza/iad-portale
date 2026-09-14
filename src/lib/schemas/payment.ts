@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { FeeType, PaymentMethod } from "@prisma/client"
 
-import { endOfToday, uuidSchema } from "./common"
+import { isNotInFuture, uuidSchema } from "./common"
 
 const FEE_TYPE_VALUES = [
   "ASSOCIATION",
@@ -58,7 +58,7 @@ export const paymentCreateSchema = z.object({
     .number({ message: "Importo obbligatorio" })
     .min(0.01, "Importo deve essere positivo")
     .max(10000, "Importo troppo alto"),
-  paymentDate: z.date().max(endOfToday(), {
+  paymentDate: z.date().refine(isNotInFuture, {
     message: "La data di pagamento non può essere nel futuro",
   }),
   notes: z.string().trim().max(500).optional(),

@@ -28,6 +28,7 @@ import {
   academicYearSchema,
   type AcademicYearValues,
 } from "@/lib/schemas/academic-year"
+import { dateOnly } from "@/lib/utils/date-only"
 import { toDateInputValue } from "@/lib/utils/format"
 
 import { createAcademicYear, updateAcademicYear } from "../actions"
@@ -40,6 +41,16 @@ type Props = {
   mode: Mode
   yearId?: string
   defaults?: Partial<AcademicYearValues>
+}
+
+// Default 1° settembre → 30 giugno, come date di calendario UTC: con
+// `new Date(y, m, d)` (mezzanotte locale) l'anno veniva salvato dal 31/08
+function defaultStartDate(): Date {
+  return dateOnly(new Date().getFullYear(), 8, 1)
+}
+
+function defaultEndDate(): Date {
+  return dateOnly(new Date().getFullYear() + 1, 5, 30)
 }
 
 export function AcademicYearFormDialog({
@@ -55,8 +66,8 @@ export function AcademicYearFormDialog({
     resolver: zodResolver(academicYearSchema),
     defaultValues: {
       label: defaults?.label ?? "",
-      startDate: defaults?.startDate ?? new Date(new Date().getFullYear(), 8, 1),
-      endDate: defaults?.endDate ?? new Date(new Date().getFullYear() + 1, 7, 31),
+      startDate: defaults?.startDate ?? defaultStartDate(),
+      endDate: defaults?.endDate ?? defaultEndDate(),
       associationFeeEur: defaults?.associationFeeEur ?? 0,
       monthlyRenewalDay: defaults?.monthlyRenewalDay ?? 10,
     },
@@ -66,11 +77,8 @@ export function AcademicYearFormDialog({
     if (open) {
       form.reset({
         label: defaults?.label ?? "",
-        startDate:
-          defaults?.startDate ?? new Date(new Date().getFullYear(), 8, 1),
-        endDate:
-          defaults?.endDate ??
-          new Date(new Date().getFullYear() + 1, 7, 31),
+        startDate: defaults?.startDate ?? defaultStartDate(),
+        endDate: defaults?.endDate ?? defaultEndDate(),
         associationFeeEur: defaults?.associationFeeEur ?? 0,
         monthlyRenewalDay: defaults?.monthlyRenewalDay ?? 10,
       })

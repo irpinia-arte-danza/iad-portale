@@ -30,6 +30,8 @@ export function PaymentsSearch({ defaultValue }: PaymentsSearchProps) {
       if (trimmed === current) return
       if (trimmed) params.set("search", trimmed)
       else params.delete("search")
+      // Nuova ricerca: si riparte dalla prima pagina
+      params.delete("page")
       startTransition(() => {
         router.push(`${pathname}?${params.toString()}`)
       })

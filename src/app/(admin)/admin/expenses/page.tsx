@@ -1,5 +1,11 @@
+import { redirect } from "next/navigation"
 import { ExpenseType, PaymentMethod } from "@prisma/client"
 
+import {
+  ListPagination,
+  pageHref,
+  parsePageParam,
+} from "../_components/list-pagination"
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
 
@@ -9,11 +15,15 @@ import { ExpensesFilters } from "./_components/expenses-filters"
 import { ExpensesSearch } from "./_components/expenses-search"
 import { ExpensesTable } from "./_components/expenses-table"
 
+const EXPENSES_PATH = "/admin/expenses"
+const PAGE_SIZE = 50
+
 interface PageProps {
   searchParams: Promise<{
     search?: string
     type?: string
     method?: string
+    page?: string
   }>
 }
 
@@ -54,8 +64,27 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   const search = resolved.search ?? ""
   const type = parseExpenseType(resolved.type)
   const method = parseMethod(resolved.method)
+  const page = parsePageParam(resolved.page)
 
-  const { items, totalCount } = await listExpenses({ search, type, method })
+  // Parametri da conservare nei link di pagina
+  const params: Record<string, string> = {}
+  if (search) params.search = search
+  if (type) params.type = type
+  if (method) params.method = method
+
+  const { items, totalCount } = await listExpenses({
+    search,
+    type,
+    method,
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  })
+
+  // Pagina oltre la fine (link vecchio, spese eliminate): all'ultima
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  if (page > totalPages) {
+    redirect(pageHref(EXPENSES_PATH, params, totalPages))
+  }
 
   return (
     <>
@@ -72,9 +101,14 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
             <ExpensesFilters defaultType={type} defaultMethod={method} />
           </div>
           <ExpensesTable expenses={items} />
-          <p className="text-xs text-muted-foreground">
-            {totalCount} {totalCount === 1 ? "spesa totale" : "spese totali"}
-          </p>
+          <ListPagination
+            basePath={EXPENSES_PATH}
+            params={params}
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalCount={totalCount}
+            noun={{ singular: "spesa", plural: "spese" }}
+          />
         </div>
       </ResourceContent>
     </>

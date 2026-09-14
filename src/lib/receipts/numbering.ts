@@ -1,5 +1,7 @@
 import { ReceiptCategory, type FeeType } from "@prisma/client"
 
+import { todayDateOnly } from "@/lib/utils/date-only"
+
 // Numerazione ricevute: {prefisso}{anno accademico compatto}/{progressivo}{suffisso}
 //   quote        → IAD/2026-27/001
 //   saggio       → IAD/2026-27/045/S
@@ -41,13 +43,5 @@ export function formatReceiptNumber(params: {
 // Giorno di calendario a Roma, come Date a mezzanotte UTC (colonne @db.Date).
 // Senza, un'emissione alle 00:30 di Roma finirebbe sul giorno precedente.
 export function todayInRome(now: Date = new Date()): Date {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Rome",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now)
-  const get = (type: string) =>
-    Number(parts.find((p) => p.type === type)?.value ?? "0")
-  return new Date(Date.UTC(get("year"), get("month") - 1, get("day")))
+  return todayDateOnly(now)
 }

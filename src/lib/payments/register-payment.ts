@@ -9,10 +9,12 @@ import {
 } from "@prisma/client"
 
 import { associationFeeDescription } from "@/lib/fees/association-fee"
+import { fiscalYearForDate } from "@/lib/fiscal-years"
 import { prisma } from "@/lib/prisma"
 import { cancelReceiptForPayment } from "@/lib/receipts/issue-receipt"
 import { feeTypeToReceiptCategory } from "@/lib/receipts/numbering"
 import type { PaymentCreateValues } from "@/lib/schemas/payment"
+import { toDateOnly } from "@/lib/utils/date-only"
 import { formatEur } from "@/lib/utils/format"
 
 import {
@@ -73,14 +75,10 @@ function lastDayOfMonthUTC(date: Date): Date {
 export async function registerPaymentCore(
   values: PaymentCreateValues,
 ): Promise<RegisterPaymentResult> {
-  const [currentAY, currentFY, athlete] = await Promise.all([
+  const [currentAY, athlete] = await Promise.all([
     prisma.academicYear.findFirst({
       where: { isCurrent: true },
       select: { id: true, label: true },
-    }),
-    prisma.fiscalYear.findFirst({
-      where: { isCurrent: true },
-      select: { id: true },
     }),
     prisma.athlete.findUnique({
       where: { id: values.athleteId, deletedAt: null },
@@ -89,9 +87,6 @@ export async function registerPaymentCore(
   ])
   if (!currentAY) {
     return { ok: false, error: "Nessun anno accademico corrente configurato" }
-  }
-  if (!currentFY) {
-    return { ok: false, error: "Nessun anno fiscale corrente configurato" }
   }
   if (!athlete) return { ok: false, error: "Allieva non trovata" }
 
@@ -228,6 +223,11 @@ export async function registerPaymentCore(
   )
 
   try {
+    // Anno fiscale dalla data del pagamento, non l'anno "corrente": un
+    // pagamento del 28/12 registrato il 3/1 resta nell'anno precedente
+    const paymentDate = toDateOnly(values.paymentDate)
+    const fiscalYear = await fiscalYearForDate(paymentDate)
+
     const payment = await prisma.$transaction(async (tx) => {
       const created = await tx.payment.create({
         data: {
@@ -235,12 +235,12 @@ export async function registerPaymentCore(
           parentId,
           courseEnrollmentId: enrollmentIds.length === 1 ? enrollmentIds[0] : null,
           academicYearId: currentAY.id,
-          fiscalYearId: currentFY.id,
+          fiscalYearId: fiscalYear.id,
           feeType,
           amountCents,
           method: values.method,
           status: PaymentStatus.PAID,
-          paymentDate: values.paymentDate,
+          paymentDate,
           periodStart:
             monthlyDueDates.length > 0
               ? firstDayOfMonthUTC(new Date(Math.min(...monthlyDueDates)))

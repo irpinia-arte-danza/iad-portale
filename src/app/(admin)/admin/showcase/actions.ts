@@ -27,6 +27,7 @@ import {
   type ShowcaseUpdateValues,
   type UpdateChoreographyValues,
 } from "@/lib/schemas/showcase"
+import { toDateOnly, toDateOnlyOrNull } from "@/lib/utils/date-only"
 
 const SHOWCASE_PATH = "/admin/showcase"
 const DASHBOARD_PATH = "/admin/dashboard"
@@ -87,15 +88,15 @@ export async function createShowcase(
         academicYearId: parsed.data.academicYearId,
         title: parsed.data.title,
         description: emptyToNull(parsed.data.description),
-        date: parsed.data.date,
+        date: toDateOnly(parsed.data.date),
         location: emptyToNull(parsed.data.location),
-        rehearsalDate: parsed.data.rehearsalDate ?? null,
+        rehearsalDate: toDateOnlyOrNull(parsed.data.rehearsalDate),
         firstInstallmentCents: Math.round(parsed.data.firstInstallmentEur * 100),
         secondInstallmentCents: Math.round(
           parsed.data.secondInstallmentEur * 100,
         ),
-        firstDeadline: parsed.data.firstDeadline,
-        secondDeadline: parsed.data.secondDeadline,
+        firstDeadline: toDateOnly(parsed.data.firstDeadline),
+        secondDeadline: toDateOnly(parsed.data.secondDeadline),
       },
       select: { id: true },
     })
@@ -158,15 +159,15 @@ export async function updateShowcase(
       data: {
         title: parsed.data.title,
         description: emptyToNull(parsed.data.description),
-        date: parsed.data.date,
+        date: toDateOnly(parsed.data.date),
         location: emptyToNull(parsed.data.location),
-        rehearsalDate: parsed.data.rehearsalDate ?? null,
+        rehearsalDate: toDateOnlyOrNull(parsed.data.rehearsalDate),
         firstInstallmentCents: Math.round(parsed.data.firstInstallmentEur * 100),
         secondInstallmentCents: Math.round(
           parsed.data.secondInstallmentEur * 100,
         ),
-        firstDeadline: parsed.data.firstDeadline,
-        secondDeadline: parsed.data.secondDeadline,
+        firstDeadline: toDateOnly(parsed.data.firstDeadline),
+        secondDeadline: toDateOnly(parsed.data.secondDeadline),
       },
     })
 

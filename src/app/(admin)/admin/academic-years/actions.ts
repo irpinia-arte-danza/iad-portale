@@ -12,6 +12,7 @@ import {
   academicYearSchema,
   type AcademicYearValues,
 } from "@/lib/schemas/academic-year"
+import { toDateOnly } from "@/lib/utils/date-only"
 
 const AY_PATH = "/admin/academic-years"
 
@@ -27,8 +28,8 @@ function mapPrismaError(error: unknown): string {
 function normalize(values: AcademicYearValues) {
   return {
     label: values.label,
-    startDate: values.startDate,
-    endDate: values.endDate,
+    startDate: toDateOnly(values.startDate),
+    endDate: toDateOnly(values.endDate),
     associationFeeCents: Math.round(values.associationFeeEur * 100),
     monthlyRenewalDay: values.monthlyRenewalDay ?? 10,
   }

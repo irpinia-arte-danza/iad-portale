@@ -1,11 +1,11 @@
 import { z } from "zod"
-import { endOfToday, uuidSchema } from "./common"
+import { isNotInFuture, uuidSchema } from "./common"
 
 export const enrollmentCreateSchema = z.object({
   courseId: uuidSchema,
   enrollmentDate: z
     .date()
-    .max(endOfToday(), {
+    .refine(isNotInFuture, {
       message: "La data di iscrizione non può essere nel futuro",
     })
     .optional(),
@@ -17,7 +17,7 @@ export const enrollmentUpdateSchema = z.object({
 })
 
 export const withdrawEnrollmentSchema = z.object({
-  withdrawalDate: z.date().max(endOfToday(), {
+  withdrawalDate: z.date().refine(isNotInFuture, {
     message: "La data di ritiro non può essere nel futuro",
   }),
 })

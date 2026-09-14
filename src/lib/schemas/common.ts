@@ -64,3 +64,11 @@ export function endOfToday(): Date {
   d.setHours(23, 59, 59, 999)
   return d
 }
+
+// "Non nel futuro" calcolato a ogni validazione, da usare con `.refine()`.
+// Con `.max(endOfToday())` il limite resta quello del giorno in cui il modulo
+// è stato caricato: un server acceso oltre la mezzanotte rifiuta la data di
+// oggi come futura (§17.18).
+export function isNotInFuture(date: Date): boolean {
+  return date <= endOfToday()
+}
