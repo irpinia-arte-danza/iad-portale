@@ -37,10 +37,13 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
 - [PDF / Export](#pdf--export)
   - §17.20 `@react-pdf/renderer` richiede `next/dynamic` con `ssr:false`
   - §17.21 Helper CSV/XLSX/PDF: builder Buffer-based separato da download
+  - §17.36 react-pdf si rompe sui testi dentro un SVG: nei PDF sempre il logo PNG
 - [UX / Form](#ux--form)
   - §17.22 Placeholder ≠ valore default
 - [Settings pattern](#settings-pattern)
   - §17.28 Aggiungere un tab
+- [Errori e diagnostica](#errori-e-diagnostica)
+  - §17.37 Catch generico "riprova tra qualche istante" su errori permanenti
 - [Supabase Auth](#supabase-auth)
   - §17.35 Email OTP expiration a 86400: avviso del security advisor voluto
 - [Domain specifico](#domain-specifico)
@@ -247,6 +250,14 @@ export function generateXLSX(sheets, filename): void {  // client
 ```
 Stesso pattern applicabile a CSV (`buildCsvString` separato da `downloadCsv`) e PDF (`renderToBuffer` separato da `PDFDownloadLink`). Regola pratica: se è pensabile riusare la logica in un cron/webhook/email/zip, estrarre subito il builder Buffer-based — refactor dopo costa di più. Scoperto: Sprint 7.F (Annual bundle richiedeva `buildXlsxBuffer` mentre `generateXLSX` era solo client-side), 21 aprile 2026.
 
+**§17.36 react-pdf si rompe impaginando i testi dentro un SVG — nei PDF usare sempre il logo PNG**: passare a `<Image src>` di `@react-pdf/renderer` un logo SVG che contiene testo (scritte non convertite in tracciati) fa lanciare il layout durante `renderToBuffer`:
+```
+TypeError: Cannot read properties of undefined (reading 'xAdvance')
+    at layoutText$1 (@react-pdf/layout/lib/index.js)
+    at resolveSvgRoot → resolveSvg (@react-pdf/layout/lib/index.js)
+```
+L'errore non dipende dai dati del documento e colpisce ogni PDF generato con quel logo. `BrandSettings` ha sia `logoUrl` (PNG) sia `logoSvgUrl` (vettoriale): nei PDF usare **solo** `logoUrl`, come già facevano bilancio e scheda allieva. Difesa aggiuntiva in `src/lib/receipts/receipt-document.ts`: se il rendering con il logo fallisce, si logga l'errore completo e si rigenera il PDF con il marchio testuale, perché un logo difettoso non deve bloccare una ricevuta allo sportello. Bug reale: la prima ricevuta emessa non si generava; `receipt.tsx` sceglieva `logoSvgUrl ?? logoUrl` fin dal flusso genitori, ma il difetto era rimasto latente perché nessuna ricevuta era mai stata emessa. Come trovarlo in fretta: riprodurre `renderToBuffer` fuori da Next con i dati reali e stampare l'errore intero (vedi §17.37). Scoperto: sprint ricevuta lato admin, settembre 2026.
+
 ---
 
 ## UX / Form
@@ -267,6 +278,18 @@ Stesso pattern applicabile a CSV (`buildCsvString` separato da `downloadCsv`) e 
 7. `DirtyGuardDialog` è già a livello shell → gestito automaticamente per il nuovo tab
 
 Scoperto: Sprint 3.7 Reminder tab, aprile 2026.
+
+---
+
+## Errori e diagnostica
+
+**§17.37 Catch generico "riprova tra qualche istante" su un errore permanente**: un `try/catch` che trasforma qualsiasi eccezione in "riprova tra qualche istante" e logga solo `error.message` (o niente) ha due effetti: l'utente riprova all'infinito un errore che non è transitorio, e chi fa supporto non vede la causa, perdendo un giro di diagnosi a indovinare (import rotti? dati mancanti? permessi?). Regole:
+1. **Distinguere i casi** prima del catch generico: risorsa inesistente (404), non autorizzato (403), stato che impedisce l'operazione (es. ricevuta annullata, 410), errore di dati noto (errore tipizzato con `code`), errore imprevisto (500).
+2. **Loggare sempre l'errore completo lato server**, passando l'oggetto errore come argomento separato così da avere lo stack: `console.error("[area] cosa è fallito", { id, userId, code }, error)`. Contesto con id e ruolo, mai dati personali.
+3. **"Riprova" solo per errori davvero transitori** (rete, timeout). Per quelli permanenti il messaggio dice cosa fare o chi avvisare.
+4. Le funzioni di dominio **lanciano errori tipizzati** invece di restituire `null` per casi diversi: un `null` che significa sia "pagamento mancante" sia "impostazioni mancanti" è indistinguibile a valle.
+
+Pattern applicato in `src/app/ricevute/[receiptId]/route.ts` (pagine distinte 404/403/410/500 con log) e `ReceiptRenderError` in `src/lib/receipts/receipt-document.ts`. Bug reale: la route della ricevuta rispondeva "Non è stato possibile generare la ricevuta, riprova tra qualche istante" per il logo SVG di §17.36, un errore che nessun nuovo tentativo avrebbe risolto. Scoperto: sprint ricevuta lato admin, settembre 2026.
 
 ---
 

@@ -215,10 +215,11 @@ export type MyOpenSchedule = Awaited<
 >[number]
 
 export async function getMyPayments(parentId: string) {
-  // Pagamenti PAID delle figlie (cross-allieve, ordinati cronologici desc)
+  // Pagamenti delle figlie (cross-allieve, ordinati cronologici desc).
+  // Anche gli stornati: restano nello storico con il loro stato.
   const payments = await prisma.payment.findMany({
     where: {
-      status: "PAID",
+      status: { in: ["PAID", "REVERSED"] },
       deletedAt: null,
       athlete: {
         parentRelations: { some: { parentId } },
@@ -240,8 +241,9 @@ export async function getMyPayments(parentId: string) {
           deletedAt: true,
         },
       },
+      status: true,
       receipt: {
-        select: { id: true, receiptNumber: true },
+        select: { id: true, receiptNumber: true, status: true },
       },
     },
     orderBy: { paymentDate: "desc" },
@@ -255,10 +257,15 @@ export async function getMyPayments(parentId: string) {
     paymentDate: p.paymentDate,
     periodStart: p.periodStart,
     periodEnd: p.periodEnd,
+    status: p.status,
     athleteId: p.athlete.id,
     athleteName: `${p.athlete.firstName} ${p.athlete.lastName}`,
     athleteArchived: p.athlete.deletedAt !== null,
-    receiptNumber: p.receipt?.receiptNumber ?? null,
+    // Scaricabile solo una ricevuta emessa dall'admin e ancora valida
+    receipt:
+      p.status === "PAID" && p.receipt?.status === "VALID"
+        ? { id: p.receipt.id, receiptNumber: p.receipt.receiptNumber }
+        : null,
   }))
 }
 

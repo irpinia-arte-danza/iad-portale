@@ -37,7 +37,8 @@ import type { AthleteWithFormRelations } from "../queries"
 interface PaymentFormProps {
   athletes: AthleteWithFormRelations[]
   defaultValues?: Partial<PaymentCreateValues>
-  onSuccess?: () => void
+  // Riceve l'id del pagamento creato: serve per emettere subito la ricevuta
+  onSuccess?: (paymentId: string) => void
 }
 
 const FEE_TYPE_ORDER = [
@@ -114,7 +115,7 @@ export function PaymentForm({
       if (result.ok) {
         toast.success("Pagamento registrato")
         form.reset()
-        onSuccess?.()
+        if (result.data) onSuccess?.(result.data.id)
       } else {
         toast.error(result.error)
       }

@@ -32,6 +32,9 @@ const paymentListItem = Prisma.validator<Prisma.PaymentDefaultArgs>()({
         course: { select: { id: true, name: true } },
       },
     },
+    receipt: {
+      select: { id: true, receiptNumber: true, status: true },
+    },
   },
 })
 
@@ -106,6 +109,16 @@ const paymentWithRelations = Prisma.validator<Prisma.PaymentDefaultArgs>()({
       select: {
         id: true,
         course: { select: { id: true, name: true, type: true } },
+      },
+    },
+    receipt: {
+      select: {
+        id: true,
+        receiptNumber: true,
+        issueDate: true,
+        status: true,
+        cancelledAt: true,
+        cancelReason: true,
       },
     },
   },

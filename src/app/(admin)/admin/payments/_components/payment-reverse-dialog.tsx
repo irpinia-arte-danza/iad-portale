@@ -38,6 +38,8 @@ interface PaymentReverseDialogProps {
   payment: {
     id: string
     athleteName: string
+    // Numero della ricevuta valida che lo storno annullerà (se emessa)
+    validReceiptNumber?: string | null
   }
   onSuccess?: () => void
 }
@@ -59,7 +61,12 @@ export function PaymentReverseDialog({
     startTransition(async () => {
       const result = await reversePayment(payment.id, values)
       if (result.ok) {
-        toast.success("Pagamento stornato")
+        const cancelled = result.data?.cancelledReceiptNumber
+        toast.success(
+          cancelled
+            ? `Pagamento stornato · ricevuta n. ${cancelled} annullata`
+            : "Pagamento stornato",
+        )
         onOpenChange(false)
         form.reset()
         onSuccess?.()
@@ -80,6 +87,13 @@ export function PaymentReverseDialog({
             tracciata ma non è reversibile dall&apos;interfaccia.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {payment.validReceiptNumber ? (
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
+            La ricevuta <strong className="font-mono">n. {payment.validReceiptNumber}</strong>{" "}
+            verrà <strong>annullata</strong>: mantiene il suo numero, resta
+            nell&apos;elenco ricevute e il PDF riporterà la dicitura ANNULLATA.
+          </p>
+        ) : null}
         <Form {...form}>
           <form
             id="payment-reverse-form"

@@ -862,6 +862,11 @@ enum ReceiptCategory {
   BLANK // ricevuta in bianco (template)
 }
 
+enum ReceiptStatus {
+  VALID // valida
+  CANCELLED // annullata (storno del pagamento): conserva il numero, mai cancellata
+}
+
 model Receipt {
   id        String   @id @default(uuid()) @db.Uuid
   paymentId String?  @unique @map("payment_id") @db.Uuid
@@ -869,13 +874,27 @@ model Receipt {
 
   category      ReceiptCategory
   receiptNumber String          @unique @map("receipt_number") // "IAD/2025-26/001"
+  // Progressivo numerico del contatore: ordina correttamente ".../100" dopo ".../99"
+  sequence      Int?            @map("sequence")
+  // Data di emissione (giorno di Roma), NON la data del pagamento
   issueDate     DateTime        @map("issue_date") @db.Date
+  issuedBy      String?         @map("issued_by") @db.Uuid
 
-  // Per ricevute "in bianco" o scollegate da un Payment
-  payerName       String? @map("payer_name")
-  payerFiscalCode String? @map("payer_fiscal_code")
-  description     String?
-  amountCents     Int?    @map("amount_cents")
+  // Numerazione senza buchi: una ricevuta non si cancella, si annulla
+  status       ReceiptStatus @default(VALID)
+  cancelledAt  DateTime?     @map("cancelled_at") @db.Timestamptz(6)
+  cancelledBy  String?       @map("cancelled_by") @db.Uuid
+  cancelReason String?       @map("cancel_reason")
+
+  // Dati congelati all'emissione (la ristampa deve restare identica anche se
+  // cambiano anagrafiche o note). Per ricevute "in bianco" sono l'unica fonte.
+  payerName         String? @map("payer_name")
+  payerFiscalCode   String? @map("payer_fiscal_code")
+  payerAddress      String? @map("payer_address")
+  athleteName       String? @map("athlete_name")
+  athleteFiscalCode String? @map("athlete_fiscal_code")
+  description       String?
+  amountCents       Int?    @map("amount_cents")
 
   pdfUrl String? @map("pdf_url")
 
@@ -883,6 +902,7 @@ model Receipt {
 
   @@index([receiptNumber])
   @@index([category, issueDate])
+  @@index([issueDate, sequence])
   @@map("receipts")
 }
 
@@ -1181,7 +1201,7 @@ model BrandSettings {
   // Logo e immagini
   logoUrl     String? @map("logo_url") // principale light (header, email)
   logoDarkUrl String? @map("logo_dark_url") // variante per dark mode
-  logoSvgUrl  String? @map("logo_svg_url") // versione vettoriale (PDF ricevute)
+  logoSvgUrl  String? @map("logo_svg_url") // versione vettoriale (NON usabile nei PDF: react-pdf non renderizza l'SVG, usare logoUrl)
   faviconUrl  String? @map("favicon_url")
 
   // Colori brand (default neutri, override via UI in Impostazioni)
@@ -1314,6 +1334,9 @@ enum AuditAction {
   COSTUME_ASSIGN
   COSTUME_UNASSIGN
   RESTORE_COSTUME
+  // Sprint ricevuta lato admin
+  RECEIPT_ISSUE
+  RECEIPT_CANCEL
 }
 
 model AuditLog {
