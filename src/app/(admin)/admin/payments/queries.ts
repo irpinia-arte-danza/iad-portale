@@ -3,10 +3,19 @@ import {
   FeeType,
   PaymentStatus,
   Prisma,
+  ScheduleStatus,
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import {
+  SCHEDULE_LINE_SELECT,
+  athleteIdOfSchedule,
+  compareScheduleLines,
+  describeSchedule,
+} from "@/lib/payments/schedule-lines"
+import { withActiveCourseOrStageScheduleFilter } from "@/lib/queries/active-schedule-filter"
+import { feeTypeToReceiptCategory } from "@/lib/receipts/numbering"
 
 type ListFilters = {
   search?: string
@@ -35,6 +44,8 @@ const paymentListItem = Prisma.validator<Prisma.PaymentDefaultArgs>()({
     receipt: {
       select: { id: true, receiptNumber: true, status: true },
     },
+    // Scadenze chiuse dal pagamento (anche più d'una)
+    paymentSchedules: { select: SCHEDULE_LINE_SELECT },
   },
 })
 
@@ -51,21 +62,25 @@ export async function listPayments(filters: ListFilters = {}) {
     offset = 0,
   } = filters
 
-  const where: Prisma.PaymentWhereInput = {
-    deletedAt: null,
-    ...(feeType ? { feeType } : {}),
-    ...(status ? { status } : {}),
-    ...(search && search.trim().length > 0
-      ? {
-          athlete: {
-            OR: [
-              { firstName: { contains: search, mode: "insensitive" } },
-              { lastName: { contains: search, mode: "insensitive" } },
-            ],
-          },
-        }
-      : {}),
+  const conditions: Prisma.PaymentWhereInput[] = [{ deletedAt: null }]
+  // Un pagamento su più scadenze compare sotto ciascuno dei suoi tipi quota
+  if (feeType) {
+    conditions.push({
+      OR: [{ feeType }, { paymentSchedules: { some: { feeType } } }],
+    })
   }
+  if (status) conditions.push({ status })
+  if (search && search.trim().length > 0) {
+    conditions.push({
+      athlete: {
+        OR: [
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+        ],
+      },
+    })
+  }
+  const where: Prisma.PaymentWhereInput = { AND: conditions }
 
   const [items, totalCount] = await Promise.all([
     prisma.payment.findMany({
@@ -121,6 +136,7 @@ const paymentWithRelations = Prisma.validator<Prisma.PaymentDefaultArgs>()({
         cancelReason: true,
       },
     },
+    paymentSchedules: { select: SCHEDULE_LINE_SELECT },
   },
 })
 
@@ -157,6 +173,8 @@ export async function listActiveAthletesForSelector() {
   })
 }
 
+// Allieve per il form "Registra pagamento". Le scadenze da incassare arrivano
+// a parte da listOpenSchedulesByAthlete.
 const athleteWithFormRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
   select: {
     id: true,
@@ -172,89 +190,6 @@ const athleteWithFormRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
         },
       },
       orderBy: [{ isPrimaryPayer: "desc" }],
-    },
-    enrollments: {
-      where: {
-        withdrawalDate: null,
-        academicYear: { isCurrent: true },
-      },
-      select: {
-        id: true,
-        course: {
-          select: { id: true, name: true, monthlyFeeCents: true },
-        },
-      },
-    },
-    stageEnrollments: {
-      where: {
-        paid: false,
-        stage: { deletedAt: null },
-      },
-      select: {
-        id: true,
-        stage: {
-          select: {
-            id: true,
-            title: true,
-            date: true,
-            feeCents: true,
-          },
-        },
-      },
-      orderBy: { stage: { date: "asc" } },
-    },
-    showcaseParticipations: {
-      where: {
-        confirmed: true,
-        showcase: { deletedAt: null },
-        paymentSchedules: {
-          some: { status: "DUE" },
-        },
-      },
-      select: {
-        id: true,
-        paymentMode: true,
-        showcase: {
-          select: {
-            id: true,
-            title: true,
-            date: true,
-          },
-        },
-        paymentSchedules: {
-          where: { status: "DUE" },
-          select: {
-            id: true,
-            feeType: true,
-            amountCents: true,
-            dueDate: true,
-            notes: true,
-          },
-          orderBy: { dueDate: "asc" },
-        },
-        costumeAssignments: {
-          where: {
-            paid: false,
-            costume: { deletedAt: null, costCents: { gt: 0 } },
-          },
-          select: {
-            id: true,
-            size: true,
-            costume: {
-              select: {
-                id: true,
-                name: true,
-                costCents: true,
-              },
-            },
-            paymentSchedule: {
-              select: { id: true, dueDate: true, amountCents: true },
-            },
-          },
-          orderBy: { costume: { name: "asc" } },
-        },
-      },
-      orderBy: { showcase: { date: "asc" } },
     },
   },
 })
@@ -276,6 +211,69 @@ export async function listAthletesWithRelations(): Promise<
     ...athleteWithFormRelations,
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   })
+}
+
+export type OpenScheduleOption = {
+  id: string
+  feeType: FeeType
+  dueDate: Date
+  amountCents: number
+  description: string
+  // Numerazione ricevute (quote / saggio / costumi): in un pagamento solo
+  // scadenze della stessa
+  category: string
+}
+
+// Scadenze da incassare per allieva: mensili dei corsi attivi, quota
+// associativa, stage, saggio confermato, costumi. Ordinate come le righe
+// della ricevuta.
+export async function listOpenSchedulesByAthlete(
+  athleteId?: string,
+): Promise<Record<string, OpenScheduleOption[]>> {
+  await requireAdmin()
+
+  const ownerFilter: Prisma.PaymentScheduleWhereInput = athleteId
+    ? {
+        OR: [
+          { athleteId },
+          { courseEnrollment: { athleteId } },
+          { stageEnrollment: { athleteId } },
+          { showcaseParticipation: { athleteId } },
+          { costumeAssignment: { participation: { athleteId } } },
+        ],
+      }
+    : {}
+
+  const schedules = await prisma.paymentSchedule.findMany({
+    where: withActiveCourseOrStageScheduleFilter({
+      AND: [
+        {
+          status: { in: [ScheduleStatus.DUE, ScheduleStatus.OVERDUE] },
+          paymentId: null,
+        },
+        ownerFilter,
+      ],
+    }),
+    select: SCHEDULE_LINE_SELECT,
+  })
+
+  const byAthlete: Record<string, OpenScheduleOption[]> = {}
+  for (const s of schedules.sort(compareScheduleLines)) {
+    if (s.showcaseParticipation && !s.showcaseParticipation.confirmed) continue
+    const owner = athleteIdOfSchedule(s)
+    if (!owner) continue
+    const list = byAthlete[owner] ?? []
+    list.push({
+      id: s.id,
+      feeType: s.feeType,
+      dueDate: s.dueDate,
+      amountCents: s.amountCents,
+      description: describeSchedule(s),
+      category: feeTypeToReceiptCategory(s.feeType),
+    })
+    byAthlete[owner] = list
+  }
+  return byAthlete
 }
 
 export async function listGuardiansForAthlete(athleteId: string) {

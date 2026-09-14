@@ -212,7 +212,7 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
               <TableHead>Allieva</TableHead>
               <TableHead className="hidden md:table-cell">Genitore</TableHead>
               <TableHead className="hidden lg:table-cell">Telefono</TableHead>
-              <TableHead className="hidden sm:table-cell">Corso</TableHead>
+              <TableHead className="hidden sm:table-cell">Corso / quota</TableHead>
               <TableHead className="text-right">Importo</TableHead>
               <TableHead>Scadenza</TableHead>
               <TableHead className="hidden lg:table-cell">
@@ -243,12 +243,19 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                     />
                   </TableCell>
                   <TableCell>
-                    <Link
-                      href={`/admin/athletes/${s.athlete.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {s.athlete.lastName} {s.athlete.firstName}
-                    </Link>
+                    <div className="flex flex-col gap-0.5">
+                      <Link
+                        href={`/admin/athletes/${s.athlete.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {s.athlete.lastName} {s.athlete.firstName}
+                      </Link>
+                      {s.feeType === "ASSOCIATION" ? (
+                        <span className="text-xs text-muted-foreground sm:hidden">
+                          {s.notes ?? "Quota associativa"}
+                        </span>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     {parentName ? (
@@ -283,6 +290,10 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                   <TableCell className="hidden sm:table-cell">
                     {s.course ? (
                       <Badge variant="secondary">{s.course.name}</Badge>
+                    ) : s.feeType === "ASSOCIATION" ? (
+                      <Badge variant="outline">
+                        {s.notes ?? "Quota associativa"}
+                      </Badge>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}

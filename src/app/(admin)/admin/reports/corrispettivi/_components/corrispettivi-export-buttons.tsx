@@ -5,7 +5,8 @@ import { Download, FileSpreadsheet, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
+import { paymentFeeTypeLabel } from "@/lib/payments/schedule-lines"
+import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { generateCSV } from "@/lib/utils/csv"
 import { generateXLSX } from "@/lib/utils/excel"
 import { formatDateShort } from "@/lib/utils/format"
@@ -50,7 +51,7 @@ function buildRows(
       const row: unknown[] = [
         formatDateShort(p.paymentDate),
         `${p.athlete.lastName} ${p.athlete.firstName}`,
-        FEE_TYPE_LABELS[p.feeType],
+        paymentFeeTypeLabel(p),
         p.courseEnrollment?.course.name ?? "",
         PAYMENT_METHOD_LABELS[p.method],
         (p.amountCents / 100).toFixed(2).replace(".", ","),
@@ -59,7 +60,7 @@ function buildRows(
       flatXlsx.push([
         formatDateShort(p.paymentDate),
         `${p.athlete.lastName} ${p.athlete.firstName}`,
-        FEE_TYPE_LABELS[p.feeType],
+        paymentFeeTypeLabel(p),
         p.courseEnrollment?.course.name ?? "",
         PAYMENT_METHOD_LABELS[p.method],
         Number((p.amountCents / 100).toFixed(2)),

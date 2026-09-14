@@ -12,7 +12,10 @@ import {
   paymentCreateSchema,
   type PaymentCreateValues,
 } from "@/lib/schemas/payment"
+import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -32,25 +35,27 @@ import {
 } from "@/components/ui/select"
 
 import { registerPayment } from "../actions"
-import type { AthleteWithFormRelations } from "../queries"
+import type { AthleteWithFormRelations, OpenScheduleOption } from "../queries"
 
 interface PaymentFormProps {
   athletes: AthleteWithFormRelations[]
+  // Scadenze da incassare per allieva (id allieva → scadenze aperte)
+  openSchedulesByAthlete: Record<string, OpenScheduleOption[]>
   defaultValues?: Partial<PaymentCreateValues>
   // Riceve l'id del pagamento creato: serve per emettere subito la ricevuta
   onSuccess?: (paymentId: string) => void
 }
 
+// Tipi per il pagamento libero (nessuna scadenza spuntata)
 const FEE_TYPE_ORDER = [
-  "MONTHLY",
-  "TRIMESTER",
+  "TRIAL_LESSON",
+  "OTHER",
   "ASSOCIATION",
+  "MONTHLY",
   "STAGE",
   "SHOWCASE_1",
   "SHOWCASE_2",
   "COSTUME",
-  "TRIAL_LESSON",
-  "OTHER",
 ] as const
 
 const METHOD_ORDER = ["CASH", "TRANSFER", "POS", "SUMUP_LINK", "OTHER"] as const
@@ -62,12 +67,21 @@ function toDateInputValue(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-function centsToEur(cents: number): string {
-  return (cents / 100).toFixed(2)
+function centsToEur(cents: number): number {
+  return Math.round(cents) / 100
+}
+
+function isOverdue(dueDate: Date): boolean {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(dueDate)
+  due.setHours(0, 0, 0, 0)
+  return due.getTime() < today.getTime()
 }
 
 export function PaymentForm({
   athletes,
+  openSchedulesByAthlete,
   defaultValues,
   onSuccess,
 }: PaymentFormProps) {
@@ -78,17 +92,11 @@ export function PaymentForm({
     defaultValues: {
       athleteId: "",
       parentId: "",
-      courseEnrollmentId: "",
-      stageEnrollmentId: "",
-      showcaseParticipationId: "",
-      costumeAssignmentId: "",
-      paymentScheduleId: "",
-      feeType: "MONTHLY",
+      paymentScheduleIds: [],
+      feeType: "OTHER",
       method: "CASH",
       amountEur: 0,
       paymentDate: new Date(),
-      periodStart: undefined,
-      periodEnd: undefined,
       notes: "",
       ...defaultValues,
     },
@@ -96,24 +104,63 @@ export function PaymentForm({
 
   const watchedAthleteId = form.watch("athleteId")
   const watchedFeeType = form.watch("feeType")
+  const watchedAmount = form.watch("amountEur")
+  const selectedIds = form.watch("paymentScheduleIds")
 
   const selectedAthlete = useMemo(
     () => athletes.find((a) => a.id === watchedAthleteId),
     [athletes, watchedAthleteId],
   )
+  const options = useMemo(
+    () => openSchedulesByAthlete[watchedAthleteId] ?? [],
+    [openSchedulesByAthlete, watchedAthleteId],
+  )
 
-  const needsEnrollmentLink =
-    watchedFeeType === "MONTHLY" || watchedFeeType === "TRIMESTER"
-  const isStageFee = watchedFeeType === "STAGE"
-  const isShowcaseFee =
-    watchedFeeType === "SHOWCASE_1" || watchedFeeType === "SHOWCASE_2"
-  const isCostumeFee = watchedFeeType === "COSTUME"
+  const selectedOptions = options.filter((o) => selectedIds.includes(o.id))
+  const selectedCategory = selectedOptions[0]?.category ?? null
+  const selectedTotalCents = selectedOptions.reduce(
+    (sum, o) => sum + o.amountCents,
+    0,
+  )
+  const isMulti = selectedOptions.length >= 2
+  const single = selectedOptions.length === 1 ? selectedOptions[0] : null
+  const hasSeparateNumbering =
+    selectedCategory !== null &&
+    options.some((o) => o.category !== selectedCategory)
+  const selectedTypesLabel = [
+    ...new Set(selectedOptions.map((o) => FEE_TYPE_LABELS[o.feeType])),
+  ].join(" + ")
+
+  // Spunta/togli: il totale si somma da solo. Con una sola scadenza l'importo
+  // resta modificabile; con più scadenze è la loro somma.
+  function toggleSchedule(option: OpenScheduleOption, checked: boolean) {
+    const current = form.getValues("paymentScheduleIds")
+    const next = checked
+      ? [...current, option.id]
+      : current.filter((id) => id !== option.id)
+    form.setValue("paymentScheduleIds", next, { shouldValidate: true })
+
+    const chosen = options.filter((o) => next.includes(o.id))
+    if (chosen.length > 0) {
+      form.setValue("feeType", chosen[0].feeType)
+      form.setValue(
+        "amountEur",
+        centsToEur(chosen.reduce((sum, o) => sum + o.amountCents, 0)),
+        { shouldValidate: true },
+      )
+    } else {
+      form.setValue("amountEur", 0)
+    }
+  }
 
   function onSubmit(values: PaymentCreateValues) {
     startTransition(async () => {
       const result = await registerPayment(values)
       if (result.ok) {
         toast.success("Pagamento registrato")
+        for (const warning of result.data?.warnings ?? []) {
+          toast.warning(warning)
+        }
         form.reset()
         if (result.data) onSuccess?.(result.data.id)
       } else {
@@ -136,11 +183,8 @@ export function PaymentForm({
                 onValueChange={(value) => {
                   field.onChange(value)
                   form.setValue("parentId", "")
-                  form.setValue("courseEnrollmentId", "")
-                  form.setValue("stageEnrollmentId", "")
-                  form.setValue("showcaseParticipationId", "")
-                  form.setValue("costumeAssignmentId", "")
-                  form.setValue("paymentScheduleId", "")
+                  form.setValue("paymentScheduleIds", [])
+                  form.setValue("amountEur", 0)
                 }}
               >
                 <FormControl>
@@ -161,31 +205,113 @@ export function PaymentForm({
           )}
         />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
-            control={form.control}
-            name="feeType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo quota</FormLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {FEE_TYPE_ORDER.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {FEE_TYPE_LABELS[type]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
+        {selectedAthlete && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Scadenze da incassare</p>
+            {options.length === 0 ? (
+              <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                Nessuna scadenza aperta per questa allieva: puoi registrare un
+                pagamento libero scegliendo il tipo quota.
+              </p>
+            ) : (
+              <ul className="divide-y rounded-md border">
+                {options.map((option) => {
+                  const checked = selectedIds.includes(option.id)
+                  const blocked =
+                    !checked &&
+                    selectedCategory !== null &&
+                    option.category !== selectedCategory
+                  return (
+                    <li key={option.id}>
+                      <label
+                        className={cn(
+                          "flex min-h-11 items-center gap-3 px-3 py-2",
+                          blocked
+                            ? "cursor-not-allowed opacity-50"
+                            : "cursor-pointer hover:bg-muted/50",
+                        )}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          disabled={blocked || isPending}
+                          onCheckedChange={(value) =>
+                            toggleSchedule(option, value === true)
+                          }
+                          aria-label={option.description}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm">
+                            {option.description}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            Scadenza {formatDateShort(new Date(option.dueDate))}
+                            {isOverdue(option.dueDate) ? " · in ritardo" : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-mono text-sm tabular-nums">
+                          {formatEur(option.amountCents)}
+                        </span>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
             )}
-          />
+            {hasSeparateNumbering ? (
+              <p className="text-xs text-muted-foreground">
+                Quote saggio e costumi hanno una numerazione ricevute separata:
+                vanno registrate in un pagamento a parte.
+              </p>
+            ) : null}
+            {selectedOptions.length > 0 ? (
+              <div className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 text-sm">
+                <span>
+                  {selectedOptions.length === 1
+                    ? "1 scadenza selezionata"
+                    : `${selectedOptions.length} scadenze selezionate`}
+                </span>
+                <span className="font-mono font-semibold tabular-nums">
+                  {formatEur(selectedTotalCents)}
+                </span>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {selectedOptions.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Tipo quota</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedTypesLabel}
+              </p>
+            </div>
+          ) : (
+            <FormField
+              control={form.control}
+              name="feeType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo quota</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {FEE_TYPE_ORDER.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {FEE_TYPE_LABELS[type]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
 
           <FormField
             control={form.control}
@@ -213,262 +339,15 @@ export function PaymentForm({
           />
         </div>
 
-        {needsEnrollmentLink && selectedAthlete && (
-          <FormField
-            control={form.control}
-            name="courseEnrollmentId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Corso (iscrizione collegata)</FormLabel>
-                <Select
-                  value={field.value || "__none__"}
-                  onValueChange={(value) => {
-                    const nextId = value === "__none__" ? "" : value
-                    field.onChange(nextId)
-                    const enrollment = selectedAthlete.enrollments.find(
-                      (e) => e.id === nextId,
-                    )
-                    if (enrollment && form.getValues("amountEur") === 0) {
-                      form.setValue(
-                        "amountEur",
-                        Number(centsToEur(enrollment.course.monthlyFeeCents)),
-                      )
-                    }
-                  }}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nessuno (pagamento libero)" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="__none__">Nessuno</SelectItem>
-                    {selectedAthlete.enrollments.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.course.name} — €
-                        {centsToEur(e.course.monthlyFeeCents)}/mese
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-
-        {isShowcaseFee && selectedAthlete && (
-          <FormField
-            control={form.control}
-            name="paymentScheduleId"
-            render={({ field }) => {
-              // Costruisce opzioni: per ogni partecipazione attiva, lista delle
-              // PaymentSchedule DUE filtrate per feeType selezionato (SHOWCASE_1 = caparra/quota unica, SHOWCASE_2 = saldo)
-              type Opt = {
-                scheduleId: string
-                participationId: string
-                label: string
-                amountCents: number
-              }
-              const opts: Opt[] = []
-              for (const p of selectedAthlete.showcaseParticipations) {
-                for (const s of p.paymentSchedules) {
-                  if (s.feeType !== watchedFeeType) continue
-                  const labelKind =
-                    s.notes?.includes("Caparra")
-                      ? "Caparra"
-                      : s.notes?.includes("Saldo")
-                        ? "Saldo"
-                        : s.notes?.includes("Quota unica")
-                          ? "Quota unica"
-                          : FEE_TYPE_LABELS[s.feeType]
-                  opts.push({
-                    scheduleId: s.id,
-                    participationId: p.id,
-                    label: `${p.showcase.title} — ${labelKind} (${centsToEur(s.amountCents)}€, entro ${new Date(s.dueDate).toLocaleDateString("it-IT")})`,
-                    amountCents: s.amountCents,
-                  })
-                }
-              }
-              return (
-                <FormItem>
-                  <FormLabel>Saggio (scadenza collegata)</FormLabel>
-                  <Select
-                    value={field.value || "__none__"}
-                    onValueChange={(value) => {
-                      const next = value === "__none__" ? "" : value
-                      field.onChange(next)
-                      if (next === "") {
-                        form.setValue("showcaseParticipationId", "")
-                      } else {
-                        const opt = opts.find((o) => o.scheduleId === next)
-                        if (opt) {
-                          form.setValue(
-                            "showcaseParticipationId",
-                            opt.participationId,
-                          )
-                          if (form.getValues("amountEur") === 0) {
-                            form.setValue(
-                              "amountEur",
-                              Number(centsToEur(opt.amountCents)),
-                            )
-                          }
-                        }
-                      }
-                    }}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Nessuna (pagamento libero)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {opts.length === 0 ? (
-                        <SelectItem value="__none__">
-                          Nessuna scadenza saggio compatibile
-                        </SelectItem>
-                      ) : (
-                        <>
-                          <SelectItem value="__none__">Nessuna</SelectItem>
-                          {opts.map((o) => (
-                            <SelectItem key={o.scheduleId} value={o.scheduleId}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )
-            }}
-          />
-        )}
-
-        {isCostumeFee && selectedAthlete && (
-          <FormField
-            control={form.control}
-            name="costumeAssignmentId"
-            render={({ field }) => {
-              type Opt = {
-                assignmentId: string
-                label: string
-                amountCents: number
-              }
-              const opts: Opt[] = []
-              for (const p of selectedAthlete.showcaseParticipations) {
-                for (const a of p.costumeAssignments) {
-                  if (!a.paymentSchedule) continue
-                  const sizeLabel = a.size ? ` · taglia ${a.size}` : ""
-                  opts.push({
-                    assignmentId: a.id,
-                    label: `${p.showcase.title} — ${a.costume.name}${sizeLabel} (${centsToEur(a.paymentSchedule.amountCents)}€, entro ${new Date(a.paymentSchedule.dueDate).toLocaleDateString("it-IT")})`,
-                    amountCents: a.paymentSchedule.amountCents,
-                  })
-                }
-              }
-              return (
-                <FormItem>
-                  <FormLabel>Costume (assegnazione non pagata)</FormLabel>
-                  <Select
-                    value={field.value || "__none__"}
-                    onValueChange={(value) => {
-                      const next = value === "__none__" ? "" : value
-                      field.onChange(next)
-                      if (next !== "") {
-                        const opt = opts.find((o) => o.assignmentId === next)
-                        if (opt && form.getValues("amountEur") === 0) {
-                          form.setValue(
-                            "amountEur",
-                            Number(centsToEur(opt.amountCents)),
-                          )
-                        }
-                      }
-                    }}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Nessuno (pagamento libero)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {opts.length === 0 ? (
-                        <SelectItem value="__none__">
-                          Nessun costume da pagare
-                        </SelectItem>
-                      ) : (
-                        <>
-                          <SelectItem value="__none__">Nessuno</SelectItem>
-                          {opts.map((o) => (
-                            <SelectItem
-                              key={o.assignmentId}
-                              value={o.assignmentId}
-                            >
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )
-            }}
-          />
-        )}
-
-        {isStageFee && selectedAthlete && (
-          <FormField
-            control={form.control}
-            name="stageEnrollmentId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Stage (iscrizione collegata)</FormLabel>
-                <Select
-                  value={field.value || "__none__"}
-                  onValueChange={(value) => {
-                    const nextId = value === "__none__" ? "" : value
-                    field.onChange(nextId)
-                    const stageEnr = selectedAthlete.stageEnrollments.find(
-                      (e) => e.id === nextId,
-                    )
-                    if (stageEnr && form.getValues("amountEur") === 0) {
-                      form.setValue(
-                        "amountEur",
-                        Number(centsToEur(stageEnr.stage.feeCents)),
-                      )
-                    }
-                  }}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nessuno (pagamento libero)" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {selectedAthlete.stageEnrollments.length === 0 ? (
-                      <SelectItem value="__none__">
-                        Nessun stage da pagare
-                      </SelectItem>
-                    ) : (
-                      <>
-                        <SelectItem value="__none__">Nessuno</SelectItem>
-                        {selectedAthlete.stageEnrollments.map((e) => (
-                          <SelectItem key={e.id} value={e.id}>
-                            {e.stage.title} — €{centsToEur(e.stage.feeCents)}
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
+        {selectedAthlete &&
+        selectedOptions.length === 0 &&
+        watchedFeeType === "ASSOCIATION" ? (
+          <p className="rounded-md border bg-muted/50 p-3 text-sm">
+            {options.some((o) => o.feeType === "ASSOCIATION")
+              ? "La quota associativa dell'anno è nell'elenco sopra: spuntala per chiuderla."
+              : "Nessuna quota associativa aperta per quest'anno. Se l'allieva non è ancora iscritta a un corso, il pagamento verrà abbinato alla quota quando la iscrivi."}
+          </p>
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField
@@ -476,7 +355,7 @@ export function PaymentForm({
             name="amountEur"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Importo (€)</FormLabel>
+                <FormLabel>{isMulti ? "Importo totale (€)" : "Importo (€)"}</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -484,6 +363,8 @@ export function PaymentForm({
                     step="0.01"
                     min="0.01"
                     placeholder="0.00"
+                    readOnly={isMulti}
+                    className={isMulti ? "bg-muted font-mono" : undefined}
                     value={field.value === 0 ? "" : field.value}
                     onChange={(e) =>
                       field.onChange(
@@ -494,6 +375,20 @@ export function PaymentForm({
                     }
                   />
                 </FormControl>
+                {isMulti ? (
+                  <p className="text-xs text-muted-foreground">
+                    Somma delle scadenze selezionate. Per incassare un importo
+                    diverso, togli le scadenze che non vengono pagate.
+                  </p>
+                ) : single &&
+                  watchedAmount > 0 &&
+                  Math.round(watchedAmount * 100) !== single.amountCents ? (
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    Diverso dall&apos;importo della scadenza (
+                    {formatEur(single.amountCents)}): la scadenza verrà
+                    comunque chiusa.
+                  </p>
+                ) : null}
                 <FormMessage />
               </FormItem>
             )}
@@ -557,57 +452,6 @@ export function PaymentForm({
               </FormItem>
             )}
           />
-        )}
-
-        {needsEnrollmentLink && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="periodStart"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Periodo: inizio</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      value={field.value ? toDateInputValue(field.value) : ""}
-                      onChange={(e) =>
-                        field.onChange(
-                          e.target.value
-                            ? new Date(e.target.value)
-                            : undefined,
-                        )
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="periodEnd"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Periodo: fine</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      value={field.value ? toDateInputValue(field.value) : ""}
-                      onChange={(e) =>
-                        field.onChange(
-                          e.target.value
-                            ? new Date(e.target.value)
-                            : undefined,
-                        )
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
         )}
 
         <FormField

@@ -9,6 +9,7 @@ import {
 } from "@/app/(admin)/admin/reports/annuale/queries"
 import { BilancioPDF } from "@/lib/pdf/components/bilancio-pdf"
 import { prisma } from "@/lib/prisma"
+import { paymentFeeTypeLabel } from "@/lib/payments/schedule-lines"
 import { EXPENSE_TYPE_LABELS } from "@/lib/schemas/expense"
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { buildXlsxBuffer, type XlsxSheet } from "@/lib/utils/excel"
@@ -48,7 +49,7 @@ function buildCorrispettiviSheets(result: CorrispettiviResult): XlsxSheet[] {
       flat.push([
         formatDateShort(p.paymentDate),
         `${p.athlete.lastName} ${p.athlete.firstName}`,
-        FEE_TYPE_LABELS[p.feeType],
+        paymentFeeTypeLabel(p),
         p.courseEnrollment?.course.name ?? "",
         PAYMENT_METHOD_LABELS[p.method],
         eur(p.amountCents),

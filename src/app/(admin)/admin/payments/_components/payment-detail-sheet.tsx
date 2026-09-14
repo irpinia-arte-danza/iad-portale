@@ -17,9 +17,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { receiptPdfHref } from "@/lib/receipts/types"
 import {
-  FEE_TYPE_LABELS,
-  PAYMENT_METHOD_LABELS,
-} from "@/lib/schemas/payment"
+  compareScheduleLines,
+  describeSchedule,
+  paymentFeeTypeLabel,
+  scheduleAdminHref,
+} from "@/lib/payments/schedule-lines"
+import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { formatDateShort } from "@/lib/utils/format"
 
 import { ReceiptIssueDialog } from "../../receipts/_components/receipt-issue-dialog"
@@ -168,7 +171,9 @@ function PaymentDetailBody({
         ) : (
           <Badge className="bg-emerald-600 hover:bg-emerald-600">Pagato</Badge>
         )}
-        <Badge variant="secondary">{FEE_TYPE_LABELS[payment.feeType]}</Badge>
+        <Badge variant="secondary" className="whitespace-normal">
+          {paymentFeeTypeLabel(payment)}
+        </Badge>
         {payment.academicYear && (
           <Badge variant="outline" className="font-mono text-xs">
             AA {payment.academicYear.label}
@@ -297,6 +302,36 @@ function PaymentDetailBody({
           </div>
         )}
       </dl>
+
+      {payment.paymentSchedules.length > 0 && (
+        <div className="space-y-2 border-t pt-4">
+          <h4 className="text-xs text-muted-foreground">
+            {payment.paymentSchedules.length === 1
+              ? "Scadenza chiusa"
+              : `Scadenze chiuse (${payment.paymentSchedules.length})`}
+          </h4>
+          <ul className="divide-y rounded-md border">
+            {[...payment.paymentSchedules]
+              .sort(compareScheduleLines)
+              .map((schedule) => (
+                <li
+                  key={schedule.id}
+                  className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                >
+                  <Link
+                    href={scheduleAdminHref(schedule, payment.athlete.id)}
+                    className="min-w-0 hover:underline"
+                  >
+                    {describeSchedule(schedule)}
+                  </Link>
+                  <span className="shrink-0 font-mono">
+                    {CURRENCY.format(schedule.amountCents / 100)}
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
 
       {payment.notes && (
         <div className="border-t pt-4">

@@ -188,6 +188,8 @@ model Athlete {
   showcaseParticipations ShowcaseParticipation[]
   stageEnrollments       StageEnrollment[]
   statusHistory          AthleteStatusHistory[]
+  // Quota associativa annuale (una per anno accademico)
+  paymentSchedules       PaymentSchedule[]
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -528,7 +530,7 @@ model StageEnrollment {
   enrolledAt DateTime @default(now()) @map("enrolled_at") @db.Timestamptz(6)
   enrolledBy String?  @map("enrolled_by") @db.Uuid // genitore o admin
   paid       Boolean  @default(false)
-  paymentId  String?  @unique @map("payment_id") @db.Uuid
+  paymentId  String?  @map("payment_id") @db.Uuid
 
   attendance StageAttendanceStatus? // null = non ancora segnata (stage futuro)
 
@@ -540,6 +542,7 @@ model StageEnrollment {
   paymentSchedule PaymentSchedule?
 
   @@unique([stageId, athleteId])
+  @@index([paymentId])
   @@map("stage_enrollments")
 }
 
@@ -630,7 +633,7 @@ model CostumeAssignment {
 
   // Denormalized: aggiornato quando il PaymentSchedule è saldato.
   paid      Boolean @default(false)
-  paymentId String? @unique @map("payment_id") @db.Uuid
+  paymentId String? @map("payment_id") @db.Uuid
 
   costume         Costume               @relation(fields: [costumeId], references: [id])
   participation   ShowcaseParticipation @relation(fields: [participationId], references: [id])
@@ -642,6 +645,7 @@ model CostumeAssignment {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([costumeId, participationId])
+  @@index([paymentId])
   @@map("costume_assignments")
 }
 
@@ -682,6 +686,8 @@ model Payment {
   fiscalYearId       String  @map("fiscal_year_id") @db.Uuid // doppia chiave temporale
   courseEnrollmentId String? @map("course_enrollment_id") @db.Uuid // MONTHLY/TRIMESTER → iscrizione corso
 
+  // Se il pagamento chiude più scadenze: tipo della prima (quota associativa,
+  // mensili, eventi). Il dettaglio per tipo sta nelle scadenze collegate.
   feeType     FeeType       @map("fee_type")
   amountCents Int           @map("amount_cents")
   method      PaymentMethod
@@ -696,12 +702,12 @@ model Payment {
   reversalReason String? @map("reversal_reason")
 
   // Ricevuta collegata
-  receipt           Receipt?
-  // Back-refs da stage/costume enrollments
-  stageEnrollment   StageEnrollment?
-  costumeAssignment CostumeAssignment?
-  // Scadenza saldata (1:1)
-  paymentSchedule   PaymentSchedule?
+  receipt            Receipt?
+  // Una consegna di denaro può chiudere più scadenze della stessa allieva
+  // (e più iscrizioni stage o costumi): una sola ricevuta
+  stageEnrollments   StageEnrollment[]
+  costumeAssignments CostumeAssignment[]
+  paymentSchedules   PaymentSchedule[]
 
   athlete          Athlete           @relation(fields: [athleteId], references: [id])
   parent           Parent?           @relation(fields: [parentId], references: [id])
@@ -734,12 +740,16 @@ enum ScheduleStatus {
 model PaymentSchedule {
   id                 String  @id @default(uuid()) @db.Uuid
   // Una scadenza è collegata a UN solo evento: corso (mensile/trimestrale),
-  // stage workshop, saggio (caparra/saldo) o costume.
-  // Esattamente uno dei quattro FK deve essere valorizzato (CHECK constraint XOR).
+  // stage workshop, saggio (caparra/saldo), costume, oppure direttamente
+  // all'allieva per la quota associativa annuale.
+  // Esattamente uno dei cinque FK deve essere valorizzato (CHECK constraint
+  // payment_schedules_one_event_chk); athleteId solo con feeType ASSOCIATION
+  // (payment_schedules_association_athlete_chk).
   courseEnrollmentId      String? @map("course_enrollment_id") @db.Uuid
   stageEnrollmentId       String? @unique @map("stage_enrollment_id") @db.Uuid
   showcaseParticipationId String? @map("showcase_participation_id") @db.Uuid
   costumeAssignmentId     String? @unique @map("costume_assignment_id") @db.Uuid
+  athleteId               String? @map("athlete_id") @db.Uuid
   academicYearId          String  @map("academic_year_id") @db.Uuid
 
   feeType     FeeType  @map("fee_type")
@@ -748,7 +758,7 @@ model PaymentSchedule {
 
   status ScheduleStatus @default(DUE)
 
-  paymentId String? @unique @map("payment_id") @db.Uuid
+  paymentId String? @map("payment_id") @db.Uuid
 
   waiverReason String? @map("waiver_reason")
   notes        String?
@@ -758,6 +768,7 @@ model PaymentSchedule {
   stageEnrollment       StageEnrollment?       @relation(fields: [stageEnrollmentId], references: [id])
   showcaseParticipation ShowcaseParticipation? @relation(fields: [showcaseParticipationId], references: [id])
   costumeAssignment     CostumeAssignment?     @relation(fields: [costumeAssignmentId], references: [id])
+  athlete               Athlete?               @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id])
   payment               Payment?               @relation(fields: [paymentId], references: [id])
 
@@ -769,6 +780,9 @@ model PaymentSchedule {
   @@index([showcaseParticipationId, dueDate])
   @@index([status, dueDate])
   @@index([academicYearId, status])
+  @@index([paymentId])
+  // Una sola quota associativa per allieva e anno
+  @@unique([athleteId, academicYearId])
   @@map("payment_schedules")
 }
 
@@ -895,6 +909,9 @@ model Receipt {
   athleteFiscalCode String? @map("athlete_fiscal_code")
   description       String?
   amountCents       Int?    @map("amount_cents")
+  // Righe della causale quando il pagamento chiude più scadenze:
+  // [{ description, amountCents, feeType }]. null = causale singola.
+  lines             Json?
 
   pdfUrl String? @map("pdf_url")
 

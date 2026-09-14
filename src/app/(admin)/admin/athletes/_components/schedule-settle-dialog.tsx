@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import type { FeeType } from "@prisma/client"
 
 import {
   Dialog,
@@ -9,26 +10,37 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import type { PaymentCreateValues } from "@/lib/schemas/payment"
 
-import type { AthleteWithFormRelations } from "../../payments/queries"
+import type {
+  AthleteWithFormRelations,
+  OpenScheduleOption,
+} from "../../payments/queries"
 import { PaymentForm } from "../../payments/_components/payment-form"
 import { ReceiptIssuePanel } from "../../receipts/_components/receipt-issue-panel"
 import { useReceiptIssue } from "../../receipts/_components/use-receipt-issue"
 
+export type SettleSchedule = {
+  id: string
+  feeType: FeeType
+  // null per la quota associativa, che non è legata a un corso
+  courseEnrollmentId: string | null
+  courseName: string
+  dueDate: Date
+  amountCents: number
+}
+
+// Da montare una sola volta per sezione (ScheduleSettleProvider), mai dentro
+// la riga della scadenza: vedi il commento nel provider.
 interface ScheduleSettleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  schedule: {
-    id: string
-    courseEnrollmentId: string
-    courseName: string
-    dueDate: Date
-    amountCents: number
-  }
+  schedule: SettleSchedule
   athleteId: string
   athleteFirstName: string
   athleteLastName: string
   athletesForPaymentForm: AthleteWithFormRelations[]
+  openSchedulesByAthlete: Record<string, OpenScheduleOption[]>
   onSuccess?: () => void
 }
 
@@ -40,19 +52,19 @@ function formatDate(date: Date): string {
   })
 }
 
-function formatEur(cents: number): string {
-  return new Intl.NumberFormat("it-IT", {
-    style: "currency",
-    currency: "EUR",
-  }).format(cents / 100)
-}
-
-function firstDayOfMonthUTC(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
-}
-
-function lastDayOfMonthUTC(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0))
+// Stesso form di /admin/payments con la scadenza cliccata già spuntata: le
+// altre scadenze aperte dell'allieva si possono aggiungere allo stesso incasso.
+function paymentDefaults(
+  schedule: SettleSchedule,
+  athleteId: string,
+): Partial<PaymentCreateValues> {
+  return {
+    athleteId,
+    paymentScheduleIds: [schedule.id],
+    feeType: schedule.feeType,
+    amountEur: schedule.amountCents / 100,
+    paymentDate: new Date(),
+  }
 }
 
 export function ScheduleSettleDialog({
@@ -63,6 +75,7 @@ export function ScheduleSettleDialog({
   athleteFirstName,
   athleteLastName,
   athletesForPaymentForm,
+  openSchedulesByAthlete,
   onSuccess,
 }: ScheduleSettleDialogProps) {
   const [registered, setRegistered] = useState(false)
@@ -85,9 +98,8 @@ export function ScheduleSettleDialog({
             <DialogHeader>
               <DialogTitle>Pagamento registrato</DialogTitle>
               <DialogDescription>
-                {athleteLastName} {athleteFirstName} — {schedule.courseName}.
-                Emetti la ricevuta adesso oppure più tardi dall&apos;elenco
-                pagamenti.
+                {athleteLastName} {athleteFirstName}. Emetti la ricevuta adesso
+                oppure più tardi dall&apos;elenco pagamenti.
               </DialogDescription>
             </DialogHeader>
             <ReceiptIssuePanel
@@ -103,31 +115,15 @@ export function ScheduleSettleDialog({
               <DialogTitle>Salda scadenza</DialogTitle>
               <DialogDescription>
                 {athleteLastName} {athleteFirstName} — {schedule.courseName} —
-                scadenza {formatDate(schedule.dueDate)}
+                scadenza {formatDate(schedule.dueDate)}. Puoi spuntare altre
+                scadenze aperte per incassarle insieme, con una sola ricevuta.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="rounded-md border bg-muted/50 p-3 text-sm">
-              <div>
-                Importo atteso:{" "}
-                <strong className="font-mono">
-                  {formatEur(schedule.amountCents)}
-                </strong>
-              </div>
-              <div className="text-muted-foreground">Tipo: Quota mensile</div>
-            </div>
-
             <PaymentForm
               athletes={athletesForPaymentForm}
-              defaultValues={{
-                athleteId,
-                courseEnrollmentId: schedule.courseEnrollmentId,
-                feeType: "MONTHLY",
-                amountEur: schedule.amountCents / 100,
-                paymentDate: new Date(),
-                periodStart: firstDayOfMonthUTC(schedule.dueDate),
-                periodEnd: lastDayOfMonthUTC(schedule.dueDate),
-              }}
+              openSchedulesByAthlete={openSchedulesByAthlete}
+              defaultValues={paymentDefaults(schedule, athleteId)}
               onSuccess={(paymentId) => {
                 setRegistered(true)
                 onSuccess?.()

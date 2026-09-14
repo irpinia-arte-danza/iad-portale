@@ -20,6 +20,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.23 Legacy required + nuovi opzionali → nullable
   - §17.24 Drop+recreate stub zero-coupling
   - §17.33 Filtri Prisma composti con `{ ...where, OR }` sovrascrivono l'OR del chiamante
+  - §17.39 `payment_id` unico su scadenze, stage e costumi: un pagamento chiudeva una sola cosa
 - [Next.js](#nextjs)
   - §17.7 Next 16 proxy export naming
   - §17.9 Next dev logga Server Action body
@@ -40,6 +41,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.36 react-pdf si rompe sui testi dentro un SVG: nei PDF sempre il logo PNG
 - [UX / Form](#ux--form)
   - §17.22 Placeholder ≠ valore default
+  - §17.38 Dialog dentro una riga che cambia gruppo dopo l'azione: si smonta e perde lo stato
 - [Settings pattern](#settings-pattern)
   - §17.28 Aggiungere un tab
 - [Errori e diagnostica](#errori-e-diagnostica)
@@ -116,6 +118,14 @@ Pattern corretto:
 return { AND: [where, { OR: [{ courseEnrollment: {...} }, { stageEnrollment: {...} }] }] }
 ```
 Vale per qualsiasi chiave logica (`OR`, `AND`, `NOT`) e per le relazioni già filtrate dal chiamante. Regola pratica: un helper che riceve un `where` dall'esterno compone sempre con `AND: [where, …]`, mai con lo spread. Bug reale: Sprint 6.A (`withActiveCourseOrStageScheduleFilter` in `src/lib/queries/active-schedule-filter.ts`), il filtro per genitore di `getMyOpenSchedules` veniva sovrascritto e la dashboard genitori mostrava le quote scadute di **tutte** le famiglie. In produzione dal 13 maggio 2026, corretto il 14 settembre 2026 (`49e793d`). Test di regressione manuale: genitore senza figlie collegate → nessuna quota.
+
+**§17.39 `payment_id` unico su scadenze, iscrizioni stage e costumi — un pagamento chiudeva una sola cosa**: `payment_schedules.payment_id`, `stage_enrollments.payment_id` e `costume_assignments.payment_id` erano `@unique`, quindi lato `Payment` le relazioni erano 1:1 (`paymentSchedule`, `stageEnrollment`, `costumeAssignment`). Il campo nullable fa sembrare possibile collegare più righe allo stesso pagamento, ma il database lo rifiuta: una famiglia che pagava quota associativa + prima mensile doveva fare due pagamenti e ricevere due ricevute. Rimosso con la migration `20260918090000_payment_multi_schedule` (indici semplici al posto degli unique): ora `Payment.paymentSchedules[]`, `stageEnrollments[]`, `costumeAssignments[]`. Da ricordare:
+1. Storno ed eliminazione riaprono **tutte** le scadenze e le iscrizioni del pagamento (`releasePaymentLinks` in `src/lib/payments/register-payment.ts`).
+2. Con più scadenze l'importo è la loro somma, le righe della causale sono congelate in `Receipt.lines`, e non si uniscono quote ordinarie, saggio (`/S`) e costumi (`/C`): numerazioni ricevute diverse.
+3. `Payment.feeType` è solo il tipo della prima scadenza: i totali per tipo quota (bilancio, corrispettivi, export) passano da `accountingLines` in `src/lib/payments/schedule-lines.ts`.
+4. `Payment.courseEnrollmentId` è valorizzato solo se tutte le scadenze sono dello stesso corso: un controllo "ci sono pagamenti su questo corso?" deve guardare anche le scadenze con `paymentId` (vedi `hardDeleteCourse`).
+
+Prima di dare per scontato che un FK nullable ammetta più righe, controllare gli indici: `select indexname, indexdef from pg_indexes where indexname like '%payment_id%'`. Scoperto: sprint incasso multiplo, settembre 2026.
 
 ---
 
@@ -263,6 +273,8 @@ L'errore non dipende dai dati del documento e colpisce ogni PDF generato con que
 ## UX / Form
 
 **§17.22 UX — Placeholder ≠ valore default**: i placeholder in form non devono mai essere confondibili con valori reali di default. Usare pattern generici ("es. Via Roma", "N°", "XX", "00000") invece di valori concreti plausibili ("Via Cervinaro", "Montella", "+39 333 1234567"). Audit Sprint 7.X ha mostrato che Giuseppina avrebbe potuto interpretare placeholder come pre-compilati. Regola pratica: ogni `placeholder="..."` su `Input` / `Textarea` deve iniziare con "es." o usare marcatori palesemente finti. Scoperto: Sprint 7.X audit UX, aprile 2026.
+
+**§17.38 Dialog dentro una riga che cambia gruppo dopo l'azione — si smonta e perde lo stato**: un dialog il cui stato vive nel componente di una riga (es. `useState` in `ScheduleRowActions`) esiste solo finché React considera quella riga la stessa. Se l'azione aggiorna la pagina (server action con `revalidatePath`) e la riga cambia posizione nell'albero, React smonta la riga e ne monta una nuova con lo stato iniziale: il dialog si chiude da solo. Esempio: la scadenza appena pagata passa dal gruppo "In scadenza" a "Pagate", cioè in un altro `<ul>`. Stesso effetto se il dialog è renderizzato sotto una condizione che l'azione rende falsa (`canSettle && <Dialog>`). Sintomo: il seguito dell'azione ("Pagamento registrato" con "Emetti ricevuta") compare e sparisce dopo mezzo secondo. Regola: i dialog che hanno un seguito dopo l'azione si montano **fuori dalle liste**, in un provider in un punto fisso della pagina; la riga li apre via context passando una copia dei dati presa all'apertura, che resta valida anche quando il record cambia stato. I dialog che si chiudono appena l'azione riesce (es. "Condona") possono restare nella riga. Pattern: `ScheduleSettleProvider` in `src/app/(admin)/admin/athletes/_components/schedule-settle-provider.tsx`. Nota: non è un reload della pagina: `revalidatePath` rigenera i Server Components e i client component rimasti nella stessa posizione conservano lo stato. Bug reale: "Salda" dalla scheda allieva, settembre 2026.
 
 ---
 

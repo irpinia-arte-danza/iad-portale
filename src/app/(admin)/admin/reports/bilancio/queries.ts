@@ -2,6 +2,10 @@ import { ExpenseType, FeeType, Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import {
+  ACCOUNTING_SCHEDULE_SELECT,
+  accountingLines,
+} from "@/lib/payments/schedule-lines"
 import { monthKey, monthLabel } from "@/lib/utils/format"
 
 export type BilancioFilters = {
@@ -98,6 +102,7 @@ export async function getBilancio(
         amountCents: true,
         feeType: true,
         paymentDate: true,
+        paymentSchedules: { select: ACCOUNTING_SCHEDULE_SELECT },
       },
     }),
     prisma.expense.findMany({
@@ -120,11 +125,14 @@ export async function getBilancio(
   let entrateCents = 0
   for (const p of payments) {
     entrateCents += p.amountCents
-    const prev = entrateMap.get(p.feeType) ?? { count: 0, totalCents: 0 }
-    entrateMap.set(p.feeType, {
-      count: prev.count + 1,
-      totalCents: prev.totalCents + p.amountCents,
-    })
+    // Un pagamento su più scadenze conta per ciascun tipo quota col suo importo
+    for (const line of accountingLines(p)) {
+      const prev = entrateMap.get(line.feeType) ?? { count: 0, totalCents: 0 }
+      entrateMap.set(line.feeType, {
+        count: prev.count + 1,
+        totalCents: prev.totalCents + line.amountCents,
+      })
+    }
     const mk = monthKey(p.paymentDate)
     const bucket = monthly.get(mk)
     if (bucket) {

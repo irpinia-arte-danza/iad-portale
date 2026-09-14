@@ -16,6 +16,10 @@ import {
   type EnrollmentUpdateValues,
   type WithdrawEnrollmentValues,
 } from "@/lib/schemas/enrollment"
+import {
+  AssociationFeeNotSetError,
+  ensureAssociationFeeSchedule,
+} from "@/lib/fees/association-fee"
 
 import { generateMonthlySchedulesForEnrollment } from "./schedule-generator"
 
@@ -56,7 +60,7 @@ export async function createEnrollment(
 
   const currentAY = await prisma.academicYear.findFirst({
     where: { isCurrent: true },
-    select: { id: true, label: true },
+    select: { id: true, label: true, associationFeeCents: true },
   })
   if (!currentAY) {
     return { ok: false, error: "Nessun anno accademico corrente configurato" }
@@ -94,7 +98,7 @@ export async function createEnrollment(
               ? parsed.data.notes
               : null,
         },
-        select: { id: true },
+        select: { id: true, enrollmentDate: true },
       })
 
       if (athlete.status === AthleteStatus.TRIAL) {
@@ -119,12 +123,25 @@ export async function createEnrollment(
         adminUserId,
       )
 
+      // Una quota associativa per allieva per anno: al secondo corso non si
+      // ripete. Importo non impostato → errore e iscrizione annullata.
+      await ensureAssociationFeeSchedule(tx, {
+        athleteId: athleteIdParsed.data,
+        academicYear: currentAY,
+        dueDate: enrollment.enrollmentDate,
+        createdBy: adminUserId,
+      })
+
       return enrollment.id
     })
 
     revalidatePath(athletePath(athleteIdParsed.data))
+    revalidatePath("/admin/scadenze")
     return { ok: true, data: { id: enrollmentId } }
   } catch (error) {
+    if (error instanceof AssociationFeeNotSetError) {
+      return { ok: false, error: error.message }
+    }
     return { ok: false, error: mapPrismaError(error) }
   }
 }

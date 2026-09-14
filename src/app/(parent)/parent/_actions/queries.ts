@@ -1,6 +1,12 @@
 import "server-only"
 
 import { prisma } from "@/lib/prisma"
+import {
+  SCHEDULE_LINE_SELECT,
+  compareScheduleLines,
+  describeSchedule,
+  paymentFeeTypeLabel,
+} from "@/lib/payments/schedule-lines"
 import { withActiveCourseOrStageScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -81,7 +87,8 @@ export async function getMyAthletes(parentId: string) {
 export type MyAthlete = Awaited<ReturnType<typeof getMyAthletes>>[number]
 
 export async function getMyOpenSchedules(parentId: string) {
-  // Scadenze DUE/OVERDUE delle figlie del genitore (corsi + stage + saggio)
+  // Scadenze DUE/OVERDUE delle figlie del genitore (corsi, quota associativa,
+  // stage, saggio, costumi)
   const schedules = await prisma.paymentSchedule.findMany({
     where: withActiveCourseOrStageScheduleFilter({
       status: { in: ["DUE", "OVERDUE"] },
@@ -120,6 +127,12 @@ export async function getMyOpenSchedules(parentId: string) {
             },
           },
         },
+        {
+          athlete: {
+            deletedAt: null,
+            parentRelations: { some: { parentId } },
+          },
+        },
       ],
     }),
     select: {
@@ -129,6 +142,10 @@ export async function getMyOpenSchedules(parentId: string) {
       amountCents: true,
       status: true,
       notes: true,
+      // Quota associativa: collegata direttamente all'allieva
+      athlete: {
+        select: { id: true, firstName: true, lastName: true },
+      },
       courseEnrollment: {
         select: {
           athleteId: true,
@@ -186,7 +203,8 @@ export async function getMyOpenSchedules(parentId: string) {
     const stageAth = s.stageEnrollment?.athlete
     const showcaseAth = s.showcaseParticipation?.athlete
     const costumeAth = s.costumeAssignment?.participation.athlete
-    const athlete = courseAth ?? stageAth ?? showcaseAth ?? costumeAth
+    const athlete =
+      courseAth ?? stageAth ?? showcaseAth ?? costumeAth ?? s.athlete
     return {
       id: s.id,
       feeType: s.feeType,
@@ -245,6 +263,8 @@ export async function getMyPayments(parentId: string) {
       receipt: {
         select: { id: true, receiptNumber: true, status: true },
       },
+      // Scadenze coperte: più d'una → righe nello storico
+      paymentSchedules: { select: SCHEDULE_LINE_SELECT },
     },
     orderBy: { paymentDate: "desc" },
   })
@@ -261,6 +281,15 @@ export async function getMyPayments(parentId: string) {
     athleteId: p.athlete.id,
     athleteName: `${p.athlete.firstName} ${p.athlete.lastName}`,
     athleteArchived: p.athlete.deletedAt !== null,
+    // "Quota associativa + Quota mensile" se il pagamento copre più scadenze
+    feeLabel: paymentFeeTypeLabel(p),
+    lines:
+      p.paymentSchedules.length >= 2
+        ? [...p.paymentSchedules].sort(compareScheduleLines).map((s) => ({
+            description: describeSchedule(s),
+            amountCents: s.amountCents,
+          }))
+        : [],
     // Scaricabile solo una ricevuta emessa dall'admin e ancora valida
     receipt:
       p.status === "PAID" && p.receipt?.status === "VALID"

@@ -40,6 +40,8 @@ interface PaymentReverseDialogProps {
     athleteName: string
     // Numero della ricevuta valida che lo storno annullerà (se emessa)
     validReceiptNumber?: string | null
+    // Scadenze chiuse dal pagamento, che lo storno riapre tutte
+    reopenSchedules?: string[]
   }
   onSuccess?: () => void
 }
@@ -93,6 +95,20 @@ export function PaymentReverseDialog({
             verrà <strong>annullata</strong>: mantiene il suo numero, resta
             nell&apos;elenco ricevute e il PDF riporterà la dicitura ANNULLATA.
           </p>
+        ) : null}
+        {payment.reopenSchedules && payment.reopenSchedules.length > 0 ? (
+          <div className="rounded-md border p-3 text-sm">
+            <p className="font-medium">
+              {payment.reopenSchedules.length === 1
+                ? "Tornerà da pagare questa scadenza:"
+                : `Torneranno da pagare queste ${payment.reopenSchedules.length} scadenze:`}
+            </p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
+              {payment.reopenSchedules.map((description, index) => (
+                <li key={`${index}-${description}`}>{description}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         <Form {...form}>
           <form

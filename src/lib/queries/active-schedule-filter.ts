@@ -1,11 +1,12 @@
 import type { Prisma } from "@prisma/client"
 
-// Sprint 6.A — PaymentSchedule è ora polimorfico:
-//   • courseEnrollmentId valorizzato → scadenza corso (mensile/trimestrale)
-//   • stageEnrollmentId valorizzato → scadenza stage
-// activeScheduleFilter (default) tiene solo scadenze di tipo corso
-// con allieva/corso attivi. Per filtri che includono stage usare
-// withActiveCourseOrStageScheduleFilter.
+// PaymentSchedule è polimorfico, ogni scadenza ha un solo collegamento:
+//   • courseEnrollmentId → quota mensile di un corso
+//   • stageEnrollmentId / showcaseParticipationId / costumeAssignmentId →
+//     stage, saggio, costume
+//   • athleteId → quota associativa annuale (una per allieva per anno)
+// activeScheduleFilter (default) tiene solo scadenze di tipo corso con
+// allieva/corso attivi: lo usano i solleciti, che riguardano le mensili.
 
 export const activeScheduleFilter = {
   courseEnrollment: {
@@ -32,9 +33,35 @@ export function withActiveScheduleFilter(
   }
 }
 
-// Scadenza valida per gli scopi del parent portal / dashboard:
-// corso attivo OPPURE stage attivo OPPURE saggio attivo OPPURE costume
-// (non soft-deleted) con allieva attiva.
+// Quota associativa di un'allieva non nel Cestino. Resta visibile anche se
+// l'allieva si ritira dai corsi: è dovuta dall'iscrizione e non si rimborsa.
+const activeAssociationFeeFilter = {
+  feeType: "ASSOCIATION",
+  athlete: { deletedAt: null },
+} as const satisfies Prisma.PaymentScheduleWhereInput
+
+// Scadenze legate all'iscrizione ai corsi: mensili dei corsi attivi e quota
+// associativa annuale. Per /admin/scadenze e i contatori della dashboard.
+// Composizione in AND per lo stesso motivo spiegato sotto.
+export function withActiveCourseOrAssociationScheduleFilter(
+  where: Prisma.PaymentScheduleWhereInput,
+): Prisma.PaymentScheduleWhereInput {
+  return {
+    AND: [
+      where,
+      {
+        OR: [
+          { courseEnrollment: activeScheduleFilter.courseEnrollment },
+          activeAssociationFeeFilter,
+        ],
+      },
+    ],
+  }
+}
+
+// Scadenza valida per gli scopi del parent portal:
+// corso attivo OPPURE quota associativa OPPURE stage attivo OPPURE saggio
+// attivo OPPURE costume (non soft-deleted) con allieva attiva.
 //
 // Composizione in AND, mai `{ ...where, OR }`: se il chiamante filtra a sua
 // volta con OR (es. il filtro per genitore del portale), lo spread lo
@@ -56,6 +83,7 @@ export function withActiveCourseOrStageScheduleFilter(
               course: { deletedAt: null },
             },
           },
+          activeAssociationFeeFilter,
           {
             stageEnrollment: {
               athlete: { deletedAt: null },

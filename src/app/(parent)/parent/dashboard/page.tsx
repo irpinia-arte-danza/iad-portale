@@ -229,7 +229,9 @@ export default async function ParentDashboardPage() {
                             >
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium">
-                                  {FEE_TYPE_LABELS[s.feeType]}
+                                  {s.feeType === "ASSOCIATION" && s.notes
+                                    ? s.notes
+                                    : FEE_TYPE_LABELS[s.feeType]}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   Scadenza {formatDateShort(s.dueDate)}
@@ -272,7 +274,7 @@ export default async function ParentDashboardPage() {
                           >
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium">
-                                {FEE_TYPE_LABELS[p.feeType]}
+                                {p.feeLabel}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {formatDateShort(p.paymentDate)}
@@ -376,7 +378,7 @@ export default async function ParentDashboardPage() {
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium">
-                        {FEE_TYPE_LABELS[p.feeType]} ·{" "}
+                        {p.feeLabel} ·{" "}
                         <span className="font-normal">{p.athleteName}</span>
                         {p.athleteArchived ? (
                           <span className="ml-1 text-xs text-muted-foreground">
@@ -396,6 +398,21 @@ export default async function ParentDashboardPage() {
                           </>
                         ) : null}
                       </p>
+                      {p.lines.length > 0 ? (
+                        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                          {p.lines.map((line, index) => (
+                            <li
+                              key={`${index}-${line.description}`}
+                              className="flex justify-between gap-3"
+                            >
+                              <span>{line.description}</span>
+                              <span className="shrink-0 font-mono tabular-nums">
+                                {formatEur(line.amountCents)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
                       {p.status === "REVERSED" ? (
                         <Badge variant="destructive" className="mt-1">
                           Pagamento stornato

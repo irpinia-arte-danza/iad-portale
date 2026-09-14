@@ -2,6 +2,7 @@ import { Document, Page, Text, View } from "@react-pdf/renderer"
 
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import type { FeeType, PaymentMethod } from "@prisma/client"
+import type { ReceiptLine } from "@/lib/receipts/types"
 
 import { pdfColors, pdfStyles } from "../styles"
 import { IADHeaderMark } from "./iad-header"
@@ -31,6 +32,8 @@ export type ReceiptData = {
   athleteFiscalCode: string | null
   feeType: FeeType
   description: string | null
+  // Righe della causale (pagamento che chiude più scadenze), null = singola
+  lines: ReceiptLine[] | null
   periodStart: Date | null
   periodEnd: Date | null
   amountCents: number
@@ -176,6 +179,46 @@ const styles = {
     color: pdfColors.muted,
     lineHeight: 1.4,
   },
+  // Causale a righe: una riga per scadenza, il totale resta in totalsRow
+  linesTable: {
+    marginTop: 8,
+    borderWidth: 0.5,
+    borderColor: pdfColors.border,
+    borderRadius: 2,
+  },
+  linesHeader: {
+    flexDirection: "row" as const,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: pdfColors.accentSoft,
+  },
+  linesHeaderText: {
+    fontSize: 8,
+    color: pdfColors.muted,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.4,
+  },
+  lineRow: {
+    flexDirection: "row" as const,
+    alignItems: "flex-start" as const,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: pdfColors.border,
+  },
+  lineDescription: {
+    flex: 1,
+    fontSize: 9,
+    color: pdfColors.text,
+    paddingRight: 8,
+  },
+  lineAmount: {
+    width: 90,
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    color: pdfColors.text,
+    textAlign: "right" as const,
+  },
   // Larghezza pagina intera e corpo 64: "ANNULLATA" resta su una riga
   // (a 88pt react-pdf la spezzava in "ANNULLA-TA")
   cancelledWatermark: {
@@ -224,6 +267,13 @@ export function ReceiptPdf({
   // react-pdf non gestisce l'SVG caricato in Impostazioni: il layout dei testi
   // dell'SVG lancia "Cannot read properties of undefined (reading 'xAdvance')".
   const logoForPdf = brand.logoUrl ?? null
+
+  // Più scadenze: tutti i tipi quota coperti ("Quota associativa + Quota mensile")
+  const feeTypeLabel = receipt.lines
+    ? [...new Set(receipt.lines.map((line) => FEE_TYPE_LABELS[line.feeType]))].join(
+        " + ",
+      )
+    : FEE_TYPE_LABELS[receipt.feeType]
 
   let periodLine: string | null = null
   // Il campo ha già l'etichetta "Periodo": qui solo le date
@@ -323,7 +373,7 @@ export function ReceiptPdf({
             <View style={pdfStyles.fieldBox}>
               <Text style={pdfStyles.fieldLabel}>Tipo quota</Text>
               <Text style={pdfStyles.fieldValue}>
-                {FEE_TYPE_LABELS[receipt.feeType]}
+                {feeTypeLabel}
               </Text>
             </View>
             <View style={pdfStyles.fieldBox}>
@@ -344,13 +394,44 @@ export function ReceiptPdf({
                 <Text style={pdfStyles.fieldValue}>{periodLine}</Text>
               </View>
             ) : null}
-            {receipt.description ? (
+            {receipt.description && !receipt.lines ? (
               <View style={{ ...pdfStyles.fieldBox, width: "100%" }}>
                 <Text style={pdfStyles.fieldLabel}>Descrizione</Text>
                 <Text style={pdfStyles.fieldValue}>{receipt.description}</Text>
               </View>
             ) : null}
           </View>
+
+          {receipt.lines ? (
+            <View style={styles.linesTable}>
+              <View style={styles.linesHeader}>
+                <Text style={{ ...styles.linesHeaderText, flex: 1 }}>
+                  Descrizione
+                </Text>
+                <Text
+                  style={{
+                    ...styles.linesHeaderText,
+                    width: 90,
+                    textAlign: "right" as const,
+                  }}
+                >
+                  Importo
+                </Text>
+              </View>
+              {receipt.lines.map((line, index) => (
+                <View
+                  key={`${index}-${line.description}`}
+                  style={styles.lineRow}
+                  wrap={false}
+                >
+                  <Text style={styles.lineDescription}>{line.description}</Text>
+                  <Text style={styles.lineAmount}>
+                    {formatEurFromCents(line.amountCents)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Importo ricevuto</Text>

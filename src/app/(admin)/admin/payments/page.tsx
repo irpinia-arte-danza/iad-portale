@@ -3,7 +3,11 @@ import { FeeType, PaymentStatus } from "@prisma/client"
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
 
-import { listAthletesWithRelations, listPayments } from "./queries"
+import {
+  listAthletesWithRelations,
+  listOpenSchedulesByAthlete,
+  listPayments,
+} from "./queries"
 import { PaymentCreateDialog } from "./_components/payment-create-dialog"
 import { PaymentsFilters } from "./_components/payments-filters"
 import { PaymentsSearch } from "./_components/payments-search"
@@ -45,10 +49,12 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
   const feeType = parseFeeType(resolved.feeType)
   const status = parseStatus(resolved.status)
 
-  const [{ items, totalCount }, athletes] = await Promise.all([
-    listPayments({ search, feeType, status }),
-    listAthletesWithRelations(),
-  ])
+  const [{ items, totalCount }, athletes, openSchedulesByAthlete] =
+    await Promise.all([
+      listPayments({ search, feeType, status }),
+      listAthletesWithRelations(),
+      listOpenSchedulesByAthlete(),
+    ])
 
   return (
     <>
@@ -56,7 +62,12 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
         breadcrumbs={[{ label: "Pagamenti" }]}
         title="Pagamenti"
         description="Registro entrate: quote mensili, stage, saggio e altri pagamenti."
-        action={<PaymentCreateDialog athletes={athletes} />}
+        action={
+          <PaymentCreateDialog
+            athletes={athletes}
+            openSchedulesByAthlete={openSchedulesByAthlete}
+          />
+        }
       />
       <ResourceContent>
         <div className="flex flex-col gap-4">

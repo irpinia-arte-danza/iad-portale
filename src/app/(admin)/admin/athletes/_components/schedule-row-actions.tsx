@@ -16,11 +16,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { ScheduleStatus } from "@prisma/client"
+import type { FeeType, ScheduleStatus } from "@prisma/client"
 
 import type { ScheduleDisplayStatus } from "@/lib/utils/schedule-status"
-import type { AthleteWithFormRelations } from "../../payments/queries"
-import { ScheduleSettleDialog } from "./schedule-settle-dialog"
+import { useOpenScheduleSettle } from "./schedule-settle-provider"
 import { ScheduleUnwaiveDialog } from "./schedule-unwaive-dialog"
 import { ScheduleWaiveDialog } from "./schedule-waive-dialog"
 
@@ -29,27 +28,19 @@ interface ScheduleRowActionsProps {
     id: string
     status: ScheduleStatus
     displayStatus: ScheduleDisplayStatus
-    courseEnrollmentId: string
+    feeType: FeeType
+    // null per la quota associativa, che non è legata a un corso
+    courseEnrollmentId: string | null
     courseName: string
     dueDate: Date
     amountCents: number
     waiverReason: string | null
     paymentId: string | null
   }
-  athleteId: string
-  athleteFirstName: string
-  athleteLastName: string
-  athletesForPaymentForm: AthleteWithFormRelations[]
 }
 
-export function ScheduleRowActions({
-  schedule,
-  athleteId,
-  athleteFirstName,
-  athleteLastName,
-  athletesForPaymentForm,
-}: ScheduleRowActionsProps) {
-  const [settleOpen, setSettleOpen] = useState(false)
+export function ScheduleRowActions({ schedule }: ScheduleRowActionsProps) {
+  const openSettle = useOpenScheduleSettle()
   const [waiveOpen, setWaiveOpen] = useState(false)
   const [unwaiveOpen, setUnwaiveOpen] = useState(false)
 
@@ -68,7 +59,18 @@ export function ScheduleRowActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {canSettle && (
-            <DropdownMenuItem onClick={() => setSettleOpen(true)}>
+            <DropdownMenuItem
+              onClick={() =>
+                openSettle({
+                  id: schedule.id,
+                  feeType: schedule.feeType,
+                  courseEnrollmentId: schedule.courseEnrollmentId,
+                  courseName: schedule.courseName,
+                  dueDate: schedule.dueDate,
+                  amountCents: schedule.amountCents,
+                })
+              }
+            >
               <BanknoteArrowUp className="h-4 w-4" />
               Salda
             </DropdownMenuItem>
@@ -93,24 +95,6 @@ export function ScheduleRowActions({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-
-      {canSettle && (
-        <ScheduleSettleDialog
-          open={settleOpen}
-          onOpenChange={setSettleOpen}
-          schedule={{
-            id: schedule.id,
-            courseEnrollmentId: schedule.courseEnrollmentId,
-            courseName: schedule.courseName,
-            dueDate: schedule.dueDate,
-            amountCents: schedule.amountCents,
-          }}
-          athleteId={athleteId}
-          athleteFirstName={athleteFirstName}
-          athleteLastName={athleteLastName}
-          athletesForPaymentForm={athletesForPaymentForm}
-        />
-      )}
 
       {canWaive && (
         <ScheduleWaiveDialog
