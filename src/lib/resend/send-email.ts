@@ -1,4 +1,7 @@
-"use server";
+// Helper interno, NON server action: niente "use server" (lo renderebbe un
+// endpoint POST raggiungibile senza controlli). I controlli di ruolo stanno
+// nelle action/route che lo chiamano. server-only impedisce l'import dal client.
+import "server-only";
 
 import { EMAIL_CONFIG, resend } from "./client";
 import type { EmailPayload, EmailSendResult } from "./types";

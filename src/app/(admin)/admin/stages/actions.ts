@@ -5,9 +5,7 @@ import { revalidatePath } from "next/cache"
 import {
   EmailStatus,
   EmailTrigger,
-  FeeType,
   Prisma,
-  ScheduleStatus,
   StageAttendanceStatus,
 } from "@prisma/client"
 
@@ -15,6 +13,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
+import { enrollAthleteCore } from "@/lib/stages/enroll-athlete"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
 import {
@@ -60,26 +59,6 @@ function startOfUTCDate(d: Date): Date {
   return new Date(
     Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
   )
-}
-
-// dueDate = max(today, min(stage.date - 7gg, registrationDeadline))
-function computeScheduleDueDate(
-  stageDate: Date,
-  registrationDeadline: Date | null | undefined,
-): Date {
-  const stageMid = startOfUTCDate(stageDate)
-  const minusSeven = new Date(stageMid)
-  minusSeven.setUTCDate(minusSeven.getUTCDate() - 7)
-
-  let candidate = minusSeven
-  if (registrationDeadline) {
-    const reg = startOfUTCDate(registrationDeadline)
-    if (reg < candidate) candidate = reg
-  }
-
-  const today = startOfUTCToday()
-  if (candidate < today) candidate = today
-  return candidate
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -297,13 +276,11 @@ export async function toggleRegistrationOpen(
 // Iscrizioni
 // ─────────────────────────────────────────────────────────────────────────
 
-type EnrollAthleteParams = StageEnrollmentCreateValues & {
-  enrolledByUserId?: string | null
-}
-
-// Logica condivisa con il parent portal. Restituisce enrollmentId.
+// Iscrizione singola admin. La logica condivisa con il parent portal vive in
+// src/lib/stages/enroll-athlete.ts. Autore dell'iscrizione e dell'audit =
+// sempre l'admin della sessione, mai un valore passato dal client.
 export async function enrollAthlete(
-  values: EnrollAthleteParams,
+  values: StageEnrollmentCreateValues,
 ): Promise<ActionResult<{ enrollmentId: string }>> {
   const { userId } = await requireAdmin()
 
@@ -319,7 +296,7 @@ export async function enrollAthlete(
     stageId: parsed.data.stageId,
     athleteId: parsed.data.athleteId,
     notes: emptyToNull(parsed.data.notes),
-    enrolledByUserId: values.enrolledByUserId ?? userId,
+    enrolledByUserId: userId,
     auditUserId: userId,
   })
 
@@ -372,125 +349,6 @@ export async function enrollAthletesBulk(
   revalidatePath(`${STAGES_PATH}/${parsed.data.stageId}`)
   revalidatePath("/admin/scadenze")
   return { ok: true, data: { enrolled, failed } }
-}
-
-// Core: usata anche dal parent portal (vedi parent/_actions/stage-actions.ts).
-type EnrollCoreParams = {
-  stageId: string
-  athleteId: string
-  notes: string | null
-  enrolledByUserId: string | null
-  auditUserId: string | null
-}
-
-export async function enrollAthleteCore(
-  params: EnrollCoreParams,
-): Promise<{ ok: true; enrollmentId: string } | { ok: false; error: string }> {
-  // 1) Stage valido + iscrizioni aperte
-  const stage = await prisma.stage.findFirst({
-    where: { id: params.stageId, deletedAt: null },
-    select: {
-      id: true,
-      title: true,
-      date: true,
-      feeCents: true,
-      capacity: true,
-      registrationOpen: true,
-      registrationDeadline: true,
-      academicYearId: true,
-      _count: { select: { enrollments: true } },
-    },
-  })
-  if (!stage) return { ok: false, error: "Stage non trovato" }
-  if (!stage.registrationOpen) {
-    return { ok: false, error: "Iscrizioni chiuse per questo stage" }
-  }
-
-  const today = startOfUTCToday()
-  const stageMid = startOfUTCDate(stage.date)
-  if (stageMid < today) {
-    return { ok: false, error: "Stage già concluso" }
-  }
-  if (stage.registrationDeadline) {
-    const deadline = startOfUTCDate(stage.registrationDeadline)
-    if (deadline < today) {
-      return { ok: false, error: "Scadenza iscrizioni superata" }
-    }
-  }
-  if (stage._count.enrollments >= stage.capacity) {
-    return { ok: false, error: "Posti esauriti" }
-  }
-
-  // 2) Atleta attiva
-  const athlete = await prisma.athlete.findFirst({
-    where: { id: params.athleteId, deletedAt: null },
-    select: { id: true },
-  })
-  if (!athlete) return { ok: false, error: "Allieva non trovata" }
-
-  // 3) Non già iscritta
-  const existing = await prisma.stageEnrollment.findUnique({
-    where: {
-      stageId_athleteId: {
-        stageId: params.stageId,
-        athleteId: params.athleteId,
-      },
-    },
-    select: { id: true },
-  })
-  if (existing) return { ok: false, error: "Allieva già iscritta a questo stage" }
-
-  const dueDate = computeScheduleDueDate(stage.date, stage.registrationDeadline)
-
-  try {
-    const created = await prisma.$transaction(async (tx) => {
-      const enrollment = await tx.stageEnrollment.create({
-        data: {
-          stageId: params.stageId,
-          athleteId: params.athleteId,
-          enrolledBy: params.enrolledByUserId,
-          notes: params.notes,
-        },
-        select: { id: true },
-      })
-
-      if (stage.feeCents > 0) {
-        await tx.paymentSchedule.create({
-          data: {
-            stageEnrollmentId: enrollment.id,
-            academicYearId: stage.academicYearId,
-            feeType: FeeType.STAGE,
-            dueDate,
-            amountCents: stage.feeCents,
-            status: ScheduleStatus.DUE,
-            createdBy: params.auditUserId ?? undefined,
-            notes: `Stage: ${stage.title}`,
-          },
-        })
-      }
-
-      if (params.auditUserId) {
-        await tx.auditLog.create({
-          data: {
-            userId: params.auditUserId,
-            action: "STAGE_ENROLLMENT_CREATE",
-            entityType: "StageEnrollment",
-            entityId: enrollment.id,
-            changes: {
-              stageId: params.stageId,
-              athleteId: params.athleteId,
-            } satisfies Prisma.InputJsonValue,
-          },
-        })
-      }
-
-      return enrollment
-    })
-
-    return { ok: true, enrollmentId: created.id }
-  } catch (error) {
-    return { ok: false, error: mapPrismaError(error) }
-  }
 }
 
 export async function unenrollAthlete(

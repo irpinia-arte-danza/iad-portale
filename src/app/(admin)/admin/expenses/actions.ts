@@ -15,8 +15,6 @@ import {
   type ExpenseUpdateValues,
 } from "@/lib/schemas/expense"
 
-import { getExpenseById, type ExpenseWithRelations } from "./queries"
-
 const EXPENSES_PATH = "/admin/expenses"
 
 function mapPrismaError(error: unknown): string {
@@ -63,25 +61,6 @@ async function resolveYearIds(expenseDate: Date): Promise<
     ok: true,
     fiscalYearId: currentFY.id,
     academicYearId: inAyWindow ? currentAY!.id : null,
-  }
-}
-
-export async function getExpenseDetail(
-  id: string,
-): Promise<ActionResult<{ expense: ExpenseWithRelations }>> {
-  const idParsed = uuidSchema.safeParse(id)
-  if (!idParsed.success) {
-    return { ok: false, error: "Identificativo non valido" }
-  }
-
-  try {
-    const expense = await getExpenseById(idParsed.data)
-    if (!expense) {
-      return { ok: false, error: "Spesa non trovata" }
-    }
-    return { ok: true, data: { expense } }
-  } catch (error) {
-    return { ok: false, error: mapPrismaError(error) }
   }
 }
 

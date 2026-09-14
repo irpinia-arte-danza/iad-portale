@@ -8,8 +8,7 @@ import { prisma } from "@/lib/prisma"
 import { requireParent } from "@/lib/auth/require-parent"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
-
-import { enrollAthleteCore } from "@/app/(admin)/admin/stages/actions"
+import { enrollAthleteCore } from "@/lib/stages/enroll-athlete"
 
 const parentEnrollSchema = z.object({
   stageId: uuidSchema,
