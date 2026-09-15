@@ -70,6 +70,7 @@ const PAYMENT_FOR_RECEIPT_SELECT = {
   feeType: true,
   amountCents: true,
   paymentDate: true,
+  method: true,
   notes: true,
   academicYear: { select: { label: true } },
   parent: { select: PERSON_SELECT },
@@ -249,6 +250,7 @@ export async function buildIssuePreview(
     amountCents: payment.amountCents,
     feeType: payment.feeType,
     paymentDate: payment.paymentDate,
+    paymentMethod: payment.method,
     lines: buildLines(payment.paymentSchedules) ?? [],
     existing: payment.receipt ? toInfo(payment.receipt) : null,
     payer: {

@@ -413,7 +413,7 @@ Ogni ricevuta:
 - Dati beneficiario
 - Descrizione causale + periodo coperto
 - Importo, metodo pagamento, data
-- **Dicitura detraibilità** per minori 5-18 anni (art. 15 TUIR)
+- **Dicitura detraibilità** per minori 5-18 anni (art. 15 TUIR), **solo se tutti i pagamenti coperti sono tracciabili** (bonifico, POS, link SumUp). Contanti o "Altro" → nessuna dicitura, solo una riga con il metodo di pagamento. Regola in `src/lib/payments/traceability.ts`; le ricevute già emesse non si rigenerano
 - Salvata in Supabase Storage
 
 ### Ricevuta in bianco (template)

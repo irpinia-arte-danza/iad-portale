@@ -154,6 +154,8 @@ export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> 
     periodEnd: payment.periodEnd,
     amountCents: receipt.amountCents ?? payment.amountCents,
     method: payment.method,
+    // Una ricevuta copre un solo pagamento (payment_id unico)
+    paymentMethods: [payment.method],
     paymentDate: payment.paymentDate,
     receiptFooter: settings?.receiptFooter ?? null,
   }

@@ -1,5 +1,6 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer"
 
+import { receiptPaymentNotice } from "@/lib/payments/traceability"
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import type { FeeType, PaymentMethod } from "@prisma/client"
 import type { ReceiptLine } from "@/lib/receipts/types"
@@ -38,6 +39,9 @@ export type ReceiptData = {
   periodEnd: Date | null
   amountCents: number
   method: PaymentMethod
+  // Metodi di tutti i pagamenti coperti dalla ricevuta (oggi uno solo: una
+  // ricevuta = un pagamento). Decidono la dicitura in calce.
+  paymentMethods: PaymentMethod[]
   paymentDate: Date
   receiptFooter: string | null
 }
@@ -71,6 +75,7 @@ function composeAddress(b: ReceiptBrand): string {
   return parts.length > 0 ? parts.join(" — ") : b.asdAddress ?? ""
 }
 
+// Testo invariato: cambia solo quando compare (receiptPaymentNotice)
 const TUIR_NOTICE =
   "Spesa detraibile ai fini IRPEF (art. 15 c.1 lett. i-quinquies TUIR) per ragazzi 5-18 anni — conservare la presente ricevuta."
 
@@ -224,6 +229,8 @@ export function ReceiptPdf({
   // dell'SVG lancia "Cannot read properties of undefined (reading 'xAdvance')".
   const logoForPdf = brand.logoUrl ?? null
 
+  const paymentNotice = receiptPaymentNotice(receipt.paymentMethods)
+
   // Più scadenze: tutti i tipi quota coperti ("Quota associativa + Quota mensile")
   const feeTypeLabel = receipt.lines
     ? [...new Set(receipt.lines.map((line) => FEE_TYPE_LABELS[line.feeType]))].join(
@@ -373,9 +380,16 @@ export function ReceiptPdf({
           </View>
         </View>
 
-        {/* TUIR + custom footer */}
+        {/* Dicitura TUIR solo con pagamenti tracciabili, altrimenti riga neutra
+            sul metodo; poi il testo libero in calce */}
         <View style={styles.noticeBox}>
-          <Text style={styles.noticeText}>{TUIR_NOTICE}</Text>
+          <Text style={styles.noticeText}>
+            {paymentNotice.kind === "TAX_DEDUCTION"
+              ? TUIR_NOTICE
+              : `Metodo di pagamento: ${paymentNotice.methods
+                  .map((m) => PAYMENT_METHOD_LABELS[m])
+                  .join(", ")}.`}
+          </Text>
           {receipt.receiptFooter ? (
             <Text style={{ ...styles.noticeText, marginTop: 4 }}>
               {receipt.receiptFooter}
