@@ -40,20 +40,10 @@ export type ReceiptData = {
   method: PaymentMethod
   paymentDate: Date
   receiptFooter: string | null
-  // Ricevuta annullata (storno del pagamento): il PDF lo dichiara in modo
-  // evidente, così una copia stampata non viene scambiata per valida
-  cancellation: { cancelledAt: Date; reason: string | null } | null
 }
 
-// Timestamp (non colonna @db.Date): formattato nel giorno di Roma
-function formatDateRome(date: Date): string {
-  return new Intl.DateTimeFormat("it-IT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "Europe/Rome",
-  }).format(date)
-}
+// Documento "come emesso", quello che si archivia: l'annullamento non entra
+// qui, si aggiunge sopra il file archiviato (src/lib/receipts/cancelled-stamp.ts)
 
 function formatDateIt(date: Date | null | undefined): string {
   if (!date) return "—"
@@ -219,40 +209,6 @@ const styles = {
     color: pdfColors.text,
     textAlign: "right" as const,
   },
-  // Larghezza pagina intera e corpo 64: "ANNULLATA" resta su una riga
-  // (a 88pt react-pdf la spezzava in "ANNULLA-TA")
-  cancelledWatermark: {
-    position: "absolute" as const,
-    top: 360,
-    left: 0,
-    right: 0,
-    alignItems: "center" as const,
-    transform: "rotate(-30deg)",
-  },
-  cancelledWatermarkText: {
-    fontSize: 64,
-    fontFamily: "Helvetica-Bold",
-    color: pdfColors.danger,
-    opacity: 0.18,
-    letterSpacing: 4,
-  },
-  cancelledBanner: {
-    borderWidth: 1.5,
-    borderColor: pdfColors.danger,
-    borderRadius: 2,
-    padding: 8,
-    marginBottom: 12,
-  },
-  cancelledBannerTitle: {
-    fontSize: 12,
-    fontFamily: "Helvetica-Bold",
-    color: pdfColors.danger,
-    marginBottom: 2,
-  },
-  cancelledBannerText: {
-    fontSize: 9,
-    color: pdfColors.danger,
-  },
 }
 
 export function ReceiptPdf({
@@ -286,12 +242,6 @@ export function ReceiptPdf({
   return (
     <Document>
       <Page size="A4" style={pdfStyles.page}>
-        {receipt.cancellation ? (
-          <View style={styles.cancelledWatermark} fixed>
-            <Text style={styles.cancelledWatermarkText}>ANNULLATA</Text>
-          </View>
-        ) : null}
-
         {/* Header */}
         <View style={pdfStyles.headerRow}>
           <IADHeaderMark logoUrl={logoForPdf} />
@@ -322,24 +272,6 @@ export function ReceiptPdf({
             Emessa il {formatDateIt(receipt.issueDate)}
           </Text>
         </View>
-
-        {receipt.cancellation ? (
-          <View style={styles.cancelledBanner}>
-            <Text style={styles.cancelledBannerTitle}>
-              RICEVUTA ANNULLATA — NON VALIDA
-            </Text>
-            <Text style={styles.cancelledBannerText}>
-              Annullata il {formatDateRome(receipt.cancellation.cancelledAt)} a
-              seguito dello storno del pagamento. Il numero resta assegnato e
-              non può essere riutilizzato.
-            </Text>
-            {receipt.cancellation.reason ? (
-              <Text style={{ ...styles.cancelledBannerText, marginTop: 2 }}>
-                Motivo: {receipt.cancellation.reason}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
 
         {/* Party row: pagante + per conto di */}
         <View style={styles.partyRow}>

@@ -326,7 +326,7 @@ Sistema email end-to-end operativo (Sprint 3 chiuso 22 aprile 2026).
 
 - **Provider**: Resend API, dominio `irpiniaartedanza.it` verified (SPF / DKIM / DMARC)
 - **Mittente**: `notifiche@irpiniaartedanza.it`, Reply-To `info@irpiniaartedanza.it`
-- **Capabilities**: template editor runtime (`/admin/email-templates`), invio manuale bulk (`/admin/scadenze`), Vercel Cron auto-reminder (3 milestone con dedup `milestoneKey`), webhook delivery tracking (svix HMAC), audit `EmailLog` completo + storico in detail allieva/genitore
+- **Capabilities**: template editor runtime (`/admin/email-templates`), invio manuale bulk (`/admin/scadenze`), auto-reminder via cron (3 milestone con dedup `milestoneKey`; **spento da settembre 2026**, tolto da `vercel.json`: i solleciti si mandano a mano da `/admin/scadenze`), webhook delivery tracking (svix HMAC), audit `EmailLog` completo + storico in detail allieva/genitore
 
 Per dettagli architettura, cronologia 9 fasi, gotcha specifici (§17.25-27), file principali ed env vars: **`docs/email-system.md`**.
 

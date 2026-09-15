@@ -76,6 +76,14 @@ export function ReceiptIssuePanel({
             </Badge>
           ) : null}
         </div>
+        {state.pdfDeferred ? (
+          <p className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            La ricevuta è emessa, ma l&apos;archivio dei PDF non ha risposto. Il
+            PDF viene archiviato alla prima apertura o entro la notte: puoi
+            aprirlo e stamparlo subito.
+          </p>
+        ) : null}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="outline" className="min-h-11" onClick={onClose}>
             Chiudi

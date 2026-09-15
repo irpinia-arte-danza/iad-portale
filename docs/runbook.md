@@ -43,6 +43,7 @@ dell'applicazione.
 | `db.dump.gpg` | `pg_dump` formato custom degli schemi `public` (tutti i dati del gestionale, `_prisma_migrations` compresa), `auth` (utenti, password in forma hash) e `storage` (metadati dei file) | sì |
 | `storage-medical-certificates.tar.gpg` | tutti i file del bucket privato dei certificati medici | sì |
 | `storage-brand.tar.gpg` | logo e allegati del brand | sì |
+| `storage-receipts.tar.gpg` | i PDF delle ricevute così come emessi (bucket privato `receipts`, da settembre 2026) | sì |
 | `storage-<bucket>.tar.gpg` | ogni bucket creato in futuro, incluso in automatico | sì |
 | `manifest.json` | data, versione Postgres, versione schema (ultima migrazione Prisma), righe per tabella, file e byte per bucket con configurazione, hash SHA-256 dei file in chiaro | no: nessun dato personale |
 | `SHA256SUMS` | hash dei file così come sono caricati | no |
@@ -112,10 +113,12 @@ Note tecniche:
   manifest, per ricrearli.
 - Schemi Supabase non usati dall'app (`vault` con 0 segreti, `realtime`,
   `extensions`): esistono già in ogni progetto nuovo.
-- **I PDF delle ricevute come documenti.** Oggi vengono rigenerati a ogni
-  apertura con logo, intestazione e footer *attuali*: il backup contiene i
-  dati della ricevuta (numero, data, importi, pagante), non il PDF così come
-  è stato emesso.
+- **I PDF delle ricevute non ancora archiviati.** Da settembre 2026 il PDF
+  si archivia all'emissione nel bucket `receipts` ed entra nel backup. Una
+  ricevuta emessa con Storage irraggiungibile ha il file solo dopo il cron
+  notturno `receipt-pdfs` (00:00–00:59 UTC, prima del backup): fino ad allora
+  il backup contiene i dati della ricevuta ma non il PDF. Vedi «Ricevute — PDF
+  archiviati».
 - Log di Vercel, Supabase e Resend. `email_logs` e `audit_logs` dell'app
   invece ci sono: sono tabelle.
 
@@ -248,7 +251,8 @@ oltre a Resend.
    - job verde;
    - nel repo di backup una release `backup-AAAA-MM-GG-HHMM` con
      `db.dump.gpg`, `storage-brand.tar.gpg`,
-     `storage-medical-certificates.tar.gpg`, `manifest.json` e `SHA256SUMS`;
+     `storage-medical-certificates.tar.gpg`, `storage-receipts.tar.gpg` (dopo
+     il primo archivio di una ricevuta), `manifest.json` e `SHA256SUMS`;
    - riepilogo del job con righe e file.
 3. Rilanciare una seconda volta. Nel passo *Manifest e controlli* deve comparire
    "Confronto con backup-…".
@@ -580,10 +584,66 @@ USING (
 
 ---
 
+## Ricevute — PDF archiviati
+
+Il PDF di una ricevuta è il documento consegnato: si genera **una volta** e poi
+si serve sempre quel file, anche se cambiano template, logo o intestazione
+dell'associazione. Codice: `src/lib/receipts/receipt-pdf-store.ts`.
+
+**Bucket `receipts`** (Supabase Storage):
+- privato, solo `application/pdf`, massimo 5 MB a file, nessuna policy RLS
+  (si legge e si scrive solo lato server con la service role);
+- nasce da solo al primo archivio. Se esiste ma è **pubblico**, l'app smette di
+  archiviare (log `Bucket receipts pubblico`): va rimesso privato dalla dashboard;
+- percorso `<anno di emissione>/<numero con "/" al posto di "-">.pdf`, per
+  esempio `2026/IAD-2026-27-003.pdf` o `2026/IAD-2026-27-045-S.pdf`, salvato in
+  `receipts.pdf_path`;
+- entra nel backup notturno senza modifiche al workflow
+  (`storage-receipts.tar.gpg`).
+
+**Quando nasce il file**:
+1. all'emissione, subito dopo l'assegnazione del numero e fuori dalla sua
+   transazione;
+2. se lì Storage non risponde (timeout 10 secondi), la ricevuta resta emessa e
+   il PDF si genera e si archivia alla prima apertura;
+3. in ogni caso il cron notturno `receipt-pdfs` archivia quelli rimasti senza
+   file, anche se nessuno li apre.
+
+**Conservazione: 10 anni. Non cancellare mai file dal bucket**, nemmeno di
+ricevute annullate, e non impostare regole di pulizia automatica. L'app non ha
+codice che cancella o sovrascrive questi file.
+
+**Ricevute annullate**: il file archiviato resta quello emesso. L'admin che le
+apre riceve lo stesso file con la filigrana "ANNULLATA" e una fascia con data e
+motivo, aggiunte al volo e mai salvate. Il genitore non le può aprire.
+
+**Controllo**: dopo la notte questa query deve essere vuota.
+
+```sql
+select receipt_number, issue_date, created_at
+from receipts
+where pdf_path is null
+order by created_at;
+```
+
+Se resta piena: log Vercel `[receipt pdf] archive failed` o
+`[cron/receipt-pdfs] receipts not archived`.
+
+**File archiviato ma non trovato** (per esempio database ripristinato senza i
+file del bucket): la route non rigenera il PDF e mostra un errore. Recupero:
+ricaricare il file da `storage-receipts.tar.gpg` del backup, con lo stesso
+percorso. Solo se il file è perso per sempre:
+`update receipts set pdf_path = null where receipt_number = '…';` → al primo
+accesso viene rigenerato con il template **attuale**, quindi non identico
+all'originale: annotarlo.
+
+---
+
 ## Cron Vercel — verifica esecuzioni
 
 **Cron registrati**:
-- `/api/cron/reminders` — invio automatico promemoria pagamenti (Sprint 3)
+- `/api/cron/receipt-pdfs` — ogni notte (`0 0 * * *`: sul piano Hobby parte in un momento qualsiasi fra 00:00 e 00:59 UTC, comunque prima del backup delle 01:37). Archivia nel bucket `receipts` i PDF delle ricevute ancora senza file, al massimo 25 per notte; non rigenera mai un file già archiviato. Dettagli in «Ricevute — PDF archiviati».
+- `/api/cron/reminders` — **spento da settembre 2026**, tolto da `vercel.json` (audit #8: un pagamento può non chiudere la scadenza giusta, il sollecito automatico scriverebbe a chi ha pagato in contanti). I solleciti si mandano a mano da `/admin/scadenze`. La route resta nel codice: chiamarla con `Authorization: Bearer $CRON_SECRET` **invia davvero** le email.
 - `/api/cron/academic-year-rollover` — ogni notte (03:00 UTC), tre passi indipendenti:
   - **anno accademico**: se un anno copre la data odierna diventa corrente. Se nessun anno la copre (luglio-agosto, o anno nuovo non ancora creato) il corrente **non viene mai azzerato**: resta l'ultimo anno, con un warning nei log;
   - **anno fiscale**: crea l'anno solare in corso (a dicembre anche il successivo) e dal 1° gennaio lo imposta come corrente. Pagamenti e spese scelgono comunque l'anno fiscale dalla propria data, e lo creano se manca;

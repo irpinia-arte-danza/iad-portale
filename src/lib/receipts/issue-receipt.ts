@@ -21,6 +21,7 @@ import {
   formatReceiptNumber,
   todayInRome,
 } from "./numbering"
+import { archiveReceiptPdf } from "./receipt-pdf-store"
 import type {
   IssuedReceiptInfo,
   IssueReceiptResult,
@@ -41,6 +42,8 @@ import type {
 //   all'emissione: la ristampa resta identica anche se cambiano i dati
 // - un pagamento che chiude più scadenze ha la causale a righe (una per
 //   scadenza), congelata in Receipt.lines
+// - il PDF si genera e si archivia all'emissione, dopo il commit del numero:
+//   da lì la ricevuta si consegna sempre con quel file (receipt-pdf-store.ts)
 // ─────────────────────────────────────────────────────────────────────────
 
 const PERSON_SELECT = {
@@ -272,7 +275,7 @@ export async function issueReceiptCore(params: {
   adminUserId: string
 }): Promise<IssueReceiptResult> {
   try {
-    return await prisma.$transaction(
+    const result = await prisma.$transaction(
       async (tx): Promise<IssueReceiptResult> => {
         const payment = await loadPayment(tx, params.paymentId)
         if (!payment) return { ok: false, error: "Pagamento non trovato" }
@@ -367,6 +370,15 @@ export async function issueReceiptCore(params: {
       },
       { timeout: 15_000 },
     )
+
+    // PDF generato e archiviato subito dopo il numero, FUORI dalla transazione:
+    // se l'archivio non risponde la ricevuta resta emessa e il PDF si archivia
+    // al primo accesso o dal cron notturno. archiveReceiptPdf non lancia.
+    if (result.ok && !result.alreadyIssued) {
+      const archived = await archiveReceiptPdf(result.receipt.id)
+      return { ...result, pdfDeferred: !archived }
+    }
+    return result
   } catch (error) {
     // Due emissioni contemporanee sullo stesso pagamento: vince la prima,
     // la seconda restituisce la ricevuta già emessa.

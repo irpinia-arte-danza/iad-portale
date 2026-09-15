@@ -913,7 +913,10 @@ model Receipt {
   // [{ description, amountCents, feeType }]. null = causale singola.
   lines             Json?
 
-  pdfUrl String? @map("pdf_url")
+  // Percorso del PDF archiviato all'emissione nel bucket privato "receipts"
+  // (<anno di emissione>/<numero>.pdf). Il file è il documento consegnato:
+  // mai rigenerato, sovrascritto o cancellato. null = non ancora archiviato.
+  pdfPath String? @map("pdf_path")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
