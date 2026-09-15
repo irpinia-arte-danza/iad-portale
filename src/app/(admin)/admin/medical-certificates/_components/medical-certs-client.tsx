@@ -3,15 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import {
-  AlertTriangle,
-  CheckCircle2,
-  ExternalLink,
-  Loader2,
-  Mail,
-  Search,
-  ShieldAlert,
-} from "lucide-react"
+import { ExternalLink, Loader2, Mail, Search } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -24,7 +16,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -43,10 +34,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { CertStatusBadge } from "@/components/medical-certificates/cert-status-badge"
+import type { CertStatus } from "@/lib/medical-certificates/certificate-status"
 import {
   MEDICAL_CERT_TYPE_LABELS,
   normalizeCertType,
-  type CertStatus,
 } from "@/lib/schemas/medical-certificate"
 import { formatDateShort } from "@/lib/utils/format"
 
@@ -70,39 +62,6 @@ const ACTIONABLE_STATUSES = new Set<CertStatus>([
   "expired",
   "expiring",
 ])
-
-function StatusBadge({ status }: { status: CertStatus }) {
-  if (status === "valid") {
-    return (
-      <Badge className="gap-1 bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100">
-        <CheckCircle2 className="h-3 w-3" />
-        Valido
-      </Badge>
-    )
-  }
-  if (status === "expiring") {
-    return (
-      <Badge className="gap-1 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-        <AlertTriangle className="h-3 w-3" />
-        In scadenza
-      </Badge>
-    )
-  }
-  if (status === "expired") {
-    return (
-      <Badge variant="destructive" className="gap-1">
-        <ShieldAlert className="h-3 w-3" />
-        Scaduto
-      </Badge>
-    )
-  }
-  return (
-    <Badge variant="outline" className="gap-1">
-      <ShieldAlert className="h-3 w-3" />
-      Mancante
-    </Badge>
-  )
-}
 
 export function MedicalCertsClient({ rows }: { rows: AthleteCertRow[] }) {
   const searchParams = useSearchParams()
@@ -305,9 +264,11 @@ export function MedicalCertsClient({ rows }: { rows: AthleteCertRow[] }) {
                           </span>
                           {r.daysToExpiry !== null ? (
                             <span className="text-xs text-muted-foreground">
-                              {r.daysToExpiry < 0
-                                ? `scaduto da ${Math.abs(r.daysToExpiry)}gg`
-                                : `tra ${r.daysToExpiry}gg`}
+                              {r.daysToExpiry === 0
+                                ? "scade oggi"
+                                : r.daysToExpiry < 0
+                                  ? `scaduto da ${Math.abs(r.daysToExpiry)}gg`
+                                  : `tra ${r.daysToExpiry}gg`}
                             </span>
                           ) : null}
                         </div>
@@ -316,7 +277,7 @@ export function MedicalCertsClient({ rows }: { rows: AthleteCertRow[] }) {
                       )}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={r.status} />
+                      <CertStatusBadge status={r.status} />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">

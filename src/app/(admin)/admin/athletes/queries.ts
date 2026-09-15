@@ -2,19 +2,61 @@ import { Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import {
+  classifyCert,
+  compareByCertificateExpiry,
+  CURRENT_CERTIFICATE_ORDER,
+} from "@/lib/medical-certificates/certificate-status"
+import { todayDateOnly } from "@/lib/utils/date-only"
+
+export type AthleteListSort = "name" | "certificate"
 
 type ListFilters = {
   search?: string
+  sort?: AthleteListSort
   limit?: number
   offset?: number
 }
 
 const DEFAULT_LIMIT = 50
 
+const athleteListInclude = Prisma.validator<Prisma.AthleteInclude>()({
+  _count: {
+    select: {
+      parentRelations: {
+        where: { parent: { deletedAt: null } },
+      },
+    },
+  },
+  // Solo il certificato corrente, per la colonna "Certificato"
+  medicalCertificates: {
+    where: { deletedAt: null },
+    orderBy: CURRENT_CERTIFICATE_ORDER,
+    take: 1,
+    select: { expiryDate: true },
+  },
+})
+
+type AthleteListRecord = Prisma.AthleteGetPayload<{
+  include: typeof athleteListInclude
+}>
+
+function toListRow(
+  { medicalCertificates, ...athlete }: AthleteListRecord,
+  today: Date,
+) {
+  const expiryDate = medicalCertificates[0]?.expiryDate ?? null
+  return {
+    ...athlete,
+    certificate: { expiryDate, status: classifyCert(expiryDate, today) },
+  }
+}
+
 export async function listAthletes(filters: ListFilters = {}) {
   await requireAdmin()
 
-  const { search, limit = DEFAULT_LIMIT, offset = 0 } = filters
+  const { search, sort = "name", limit = DEFAULT_LIMIT, offset = 0 } = filters
+  const today = todayDateOnly()
 
   const where: Prisma.AthleteWhereInput = {
     deletedAt: null,
@@ -28,26 +70,46 @@ export async function listAthletes(filters: ListFilters = {}) {
       : {}),
   }
 
-  const [items, totalCount] = await Promise.all([
+  const orderBy: Prisma.AthleteOrderByWithRelationInput[] = [
+    { lastName: "asc" },
+    { firstName: "asc" },
+  ]
+
+  if (sort === "certificate") {
+    // Il certificato corrente è una relazione: si ordina in memoria l'elenco
+    // completo (poche centinaia di allieve) e poi si pagina. A parità di
+    // scadenza resta l'ordine per nome (sort stabile).
+    const athletes = await prisma.athlete.findMany({
+      where,
+      include: athleteListInclude,
+      orderBy,
+    })
+    const rows = athletes
+      .map((athlete) => toListRow(athlete, today))
+      .sort((a, b) =>
+        compareByCertificateExpiry(
+          a.certificate.expiryDate,
+          b.certificate.expiryDate,
+        ),
+      )
+    return { items: rows.slice(offset, offset + limit), totalCount: rows.length }
+  }
+
+  const [athletes, totalCount] = await Promise.all([
     prisma.athlete.findMany({
       where,
-      include: {
-        _count: {
-          select: {
-            parentRelations: {
-              where: { parent: { deletedAt: null } },
-            },
-          },
-        },
-      },
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      include: athleteListInclude,
+      orderBy,
       take: limit,
       skip: offset,
     }),
     prisma.athlete.count({ where }),
   ])
 
-  return { items, totalCount }
+  return {
+    items: athletes.map((athlete) => toListRow(athlete, today)),
+    totalCount,
+  }
 }
 
 const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
@@ -89,10 +151,10 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
       where: { feeType: "ASSOCIATION" },
       orderBy: { dueDate: "desc" },
     },
-    // Sprint 1.B: certificati medici (ultimo + storico). Filtra non-deleted.
+    // Sprint 1.B: certificati medici (corrente + storico). Filtra non-deleted.
     medicalCertificates: {
       where: { deletedAt: null },
-      orderBy: [{ issueDate: "desc" }],
+      orderBy: CURRENT_CERTIFICATE_ORDER,
       select: {
         id: true,
         type: true,

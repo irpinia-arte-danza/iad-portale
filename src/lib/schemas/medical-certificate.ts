@@ -60,18 +60,4 @@ export const medicalCertSchema = z
 
 export type MedicalCertValues = z.infer<typeof medicalCertSchema>
 
-// Status classification per badge UI: missing | expired | expiring | valid
-export type CertStatus = "missing" | "expired" | "expiring" | "valid"
-
-export const EXPIRY_WARN_DAYS = 30
-
-export function classifyCert(expiry: Date | null | undefined): CertStatus {
-  if (!expiry) return "missing"
-  const now = new Date()
-  const expiryDate = new Date(expiry)
-  if (expiryDate < now) return "expired"
-  const diffDays =
-    (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-  if (diffDays <= EXPIRY_WARN_DAYS) return "expiring"
-  return "valid"
-}
+// Stato del certificato (classifyCert): src/lib/medical-certificates/certificate-status.ts
