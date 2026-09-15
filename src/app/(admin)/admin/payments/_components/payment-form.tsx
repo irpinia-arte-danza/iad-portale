@@ -275,7 +275,12 @@ export function PaymentForm({
 
         {selectedAthlete && (
           <div className="space-y-2">
-            <p className="text-sm font-medium">Scadenze da incassare</p>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-sm font-medium">Scadenze da incassare</p>
+              {selectedOptions.length > 0 ? (
+                <p className="text-xs text-muted-foreground">Importo incassato</p>
+              ) : null}
+            </div>
             {options.length === 0 ? (
               <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
                 Nessuna scadenza aperta per questa allieva: puoi registrare un
@@ -289,7 +294,9 @@ export function PaymentForm({
                     !checked &&
                     selectedCategory !== null &&
                     option.category !== selectedCategory
-                  const editable = checked && isMulti
+                  // Importo sulla riga spuntata, sempre: stesso gesto con una o
+                  // più scadenze (con una sola è sincronizzato con "Importo")
+                  const editable = checked
                   const collected = rowCents(option)
                   return (
                     <li

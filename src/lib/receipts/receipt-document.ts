@@ -99,18 +99,14 @@ function parseReceiptLines(value: Prisma.JsonValue | null): ReceiptLine[] | null
   return lines.length >= 2 ? lines : null
 }
 
-// PDF "come emesso": anche per una ricevuta già annullata il documento non
-// riporta l'annullamento, che si aggiunge in lettura (cancelled-stamp.ts).
-// Lancia ReceiptRenderError per dati mancanti, oppure l'errore del renderer.
-export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> {
-  const payment = receipt.payment
-  if (!payment) {
-    throw new ReceiptRenderError(
-      "NO_PAYMENT",
-      `Receipt ${receipt.id} is not linked to a payment`,
-    )
-  }
-
+// Rendering dai dati del documento, con dati dell'associazione e piè di pagina
+// dalle impostazioni. Usato dalla ricevuta emessa e dall'anteprima, così i due
+// PDF sono lo stesso documento. Lancia ReceiptRenderError (NO_BRAND) per dati
+// mancanti, oppure l'errore del renderer.
+export async function renderReceiptPdfFromData(
+  data: Omit<ReceiptData, "receiptFooter">,
+  logContext: Record<string, string>,
+): Promise<Buffer> {
   const [brand, settings] = await Promise.all([
     prisma.brandSettings.findUnique({
       where: { id: 1 },
@@ -138,32 +134,14 @@ export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> 
     throw new ReceiptRenderError("NO_BRAND", "BrandSettings row (id 1) missing")
   }
 
-  const data: ReceiptData = {
-    receiptNumber: receipt.receiptNumber,
-    issueDate: receipt.issueDate,
-    payerName: receipt.payerName ?? athleteNameOf(receipt),
-    payerFiscalCode: receipt.payerFiscalCode,
-    payerAddress: receipt.payerAddress,
-    athleteName: athleteNameOf(receipt),
-    athleteFiscalCode:
-      receipt.athleteFiscalCode ?? payment.athlete.fiscalCode ?? null,
-    feeType: payment.feeType,
-    description: receipt.description,
-    lines: parseReceiptLines(receipt.lines),
-    periodStart: payment.periodStart,
-    periodEnd: payment.periodEnd,
-    amountCents: receipt.amountCents ?? payment.amountCents,
-    method: payment.method,
-    // Una ricevuta copre un solo pagamento (payment_id unico)
-    paymentMethods: [payment.method],
-    paymentDate: payment.paymentDate,
+  const receipt: ReceiptData = {
+    ...data,
     receiptFooter: settings?.receiptFooter ?? null,
   }
-
   const brandData: ReceiptBrand = brand
 
   try {
-    return await renderToBuffer(ReceiptPdf({ receipt: data, brand: brandData }))
+    return await renderToBuffer(ReceiptPdf({ receipt, brand: brandData }))
   } catch (error) {
     if (!brandData.logoUrl) throw error
     // Il logo (immagine remota, formato caricato dall'admin) non deve impedire
@@ -171,13 +149,50 @@ export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> 
     // causa resta nei log per sistemare il logo.
     console.error(
       "[receipt pdf] render with logo failed, retrying without logo",
-      { receiptId: receipt.id },
+      logContext,
       error,
     )
     return renderToBuffer(
-      ReceiptPdf({ receipt: data, brand: { ...brandData, logoUrl: null } }),
+      ReceiptPdf({ receipt, brand: { ...brandData, logoUrl: null } }),
     )
   }
+}
+
+// PDF "come emesso": anche per una ricevuta già annullata il documento non
+// riporta l'annullamento, che si aggiunge in lettura (cancelled-stamp.ts).
+// Lancia ReceiptRenderError per dati mancanti, oppure l'errore del renderer.
+export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> {
+  const payment = receipt.payment
+  if (!payment) {
+    throw new ReceiptRenderError(
+      "NO_PAYMENT",
+      `Receipt ${receipt.id} is not linked to a payment`,
+    )
+  }
+
+  return renderReceiptPdfFromData(
+    {
+      receiptNumber: receipt.receiptNumber,
+      issueDate: receipt.issueDate,
+      payerName: receipt.payerName ?? athleteNameOf(receipt),
+      payerFiscalCode: receipt.payerFiscalCode,
+      payerAddress: receipt.payerAddress,
+      athleteName: athleteNameOf(receipt),
+      athleteFiscalCode:
+        receipt.athleteFiscalCode ?? payment.athlete.fiscalCode ?? null,
+      feeType: payment.feeType,
+      description: receipt.description,
+      lines: parseReceiptLines(receipt.lines),
+      periodStart: payment.periodStart,
+      periodEnd: payment.periodEnd,
+      amountCents: receipt.amountCents ?? payment.amountCents,
+      method: payment.method,
+      // Una ricevuta copre un solo pagamento (payment_id unico)
+      paymentMethods: [payment.method],
+      paymentDate: payment.paymentDate,
+    },
+    { receiptId: receipt.id },
+  )
 }
 
 const FILENAME_FORBIDDEN = new Set(['"', "<", ">", ":", "|", "?", "*"])

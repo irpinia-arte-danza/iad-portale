@@ -3,6 +3,7 @@
 import {
   AlertTriangle,
   CheckCircle2,
+  ExternalLink,
   FileText,
   Info,
   Loader2,
@@ -12,8 +13,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { isTraceablePaymentMethod } from "@/lib/payments/traceability"
-import { receiptPdfHref } from "@/lib/receipts/types"
-import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
+import { receiptPdfHref, receiptPreviewPdfHref } from "@/lib/receipts/types"
+import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { formatDateShort, formatEur } from "@/lib/utils/format"
 
 import type { ReceiptIssueState } from "./use-receipt-issue"
@@ -114,70 +115,47 @@ export function ReceiptIssuePanel({
   // preview | issuing
   const { preview } = state
   const issuing = state.phase === "issuing"
+  const traceable = isTraceablePaymentMethod(preview.paymentMethod)
+  const methodLabel = PAYMENT_METHOD_LABELS[preview.paymentMethod]
+  const previewHref = receiptPreviewPdfHref(preview.paymentId)
 
   return (
     <div className="space-y-4">
-      <dl className="grid gap-2 rounded-md border p-3 text-sm">
-        <div className="grid grid-cols-[110px_1fr] gap-2">
-          <dt className="text-muted-foreground">Allieva</dt>
-          <dd className="font-medium">{preview.athleteName}</dd>
-        </div>
-        <div className="grid grid-cols-[110px_1fr] gap-2">
-          <dt className="text-muted-foreground">Importo</dt>
-          <dd className="font-mono">
-            {formatEur(preview.amountCents)} ·{" "}
-            {preview.lines.length > 0
-              ? [
-                  ...new Set(
-                    preview.lines.map((line) => FEE_TYPE_LABELS[line.feeType]),
-                  ),
-                ].join(" + ")
-              : FEE_TYPE_LABELS[preview.feeType]}
-          </dd>
-        </div>
-        {preview.lines.length > 0 ? (
-          <div className="grid grid-cols-[110px_1fr] gap-2">
-            <dt className="text-muted-foreground">Causale</dt>
-            <dd>
-              <ul className="space-y-0.5">
-                {preview.lines.map((line, index) => (
-                  <li
-                    key={`${index}-${line.description}`}
-                    className="flex justify-between gap-3"
-                  >
-                    <span>{line.description}</span>
-                    <span className="shrink-0 font-mono tabular-nums">
-                      {formatEur(line.amountCents)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </dd>
-          </div>
-        ) : null}
-        <div className="grid grid-cols-[110px_1fr] gap-2">
-          <dt className="text-muted-foreground">Intestata a</dt>
-          <dd>
-            <span className="font-medium">{preview.payer.name}</span>
-            {preview.payer.fiscalCode ? (
-              <span className="block font-mono text-xs text-muted-foreground">
-                C.F. {preview.payer.fiscalCode}
-              </span>
-            ) : null}
-            {preview.payer.address ? (
-              <span className="block text-xs text-muted-foreground">
-                {preview.payer.address}
-              </span>
-            ) : null}
-          </dd>
-        </div>
-      </dl>
-
       {preview.blocker ? (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {preview.blocker}
         </p>
-      ) : null}
+      ) : (
+        <div className="space-y-2">
+          {/* Il documento che verrà emesso: stessi dati e stesso PDF, con il
+              numero previsto e la filigrana ANTEPRIMA */}
+          <div className="overflow-hidden rounded-md border bg-muted/30">
+            <iframe
+              title="Anteprima della ricevuta"
+              src={`${previewHref}#toolbar=0&navpanes=0&view=FitH`}
+              className="block h-[420px] w-full sm:h-[520px]"
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-x-3 text-xs text-muted-foreground">
+            <span>
+              {preview.athleteName} ·{" "}
+              <span className="font-mono tabular-nums">
+                {formatEur(preview.amountCents)}
+              </span>{" "}
+              · intestata a {preview.payer.name}
+            </span>
+            <a
+              href={previewHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center gap-1 font-medium text-foreground underline underline-offset-4"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Apri a schermo intero
+            </a>
+          </div>
+        </div>
+      )}
 
       {preview.warnings.length > 0 ? (
         <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
@@ -193,21 +171,27 @@ export function ReceiptIssuePanel({
         </div>
       ) : null}
 
-      {!isTraceablePaymentMethod(preview.paymentMethod) ? (
+      {traceable ? (
+        <p className="flex gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          Pagamento tracciabile ({methodLabel}) → la ricevuta riporta la
+          dicitura di detraibilità.
+        </p>
+      ) : (
         <p className="flex gap-2 rounded-md border border-sky-300 bg-sky-50 p-3 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100">
           <Info className="mt-0.5 h-4 w-4 shrink-0" />
           {preview.paymentMethod === "CASH"
             ? "Pagamento in contanti"
-            : `Metodo di pagamento "${PAYMENT_METHOD_LABELS[preview.paymentMethod]}"`}{" "}
+            : `Metodo di pagamento "${methodLabel}"`}{" "}
           → la ricevuta non riporterà la dicitura di detraibilità, solo il
           metodo di pagamento.
         </p>
-      ) : null}
+      )}
 
       <p className="text-xs text-muted-foreground">
-        Il numero viene assegnato adesso e non si può cancellare. I dati sopra
-        restano fissati sulla ricevuta: se c&apos;è un errore, si storna il
-        pagamento e la ricevuta risulta annullata.
+        Il numero viene assegnato adesso e non si può cancellare. I dati
+        dell&apos;anteprima restano fissati sulla ricevuta: se c&apos;è un
+        errore, si storna il pagamento e la ricevuta risulta annullata.
       </p>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

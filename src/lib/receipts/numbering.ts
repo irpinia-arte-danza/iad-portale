@@ -40,6 +40,16 @@ export function formatReceiptNumber(params: {
   return `${params.prefix}${compactAcademicYear(params.academicYearLabel)}/${progressive}${receiptCategorySuffix(params.category)}`
 }
 
+// Progressivo da assegnare: il contatore (già incrementato), salvo che un
+// progressivo uguale o più alto sia già stato emesso con lo stesso prefisso.
+// Stessa regola per l'emissione e per il numero previsto dell'anteprima.
+export function nextReceiptSequence(
+  counter: number,
+  maxIssuedSequence: number,
+): number {
+  return counter > maxIssuedSequence ? counter : maxIssuedSequence + 1
+}
+
 // Giorno di calendario a Roma, come Date a mezzanotte UTC (colonne @db.Date).
 // Senza, un'emissione alle 00:30 di Roma finirebbe sul giorno precedente.
 export function todayInRome(now: Date = new Date()): Date {
