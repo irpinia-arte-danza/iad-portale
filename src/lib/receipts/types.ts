@@ -1,4 +1,4 @@
-import type { FeeType, ReceiptStatus } from "@prisma/client"
+import type { FeeType, PaymentMethod, ReceiptStatus } from "@prisma/client"
 
 // Tipi condivisi client/server per emissione e consultazione ricevute.
 
@@ -28,6 +28,7 @@ export type ReceiptIssuePreview = {
   amountCents: number
   feeType: FeeType
   paymentDate: Date
+  paymentMethod: PaymentMethod
   existing: IssuedReceiptInfo | null
   payer: {
     name: string

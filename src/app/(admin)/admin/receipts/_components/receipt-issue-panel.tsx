@@ -1,11 +1,19 @@
 "use client"
 
-import { AlertTriangle, CheckCircle2, FileText, Loader2, Printer } from "lucide-react"
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FileText,
+  Info,
+  Loader2,
+  Printer,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { isTraceablePaymentMethod } from "@/lib/payments/traceability"
 import { receiptPdfHref } from "@/lib/receipts/types"
-import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
+import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { formatDateShort, formatEur } from "@/lib/utils/format"
 
 import type { ReceiptIssueState } from "./use-receipt-issue"
@@ -183,6 +191,17 @@ export function ReceiptIssuePanel({
             ))}
           </ul>
         </div>
+      ) : null}
+
+      {!isTraceablePaymentMethod(preview.paymentMethod) ? (
+        <p className="flex gap-2 rounded-md border border-sky-300 bg-sky-50 p-3 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          {preview.paymentMethod === "CASH"
+            ? "Pagamento in contanti"
+            : `Metodo di pagamento "${PAYMENT_METHOD_LABELS[preview.paymentMethod]}"`}{" "}
+          → la ricevuta non riporterà la dicitura di detraibilità, solo il
+          metodo di pagamento.
+        </p>
       ) : null}
 
       <p className="text-xs text-muted-foreground">
