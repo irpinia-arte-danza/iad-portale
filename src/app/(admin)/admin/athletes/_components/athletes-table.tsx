@@ -170,7 +170,7 @@ export function AthletesTable({ athletes, sort, sortHrefs }: AthletesTableProps)
               </TableCell>
               <TableCell>
                 <div className="flex flex-col items-start gap-1">
-                  <CertStatusBadge status={certificate.status} />
+                  <CertStatusBadge status={certificate.status} alertMissing />
                   {certificate.expiryDate ? (
                     <span className="hidden text-xs text-muted-foreground sm:inline">
                       {expired ? "scaduto il" : "scade il"}{" "}

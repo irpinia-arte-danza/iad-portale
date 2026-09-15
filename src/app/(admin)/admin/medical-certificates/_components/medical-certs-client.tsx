@@ -264,9 +264,11 @@ export function MedicalCertsClient({ rows }: { rows: AthleteCertRow[] }) {
                           </span>
                           {r.daysToExpiry !== null ? (
                             <span className="text-xs text-muted-foreground">
-                              {r.daysToExpiry < 0
-                                ? `scaduto da ${Math.abs(r.daysToExpiry)}gg`
-                                : `tra ${r.daysToExpiry}gg`}
+                              {r.daysToExpiry === 0
+                                ? "scade oggi"
+                                : r.daysToExpiry < 0
+                                  ? `scaduto da ${Math.abs(r.daysToExpiry)}gg`
+                                  : `tra ${r.daysToExpiry}gg`}
                             </span>
                           ) : null}
                         </div>
