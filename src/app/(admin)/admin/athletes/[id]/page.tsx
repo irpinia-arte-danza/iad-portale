@@ -49,7 +49,13 @@ export default async function AthleteDetailPage({ params }: PageProps) {
     }),
     prisma.academicYear.findFirst({
       where: { isCurrent: true },
-      select: { id: true, label: true },
+      select: {
+        id: true,
+        label: true,
+        startDate: true,
+        monthlyRenewalDay: true,
+        associationFeeCents: true,
+      },
     }),
     listAthletesWithRelations(),
     getAthleteEmailLog(resolvedParams.id),
@@ -98,7 +104,10 @@ export default async function AthleteDetailPage({ params }: PageProps) {
             athleteFirstName={athlete.firstName}
             enrollments={athlete.enrollments}
             activeCourses={activeCourses}
-            currentAcademicYearLabel={currentAcademicYear?.label ?? null}
+            currentAcademicYear={currentAcademicYear}
+            hasAssociationFee={athlete.paymentSchedules.some(
+              (s) => s.academicYearId === currentAcademicYear?.id,
+            )}
           />
           <SchedulesSection
             athleteId={athlete.id}
