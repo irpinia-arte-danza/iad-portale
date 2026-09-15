@@ -4,8 +4,11 @@ import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   classifyCert,
+  CURRENT_CERTIFICATE_ORDER,
+  daysUntilExpiry,
   type CertStatus,
-} from "@/lib/schemas/medical-certificate"
+} from "@/lib/medical-certificates/certificate-status"
+import { todayDateOnly } from "@/lib/utils/date-only"
 
 export type AthleteCertRow = {
   athleteId: string
@@ -31,16 +34,10 @@ const STATUS_PRIORITY: Record<CertStatus, number> = {
   valid: 3,
 }
 
-function diffDays(expiry: Date | null): number | null {
-  if (!expiry) return null
-  const now = Date.now()
-  const e = new Date(expiry).getTime()
-  return Math.floor((e - now) / (1000 * 60 * 60 * 24))
-}
-
 export async function getCertificatesOverview(): Promise<AthleteCertRow[]> {
   await requireAdmin()
 
+  const today = todayDateOnly()
   const athletes = await prisma.athlete.findMany({
     where: { deletedAt: null },
     select: {
@@ -49,7 +46,7 @@ export async function getCertificatesOverview(): Promise<AthleteCertRow[]> {
       lastName: true,
       medicalCertificates: {
         where: { deletedAt: null },
-        orderBy: { issueDate: "desc" },
+        orderBy: CURRENT_CERTIFICATE_ORDER,
         take: 1,
         select: {
           id: true,
@@ -82,7 +79,6 @@ export async function getCertificatesOverview(): Promise<AthleteCertRow[]> {
 
   const rows: AthleteCertRow[] = athletes.map((a) => {
     const cert = a.medicalCertificates[0] ?? null
-    const status = classifyCert(cert?.expiryDate ?? null)
     const parent = a.parentRelations[0]?.parent ?? null
     return {
       athleteId: a.id,
@@ -91,8 +87,8 @@ export async function getCertificatesOverview(): Promise<AthleteCertRow[]> {
       parentEmail: parent?.email ?? null,
       parentId: parent?.id ?? null,
       cert,
-      status,
-      daysToExpiry: diffDays(cert?.expiryDate ?? null),
+      status: classifyCert(cert?.expiryDate ?? null, today),
+      daysToExpiry: cert ? daysUntilExpiry(cert.expiryDate, today) : null,
     }
   })
 
@@ -110,12 +106,13 @@ export async function getCertificateStatusCounts(): Promise<
 > {
   await requireAdmin()
 
+  const today = todayDateOnly()
   const athletes = await prisma.athlete.findMany({
     where: { deletedAt: null },
     select: {
       medicalCertificates: {
         where: { deletedAt: null },
-        orderBy: { issueDate: "desc" },
+        orderBy: CURRENT_CERTIFICATE_ORDER,
         take: 1,
         select: { expiryDate: true },
       },
@@ -131,7 +128,7 @@ export async function getCertificateStatusCounts(): Promise<
 
   for (const a of athletes) {
     const expiry = a.medicalCertificates[0]?.expiryDate ?? null
-    counts[classifyCert(expiry)] += 1
+    counts[classifyCert(expiry, today)] += 1
   }
 
   return counts

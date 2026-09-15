@@ -35,6 +35,9 @@ import {
 } from "@/components/ui/card"
 import {
   classifyCert,
+  compareCurrentFirst,
+} from "@/lib/medical-certificates/certificate-status"
+import {
   MEDICAL_CERT_TYPE_LABELS,
   normalizeCertType,
   type MedicalCertType,
@@ -72,10 +75,8 @@ export function MedicalCertSection({ athleteId, certificates }: Props) {
   const [downloadingId, setDownloadingId] = React.useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = React.useState(false)
 
-  const sorted = [...certificates].sort(
-    (a, b) =>
-      new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime(),
-  )
+  // Corrente = scadenza più lontana, come in lista allieve e riepilogo
+  const sorted = [...certificates].sort(compareCurrentFirst)
   const latest = sorted[0] ?? null
   const history = sorted.slice(1)
 

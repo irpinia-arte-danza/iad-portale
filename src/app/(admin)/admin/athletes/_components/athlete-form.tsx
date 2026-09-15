@@ -1,6 +1,6 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2 } from "lucide-react"
@@ -29,12 +29,21 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { AnagraficaCompletaSection } from "@/components/forms/anagrafica-completa-section"
 import {
+  EMPTY_NEW_ATHLETE_CERTIFICATE,
+  isNewAthleteCertificateEmpty,
+  newAthleteCertificateError,
+  newAthleteCertificateFormData,
+  type NewAthleteCertificate,
+} from "@/lib/medical-certificates/new-athlete-certificate"
+import {
   athleteCreateSchema,
   genderOptions,
   type AthleteCreateValues,
 } from "@/lib/schemas/athlete"
 
+import { createMedicalCertificate } from "../[id]/medical-cert-actions"
 import { createAthlete, updateAthlete } from "../actions"
+import { NewAthleteCertificateFields } from "./new-athlete-certificate-fields"
 
 interface AthleteFormProps {
   mode: "create" | "edit"
@@ -50,6 +59,12 @@ export function AthleteForm({
   onSuccess,
 }: AthleteFormProps) {
   const [isPending, startTransition] = useTransition()
+  const [certificate, setCertificate] = useState<NewAthleteCertificate>(
+    EMPTY_NEW_ATHLETE_CERTIFICATE,
+  )
+  const [certificateError, setCertificateError] = useState<string | null>(
+    null,
+  )
 
   const form = useForm<AthleteCreateValues>({
     resolver: zodResolver(athleteCreateSchema),
@@ -72,21 +87,57 @@ export function AthleteForm({
   })
 
   function onSubmit(values: AthleteCreateValues) {
-    startTransition(async () => {
-      const result =
-        mode === "create"
-          ? await createAthlete(values)
-          : await updateAthlete(athleteId!, values)
+    if (mode === "edit") {
+      startTransition(async () => {
+        const result = await updateAthlete(athleteId!, values)
+        if (result.ok) {
+          toast.success("Modifiche salvate")
+          onSuccess?.()
+        } else {
+          toast.error(result.error)
+        }
+      })
+      return
+    }
 
-      if (result.ok) {
-        toast.success(
-          mode === "create" ? "Allieva aggiunta" : "Modifiche salvate"
-        )
-        if (mode === "create") form.reset()
-        onSuccess?.()
-      } else {
+    // Certificato compilato a metà: si corregge prima di creare l'allieva
+    const certError = newAthleteCertificateError(certificate)
+    if (certError) {
+      setCertificateError(certError)
+      return
+    }
+    const withCertificate = !isNewAthleteCertificateEmpty(certificate)
+
+    startTransition(async () => {
+      const result = await createAthlete(values)
+      if (!result.ok) {
         toast.error(result.error)
+        return
       }
+
+      // Il certificato si salva dopo l'allieva: se fallisce, l'allieva resta
+      const newAthleteId = result.data?.id
+      let certificateFailure: string | null = null
+      if (withCertificate && newAthleteId) {
+        const saved = await createMedicalCertificate(
+          newAthleteId,
+          newAthleteCertificateFormData(certificate),
+        )
+        if (!saved.ok) certificateFailure = saved.error
+      }
+
+      if (certificateFailure) {
+        toast.warning("Allieva aggiunta, certificato non salvato", {
+          description: `${certificateFailure}. Caricalo dalla scheda dell'allieva.`,
+        })
+      } else {
+        toast.success(
+          withCertificate ? "Allieva e certificato aggiunti" : "Allieva aggiunta",
+        )
+      }
+      form.reset()
+      setCertificate(EMPTY_NEW_ATHLETE_CERTIFICATE)
+      onSuccess?.()
     })
   }
 
@@ -185,6 +236,21 @@ export function AthleteForm({
         <AnagraficaCompletaSection personLabel="allieva" />
 
         <Separator />
+
+        {mode === "create" ? (
+          <>
+            <NewAthleteCertificateFields
+              value={certificate}
+              onChange={(value) => {
+                setCertificate(value)
+                setCertificateError(null)
+              }}
+              error={certificateError}
+              disabled={isPending}
+            />
+            <Separator />
+          </>
+        ) : null}
 
         <FormField
           control={form.control}

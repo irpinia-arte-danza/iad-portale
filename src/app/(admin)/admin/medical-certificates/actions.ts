@@ -14,6 +14,10 @@ import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
 import {
   classifyCert,
+  CURRENT_CERTIFICATE_ORDER,
+  daysUntilExpiry,
+} from "@/lib/medical-certificates/certificate-status"
+import {
   MEDICAL_CERT_TYPE_LABELS,
   normalizeCertType,
 } from "@/lib/schemas/medical-certificate"
@@ -63,7 +67,7 @@ async function loadTargets(athleteIds: string[]) {
       lastName: true,
       medicalCertificates: {
         where: { deletedAt: null },
-        orderBy: { issueDate: "desc" },
+        orderBy: CURRENT_CERTIFICATE_ORDER,
         take: 1,
         select: {
           id: true,
@@ -219,10 +223,7 @@ export async function sendCertReminders(
       continue
     }
 
-    const days = Math.floor(
-      (new Date(cert.expiryDate).getTime() - Date.now()) /
-        (1000 * 60 * 60 * 24),
-    )
+    const days = daysUntilExpiry(cert.expiryDate)
     sendable.push({
       athleteId,
       athleteName,

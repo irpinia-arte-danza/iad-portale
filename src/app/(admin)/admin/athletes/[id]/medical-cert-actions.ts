@@ -32,8 +32,11 @@ function mapPrismaError(error: unknown): string {
   return "Errore interno, riprova"
 }
 
+// Scheda allieva, lista allieve (colonna certificato) e riepilogo certificati
 function revalidateAthlete(athleteId: string) {
   revalidatePath(`/admin/athletes/${athleteId}`)
+  revalidatePath("/admin/athletes")
+  revalidatePath("/admin/medical-certificates")
 }
 
 function parseValues(formData: FormData): MedicalCertValues | { error: string } {

@@ -13,6 +13,10 @@ import {
 } from "@/components/ui/card"
 import { prisma } from "@/lib/prisma"
 import { requireTeacher } from "@/lib/auth/require-teacher"
+import {
+  classifyCert,
+  CURRENT_CERTIFICATE_ORDER,
+} from "@/lib/medical-certificates/certificate-status"
 import { formatDateShort } from "@/lib/utils/format"
 
 type PageProps = {
@@ -28,18 +32,6 @@ const DAY_OF_WEEK_LABELS = [
   "Venerdì",
   "Sabato",
 ]
-
-const MEDICAL_WARN_DAYS = 30
-
-function classifyCertificate(expiry: Date | null): "missing" | "expired" | "expiring" | "valid" {
-  if (!expiry) return "missing"
-  const now = new Date()
-  const expiryDate = new Date(expiry)
-  if (expiryDate < now) return "expired"
-  const diffDays = (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-  if (diffDays <= MEDICAL_WARN_DAYS) return "expiring"
-  return "valid"
-}
 
 export default async function TeacherCourseDetailPage({ params }: PageProps) {
   const { teacherId } = await requireTeacher()
@@ -111,8 +103,10 @@ export default async function TeacherCourseDetailPage({ params }: PageProps) {
               },
             },
           },
+          // Certificato corrente: quelli nel Cestino non contano
           medicalCertificates: {
-            orderBy: { expiryDate: "desc" },
+            where: { deletedAt: null },
+            orderBy: CURRENT_CERTIFICATE_ORDER,
             take: 1,
             select: { expiryDate: true },
           },
@@ -214,7 +208,7 @@ export default async function TeacherCourseDetailPage({ params }: PageProps) {
                 const a = e.athlete
                 const parentRel = a.parentRelations[0]
                 const cert = a.medicalCertificates[0]?.expiryDate ?? null
-                const certStatus = classifyCertificate(cert)
+                const certStatus = classifyCert(cert)
                 const stats = statsByAthlete.get(a.id) ?? {
                   present: 0,
                   absent: 0,

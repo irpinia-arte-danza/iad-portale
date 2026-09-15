@@ -1,12 +1,16 @@
 import { createAdminClient } from "./admin-client"
+import {
+  MEDICAL_CERT_ALLOWED_MIME,
+  MEDICAL_CERT_MAX_BYTES,
+} from "@/lib/medical-certificates/file-rules"
 import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 
 export const MEDICAL_CERT_BUCKET = "medical-certificates"
 
-export const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png"] as const
+export const ALLOWED_MIME = MEDICAL_CERT_ALLOWED_MIME
 const ALLOWED_MIME_SET = new Set<string>(ALLOWED_MIME)
 
-const MAX_BYTES = 3 * 1024 * 1024 // 3 MB
+const MAX_BYTES = MEDICAL_CERT_MAX_BYTES
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 // 24h
 

@@ -1,7 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { ArrowDown } from "lucide-react"
 
+import { CertStatusBadge } from "@/components/medical-certificates/cert-status-badge"
 import {
   Table,
   TableBody,
@@ -11,7 +13,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import type { CertStatus } from "@/lib/medical-certificates/certificate-status"
+import { cn } from "@/lib/utils"
 import { computeAge } from "@/lib/utils/date-helpers"
+import { formatDateShort } from "@/lib/utils/format"
 
 import { AthleteRowActions } from "./athlete-row-actions"
 
@@ -32,10 +37,16 @@ type AthleteRow = {
   residenceCap: string | null
   instructorNotes: string | null
   _count: { parentRelations: number }
+  // Certificato corrente, stato calcolato lato server
+  certificate: { expiryDate: Date | null; status: CertStatus }
 }
+
+type AthletesSort = "name" | "certificate"
 
 interface AthletesTableProps {
   athletes: AthleteRow[]
+  sort: AthletesSort
+  sortHrefs: Record<AthletesSort, string>
 }
 
 const STATUS_LABELS: Record<AthleteRow["status"], string> = {
@@ -55,7 +66,32 @@ const STATUS_VARIANTS: Record<
   WITHDRAWN: "destructive",
 }
 
-export function AthletesTable({ athletes }: AthletesTableProps) {
+function SortLink({
+  label,
+  href,
+  active,
+}: {
+  label: string
+  href: string
+  active: boolean
+}) {
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      aria-current={active ? "true" : undefined}
+      className={cn(
+        "inline-flex items-center gap-1 hover:text-foreground hover:underline",
+        active ? "text-foreground" : "text-muted-foreground",
+      )}
+    >
+      {label}
+      {active ? <ArrowDown className="h-3 w-3" /> : null}
+    </Link>
+  )
+}
+
+export function AthletesTable({ athletes, sort, sortHrefs }: AthletesTableProps) {
   if (athletes.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center">
@@ -72,20 +108,41 @@ export function AthletesTable({ athletes }: AthletesTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Nome</TableHead>
+            <TableHead>
+              <SortLink
+                label="Nome"
+                href={sortHrefs.name}
+                active={sort === "name"}
+              />
+            </TableHead>
             <TableHead className="hidden sm:table-cell">Età</TableHead>
             <TableHead className="hidden md:table-cell">Stato</TableHead>
-            <TableHead className="text-center">Genitori</TableHead>
+            <TableHead>
+              <SortLink
+                label="Certificato"
+                href={sortHrefs.certificate}
+                active={sort === "certificate"}
+              />
+            </TableHead>
+            <TableHead className="hidden text-center sm:table-cell">
+              Genitori
+            </TableHead>
             <TableHead className="w-[50px]" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {athletes.map((athlete) => {
             const age = computeAge(athlete.dateOfBirth)
+            const { certificate } = athlete
+            const expired = certificate.status === "expired"
             return (
             <TableRow
               key={athlete.id}
-              className="hover:bg-muted/50"
+              className={cn(
+                "hover:bg-muted/50",
+                expired &&
+                  "bg-red-50 hover:bg-red-100/70 dark:bg-red-950/30 dark:hover:bg-red-950/50",
+              )}
             >
               <TableCell>
                 <Link
@@ -111,7 +168,18 @@ export function AthletesTable({ athletes }: AthletesTableProps) {
                   {STATUS_LABELS[athlete.status]}
                 </Badge>
               </TableCell>
-              <TableCell className="text-center">
+              <TableCell>
+                <div className="flex flex-col items-start gap-1">
+                  <CertStatusBadge status={certificate.status} />
+                  {certificate.expiryDate ? (
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
+                      {expired ? "scaduto il" : "scade il"}{" "}
+                      {formatDateShort(new Date(certificate.expiryDate))}
+                    </span>
+                  ) : null}
+                </div>
+              </TableCell>
+              <TableCell className="hidden text-center sm:table-cell">
                 {athlete._count.parentRelations}
               </TableCell>
               <TableCell>
