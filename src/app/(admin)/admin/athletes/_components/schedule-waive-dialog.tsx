@@ -77,7 +77,7 @@ export function ScheduleWaiveDialog({
     startTransition(async () => {
       const result = await waiveSchedule(schedule.id, values)
       if (result.ok) {
-        toast.success("Scadenza condonata")
+        toast.success("Scadenza segnata come non dovuta")
         onOpenChange(false)
         form.reset()
         onSuccess?.()
@@ -91,12 +91,12 @@ export function ScheduleWaiveDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Condonare questa scadenza?</AlertDialogTitle>
+          <AlertDialogTitle>Segnare la scadenza come non dovuta?</AlertDialogTitle>
           <AlertDialogDescription>
             {schedule.courseName} — scadenza {formatDate(schedule.dueDate)} —{" "}
-            {formatEur(schedule.amountCents)}. La scadenza non dovrà più essere
-            pagata. Indica il motivo per audit (es. borsa studio, accordo
-            speciale).
+            {formatEur(schedule.amountCents)}. Questa quota non è dovuta e non
+            verrà richiesta. Indica il motivo (es. mese di chiusura, borsa di
+            studio).
           </AlertDialogDescription>
         </AlertDialogHeader>
         <Form {...form}>
@@ -110,11 +110,11 @@ export function ScheduleWaiveDialog({
               name="waiverReason"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Motivo condono</FormLabel>
+                  <FormLabel>Motivo</FormLabel>
                   <FormControl>
                     <Textarea
                       rows={3}
-                      placeholder="Es. accordo con famiglia, borsa studio…"
+                      placeholder="Es. mese di chiusura, borsa di studio…"
                       {...field}
                     />
                   </FormControl>
@@ -130,15 +130,14 @@ export function ScheduleWaiveDialog({
             type="submit"
             form="waive-schedule-form"
             disabled={isPending}
-            variant="destructive"
           >
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Condono…
+                Salvataggio…
               </>
             ) : (
-              "Condona"
+              "Segna come non dovuta"
             )}
           </Button>
         </AlertDialogFooter>

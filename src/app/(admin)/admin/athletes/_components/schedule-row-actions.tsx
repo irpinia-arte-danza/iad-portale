@@ -3,8 +3,8 @@
 import { useState } from "react"
 import {
   BanknoteArrowUp,
+  CalendarX,
   MoreHorizontal,
-  RotateCcw,
   Undo2,
 } from "lucide-react"
 
@@ -78,19 +78,16 @@ export function ScheduleRowActions({ schedule }: ScheduleRowActionsProps) {
           {canWaive && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => setWaiveOpen(true)}
-                variant="destructive"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Condona
+              <DropdownMenuItem onClick={() => setWaiveOpen(true)}>
+                <CalendarX className="h-4 w-4" />
+                Segna come non dovuta
               </DropdownMenuItem>
             </>
           )}
           {canUnwaive && (
             <DropdownMenuItem onClick={() => setUnwaiveOpen(true)}>
               <Undo2 className="h-4 w-4" />
-              Annulla condono
+              Ripristina come dovuta
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

@@ -83,17 +83,18 @@ export function AthleteCardPDF({ data, brand }: Props) {
     0,
   )
 
+  // Solo quote da pagare: il foglio va alla famiglia, e una quota non dovuta
+  // per lei non esiste (resta nel gestionale e nell'audit)
   const dueSchedules = data.enrollments.flatMap((e) =>
     e.paymentSchedules
-      .filter((s) => s.status === "DUE" || s.status === "WAIVED")
+      .filter((s) => s.status === "DUE")
       .map((s) => ({
         schedule: s,
         courseName: e.course.name,
       })),
   )
   const totalDueCents = dueSchedules.reduce(
-    (sum, { schedule }) =>
-      schedule.status === "DUE" ? sum + schedule.amountCents : sum,
+    (sum, { schedule }) => sum + schedule.amountCents,
     0,
   )
 
@@ -334,9 +335,7 @@ export function AthleteCardPDF({ data, brand }: Props) {
                 due.setHours(0, 0, 0, 0)
                 const isOverdue =
                   schedule.status === "DUE" && due.getTime() < today.getTime()
-                let statusLabel = "In scadenza"
-                if (schedule.status === "WAIVED") statusLabel = "Condonata"
-                else if (isOverdue) statusLabel = "In ritardo"
+                const statusLabel = isOverdue ? "In ritardo" : "In scadenza"
                 return (
                   <View key={schedule.id} style={pdfStyles.tableRow}>
                     <Text style={[pdfStyles.td, { width: "18%" }]}>
@@ -364,7 +363,7 @@ export function AthleteCardPDF({ data, brand }: Props) {
               })}
               <View style={pdfStyles.tableRowTotal}>
                 <Text style={[pdfStyles.tdBold, { width: "85%" }]}>
-                  Totale dovuto (esclude condonate)
+                  Totale da pagare
                 </Text>
                 <Text
                   style={[

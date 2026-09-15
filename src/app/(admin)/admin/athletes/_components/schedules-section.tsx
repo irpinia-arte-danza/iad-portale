@@ -115,7 +115,7 @@ export function SchedulesSection({
     { key: "DUE", label: "In scadenza", items: due },
     { key: "FUTURE", label: "Prossime", items: future },
     { key: "PAID", label: "Pagate", items: paid },
-    { key: "WAIVED", label: "Condonate", items: waived },
+    { key: "WAIVED", label: "Non dovute", items: waived },
   ]
 
   // Il dialog "Salda" sta nel provider, fuori dai gruppi: una scadenza appena
@@ -153,7 +153,7 @@ export function SchedulesSection({
                 <Badge variant="outline">{due.length} In scadenza</Badge>
                 <Badge variant="outline">{future.length} Prossime</Badge>
                 <Badge variant="secondary">{paid.length} Pagate</Badge>
-                <Badge variant="outline">{waived.length} Condonate</Badge>
+                <Badge variant="outline">{waived.length} Non dovute</Badge>
               </div>
 
               <div className="space-y-6">
@@ -240,5 +240,5 @@ function StatusBadge({ status }: { status: ScheduleDisplayStatus }) {
       </Badge>
     )
   }
-  return <Badge variant="secondary">Condonata</Badge>
+  return <Badge variant="secondary">Non dovuta</Badge>
 }

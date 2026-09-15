@@ -1,6 +1,7 @@
 import "server-only"
 
 import {
+  AuditAction,
   FeeType,
   PaymentStatus,
   ScheduleStatus,
@@ -75,8 +76,14 @@ export async function ensureAssociationFeeSchedule(
       paymentSchedules: { none: {} },
     },
     orderBy: { paymentDate: "asc" },
-    select: { id: true },
+    select: { id: true, amountCents: true },
   })
+
+  // Quota incassata per meno dell'importo dell'anno: vale quanto incassato,
+  // come quando si salda la scadenza (src/lib/payments/collection-plan.ts)
+  const amountCents = payment
+    ? Math.min(payment.amountCents, academicYear.associationFeeCents)
+    : academicYear.associationFeeCents
 
   // ON CONFLICT DO NOTHING sull'indice unico (allieva, anno): due iscrizioni
   // contemporanee non generano due quote e non fanno fallire la transazione
@@ -87,7 +94,7 @@ export async function ensureAssociationFeeSchedule(
         academicYearId: academicYear.id,
         feeType: FeeType.ASSOCIATION,
         dueDate: params.dueDate,
-        amountCents: academicYear.associationFeeCents,
+        amountCents,
         status: payment ? ScheduleStatus.PAID : ScheduleStatus.DUE,
         paymentId: payment?.id ?? null,
         notes: associationFeeDescription(academicYear.label),
@@ -96,6 +103,31 @@ export async function ensureAssociationFeeSchedule(
     ],
     skipDuplicates: true,
   })
+
+  if (
+    result.count === 1 &&
+    payment &&
+    payment.amountCents !== academicYear.associationFeeCents
+  ) {
+    await tx.auditLog.create({
+      data: {
+        userId: params.createdBy,
+        action: AuditAction.UPDATE,
+        entityType: "Payment",
+        entityId: payment.id,
+        changes: {
+          amountDifferences: [
+            {
+              schedule: associationFeeDescription(academicYear.label),
+              dueCents: academicYear.associationFeeCents,
+              collectedCents: payment.amountCents,
+              scheduleAmountAfterCents: amountCents,
+            },
+          ],
+        },
+      },
+    })
+  }
 
   return result.count === 1 ? "created" : "existing"
 }

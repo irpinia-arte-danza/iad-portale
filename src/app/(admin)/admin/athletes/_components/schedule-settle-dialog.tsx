@@ -61,6 +61,7 @@ function paymentDefaults(
   return {
     athleteId,
     paymentScheduleIds: [schedule.id],
+    scheduleAmountsEur: { [schedule.id]: schedule.amountCents / 100 },
     feeType: schedule.feeType,
     amountEur: schedule.amountCents / 100,
     paymentDate: new Date(),

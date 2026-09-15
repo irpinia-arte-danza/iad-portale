@@ -226,9 +226,10 @@ const athleteForPDF = Prisma.validator<Prisma.AthleteDefaultArgs>()({
         academicYear: {
           select: { id: true, label: true, isCurrent: true },
         },
+        // Scheda per la famiglia: solo le quote da pagare, mai le non dovute
         paymentSchedules: {
           where: {
-            status: { in: ["DUE", "WAIVED"] },
+            status: "DUE",
           },
           orderBy: { dueDate: "asc" },
         },

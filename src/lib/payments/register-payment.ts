@@ -17,6 +17,7 @@ import type { PaymentCreateValues } from "@/lib/schemas/payment"
 import { toDateOnly } from "@/lib/utils/date-only"
 import { formatEur } from "@/lib/utils/format"
 
+import { amountDifferences, eurToCents, planCollection } from "./collection-plan"
 import {
   SCHEDULE_LINE_SELECT,
   athleteIdOfSchedule,
@@ -34,9 +35,12 @@ import {
 //   scadenze, tutte della stessa allieva
 // - scadenze chiuse tutte nella stessa transazione o nessuna
 // - una scadenza pagata da un altro pagamento fa fallire tutto; una
-//   condonata nel frattempo viene esclusa con avviso
-// - con più scadenze l'importo è la loro somma (righe della ricevuta e
-//   ripartizione per tipo quota tornano al centesimo)
+//   segnata come non dovuta nel frattempo viene esclusa con avviso
+// - importo per scadenza (collection-plan.ts): una quota incassata per meno
+//   del suo importo vale quanto incassato, la scadenza si allinea e risulta
+//   pagata senza residuo; con più scadenze il totale è la somma delle righe
+//   (righe della ricevuta e ripartizione per tipo quota tornano al centesimo)
+// - importo incassato diverso da quello della scadenza → audit del pagamento
 // - quote saggio e costumi hanno numerazione ricevute separata: non si uniscono
 //   alle quote ordinarie né tra loro
 // ─────────────────────────────────────────────────────────────────────────
@@ -45,7 +49,8 @@ export type RegisterPaymentResult =
   | { ok: true; paymentId: string; warnings: string[] }
   | { ok: false; error: string }
 
-// Scadenza pagata o condonata da un'altra operazione durante la transazione
+// Scadenza pagata o segnata come non dovuta da un'altra operazione durante la
+// transazione
 class ScheduleChangedError extends Error {}
 
 const OPEN_STATUSES: ScheduleStatus[] = [ScheduleStatus.DUE, ScheduleStatus.OVERDUE]
@@ -60,8 +65,13 @@ function emptyToNull(value: string | undefined | null): string | null {
   return trimmed === "" ? null : trimmed
 }
 
-function sumCents(schedules: ScheduleLine[]): number {
-  return schedules.reduce((sum, s) => sum + s.amountCents, 0)
+function rowAmountsCents(
+  amounts: Record<string, number> | undefined,
+): Record<string, number> | undefined {
+  if (!amounts) return undefined
+  return Object.fromEntries(
+    Object.entries(amounts).map(([id, eur]) => [id, eurToCents(eur)]),
+  )
 }
 
 function firstDayOfMonthUTC(date: Date): Date {
@@ -74,6 +84,7 @@ function lastDayOfMonthUTC(date: Date): Date {
 
 export async function registerPaymentCore(
   values: PaymentCreateValues,
+  actor: { userId: string },
 ): Promise<RegisterPaymentResult> {
   const [currentAY, athlete] = await Promise.all([
     prisma.academicYear.findFirst({
@@ -122,7 +133,7 @@ export async function registerPaymentCore(
     if (association?.status === ScheduleStatus.WAIVED) {
       return {
         ok: false,
-        error: `${label} condonata per questa allieva: annulla il condono dalla scheda allieva prima di registrare il pagamento`,
+        error: `${label} segnata come non dovuta per questa allieva: ripristinala come dovuta dalla scheda allieva prima di registrare il pagamento`,
       }
     }
     if (association) scheduleIds = [association.id]
@@ -164,7 +175,7 @@ export async function registerPaymentCore(
   if (selected.length > 0 && open.length === 0) {
     return {
       ok: false,
-      error: "Le scadenze selezionate risultano condonate: nessun pagamento registrato",
+      error: "Le scadenze selezionate risultano non dovute: nessun pagamento registrato",
     }
   }
 
@@ -185,28 +196,38 @@ export async function registerPaymentCore(
   }
 
   const warnings = waived.map(
-    (s) => `«${describeSchedule(s)}» esclusa: risulta condonata`,
+    (s) => `«${describeSchedule(s)}» esclusa: risulta non dovuta`,
   )
 
-  // Importo: con una scadenza resta libero come sempre; con più scadenze deve
-  // essere la loro somma, meno quelle condonate nel frattempo.
-  const inputCents = Math.round(values.amountEur * 100)
-  let amountCents = inputCents
-  if (selected.length >= 2) {
-    const selectedCents = sumCents(selected)
-    if (inputCents !== selectedCents) {
-      return {
-        ok: false,
-        error: `L'importo deve essere la somma delle scadenze selezionate (${formatEur(selectedCents)}). Per incassare un importo diverso, togli le scadenze che non vengono pagate.`,
-      }
-    }
-    amountCents = sumCents(open)
-    if (amountCents !== selectedCents) {
-      warnings.push(
-        `Importo registrato ${formatEur(amountCents)} invece di ${formatEur(selectedCents)}`,
-      )
-    }
+  // Importo per scadenza: con una scadenza è l'importo del pagamento, con più
+  // scadenze quello di ogni riga. Quelle segnate come non dovute nel frattempo
+  // escono dal totale.
+  const inputCents = eurToCents(values.amountEur)
+  const plan = planCollection({
+    schedules: selected.map((s) => ({
+      id: s.id,
+      amountCents: s.amountCents,
+      description: describeSchedule(s),
+    })),
+    totalCents: inputCents,
+    rowCents: rowAmountsCents(values.scheduleAmountsEur),
+  })
+  if (!plan.ok) return { ok: false, error: plan.error }
+
+  const openIds = new Set(open.map((s) => s.id))
+  const openRows = plan.rows.filter((r) => openIds.has(r.scheduleId))
+  const amountCents =
+    selected.length === 0
+      ? inputCents
+      : openRows.reduce((sum, r) => sum + r.collectedCents, 0)
+  if (amountCents !== inputCents) {
+    warnings.push(
+      `Importo registrato ${formatEur(amountCents)} invece di ${formatEur(inputCents)}`,
+    )
   }
+  // Quote incassate per meno: la scadenza vale quanto incassato
+  const alignments = openRows.filter((r) => r.alignedCents !== r.dueCents)
+  const differences = amountDifferences(openRows)
 
   const feeType = open[0]?.feeType ?? values.feeType
   const enrollmentIds = [
@@ -266,6 +287,36 @@ export async function registerPaymentCore(
         if (closed.count !== open.length) throw new ScheduleChangedError()
       }
 
+      for (const row of alignments) {
+        const aligned = await tx.paymentSchedule.updateMany({
+          where: { id: row.scheduleId, paymentId: created.id },
+          data: { amountCents: row.alignedCents },
+        })
+        if (aligned.count !== 1) throw new ScheduleChangedError()
+      }
+
+      // Serve a capire dopo mesi perché quella quota era diversa
+      if (differences.length > 0) {
+        await tx.auditLog.create({
+          data: {
+            userId: actor.userId,
+            action: AuditAction.CREATE,
+            entityType: "Payment",
+            entityId: created.id,
+            changes: {
+              amountDifferences: differences.map((r) => ({
+                scheduleId: r.scheduleId,
+                schedule: r.description,
+                dueCents: r.dueCents,
+                collectedCents: r.collectedCents,
+                scheduleAmountAfterCents: r.alignedCents,
+              })),
+              notes: emptyToNull(values.notes),
+            },
+          },
+        })
+      }
+
       if (stageEnrollmentIds.length > 0) {
         const marked = await tx.stageEnrollment.updateMany({
           where: { id: { in: stageEnrollmentIds }, paid: false },
@@ -295,7 +346,7 @@ export async function registerPaymentCore(
       return {
         ok: false,
         error:
-          "Una delle scadenze è stata pagata o condonata mentre registravi: nessun pagamento registrato. Ricarica la pagina.",
+          "Una delle scadenze è stata pagata o segnata come non dovuta mentre registravi: nessun pagamento registrato. Ricarica la pagina.",
       }
     }
     throw error
