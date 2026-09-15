@@ -8,11 +8,14 @@ import {
   type PDFFont,
 } from "pdf-lib"
 
-// Ricevuta annullata: il PDF archiviato resta quello consegnato. Per mostrarla
-// all'admin si aggiunge al volo, su ogni pagina, la filigrana "ANNULLATA" e una
-// fascia nel margine alto (vuoto nel layout: paddingTop 36pt) con data e
-// motivo. Nessun riquadro pieno: il contenuto originale resta leggibile.
-// Il risultato non si salva mai.
+// Timbri aggiunti al volo sopra un PDF di ricevuta, su ogni pagina: filigrana
+// diagonale e una fascia nel margine alto (vuoto nel layout: paddingTop 36pt).
+// Nessun riquadro pieno: il contenuto originale resta leggibile. Il risultato
+// non si salva mai.
+// - ricevuta annullata: il PDF archiviato resta quello consegnato, per
+//   mostrarla all'admin si aggiunge "ANNULLATA" con data e motivo
+// - anteprima prima dell'emissione: "ANTEPRIMA", perché non si stampi né si
+//   consegni al posto della ricevuta
 
 export type ReceiptCancellation = {
   cancelledAt: Date
@@ -20,8 +23,8 @@ export type ReceiptCancellation = {
 }
 
 const DANGER = rgb(185 / 255, 28 / 255, 28 / 255) // pdfColors.danger #b91c1c
+const PREVIEW = rgb(51 / 255, 65 / 255, 85 / 255) // slate-700
 const PAGE_MARGIN = 36
-const WATERMARK = "ANNULLATA"
 const WATERMARK_SIZE = 72
 const WATERMARK_ANGLE = 30
 
@@ -74,22 +77,23 @@ function fitToWidth(
   return `${cut.trimEnd()}…`
 }
 
-export async function stampCancelledReceipt(
+async function stampPages(
   pdf: Uint8Array,
-  cancellation: ReceiptCancellation,
+  stamp: {
+    watermark: string
+    headline: string
+    detail: string | null
+    color: ReturnType<typeof rgb>
+  },
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdf)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const regular = await doc.embedFont(StandardFonts.Helvetica)
 
-  const headline = toWinAnsi(
-    `RICEVUTA ANNULLATA — NON VALIDA · annullata il ${formatDateRome(cancellation.cancelledAt)} a seguito dello storno del pagamento`,
-  )
-  const reason = cancellation.reason
-    ? toWinAnsi(`Motivo: ${cancellation.reason}`)
-    : null
+  const headline = toWinAnsi(stamp.headline)
+  const detail = stamp.detail ? toWinAnsi(stamp.detail) : null
 
-  const textWidth = bold.widthOfTextAtSize(WATERMARK, WATERMARK_SIZE)
+  const textWidth = bold.widthOfTextAtSize(stamp.watermark, WATERMARK_SIZE)
   const textHeight = bold.heightAtSize(WATERMARK_SIZE, { descender: false })
   const rad = (WATERMARK_ANGLE * Math.PI) / 180
 
@@ -102,30 +106,54 @@ export async function stampCancelledReceipt(
       y: height - 17,
       size: 8.5,
       font: bold,
-      color: DANGER,
+      color: stamp.color,
     })
-    if (reason) {
-      page.drawText(fitToWidth(reason, regular, 8, maxWidth), {
+    if (detail) {
+      page.drawText(fitToWidth(detail, regular, 8, maxWidth), {
         x: PAGE_MARGIN,
         y: height - 28,
         size: 8,
         font: regular,
-        color: DANGER,
+        color: stamp.color,
       })
     }
 
     // Filigrana diagonale centrata: il punto di partenza del testo ruotato è
     // il centro pagina meno metà larghezza e metà altezza lungo gli assi ruotati
-    page.drawText(WATERMARK, {
+    page.drawText(stamp.watermark, {
       x: width / 2 - (textWidth / 2) * Math.cos(rad) + (textHeight / 2) * Math.sin(rad),
       y: height / 2 - (textWidth / 2) * Math.sin(rad) - (textHeight / 2) * Math.cos(rad),
       size: WATERMARK_SIZE,
       font: bold,
-      color: DANGER,
+      color: stamp.color,
       opacity: 0.18,
       rotate: degrees(WATERMARK_ANGLE),
     })
   }
 
   return doc.save()
+}
+
+export async function stampCancelledReceipt(
+  pdf: Uint8Array,
+  cancellation: ReceiptCancellation,
+): Promise<Uint8Array> {
+  return stampPages(pdf, {
+    watermark: "ANNULLATA",
+    headline: `RICEVUTA ANNULLATA — NON VALIDA · annullata il ${formatDateRome(cancellation.cancelledAt)} a seguito dello storno del pagamento`,
+    detail: cancellation.reason ? `Motivo: ${cancellation.reason}` : null,
+    color: DANGER,
+  })
+}
+
+export async function stampReceiptPreview(
+  pdf: Uint8Array,
+  preview: { receiptNumber: string },
+): Promise<Uint8Array> {
+  return stampPages(pdf, {
+    watermark: "ANTEPRIMA",
+    headline: "ANTEPRIMA — NON È UNA RICEVUTA: non stampare né consegnare",
+    detail: `Il numero ${preview.receiptNumber} è quello previsto: viene assegnato solo con «Emetti ricevuta».`,
+    color: PREVIEW,
+  })
 }

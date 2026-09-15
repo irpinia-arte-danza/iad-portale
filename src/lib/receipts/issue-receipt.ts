@@ -5,6 +5,7 @@ import {
   PaymentStatus,
   Prisma,
   ReceiptStatus,
+  type ReceiptCategory,
 } from "@prisma/client"
 
 import { associationFeeDescription } from "@/lib/fees/association-fee"
@@ -19,6 +20,7 @@ import { prisma } from "@/lib/prisma"
 import {
   feeTypeToReceiptCategory,
   formatReceiptNumber,
+  nextReceiptSequence,
   todayInRome,
 } from "./numbering"
 import { archiveReceiptPdf } from "./receipt-pdf-store"
@@ -72,6 +74,8 @@ const PAYMENT_FOR_RECEIPT_SELECT = {
   paymentDate: true,
   method: true,
   notes: true,
+  periodStart: true,
+  periodEnd: true,
   academicYear: { select: { label: true } },
   parent: { select: PERSON_SELECT },
   athlete: {
@@ -93,7 +97,7 @@ const PAYMENT_FOR_RECEIPT_SELECT = {
   receipt: { select: RECEIPT_INFO_SELECT },
 } satisfies Prisma.PaymentSelect
 
-type PaymentForReceipt = Prisma.PaymentGetPayload<{
+export type PaymentForReceipt = Prisma.PaymentGetPayload<{
   select: typeof PAYMENT_FOR_RECEIPT_SELECT
 }>
 
@@ -232,6 +236,46 @@ async function loadPayment(
   })
 }
 
+// Pagamento con tutto quello che serve alla ricevuta (anche all'anteprima)
+export function loadPaymentForReceipt(
+  paymentId: string,
+): Promise<PaymentForReceipt | null> {
+  return loadPayment(prisma, paymentId)
+}
+
+export type ReceiptSnapshot = {
+  category: ReceiptCategory
+  payerName: string
+  payerFiscalCode: string | null
+  payerAddress: string | null
+  payerSource: ReceiptPayerSource
+  athleteName: string
+  athleteFiscalCode: string | null
+  description: string | null
+  amountCents: number
+  lines: ReceiptLine[] | null
+}
+
+// Dati che l'emissione congela sulla ricevuta. L'anteprima usa gli stessi:
+// quello che si vede prima è quello che si emette.
+export function buildReceiptSnapshot(payment: PaymentForReceipt): ReceiptSnapshot {
+  const payer = resolvePayer(payment)
+  return {
+    // Più scadenze sono sempre della stessa numerazione (vincolo di
+    // registrazione): la categoria del tipo principale vale per tutte
+    category: feeTypeToReceiptCategory(payment.feeType),
+    payerName: fullName(payer.person),
+    payerFiscalCode: payer.person.fiscalCode,
+    payerAddress: composeAddress(payer.person),
+    payerSource: payer.source,
+    athleteName: fullName(payment.athlete),
+    athleteFiscalCode: payment.athlete.fiscalCode,
+    description: buildDescription(payment),
+    amountCents: payment.amountCents,
+    lines: buildLines(payment.paymentSchedules),
+  }
+}
+
 export async function buildIssuePreview(
   paymentId: string,
 ): Promise<ReceiptIssuePreview | null> {
@@ -309,45 +353,42 @@ export async function issueReceiptCore(params: {
           where: { receiptNumber: { startsWith: settings.receiptPrefix } },
           _max: { sequence: true },
         })
-        let sequence = settings.receiptNumber
-        const maxIssued = highest._max.sequence ?? 0
-        if (sequence <= maxIssued) {
-          sequence = maxIssued + 1
+        const sequence = nextReceiptSequence(
+          settings.receiptNumber,
+          highest._max.sequence ?? 0,
+        )
+        if (sequence !== settings.receiptNumber) {
           await tx.receiptSettings.update({
             where: { id: 1 },
             data: { receiptNumber: sequence },
           })
         }
 
-        const payer = resolvePayer(payment)
-        // Più scadenze sono sempre della stessa numerazione (vincolo di
-        // registrazione): la categoria del tipo principale vale per tutte
-        const category = feeTypeToReceiptCategory(payment.feeType)
+        const snapshot = buildReceiptSnapshot(payment)
         const receiptNumber = formatReceiptNumber({
           prefix: settings.receiptPrefix,
           academicYearLabel: payment.academicYear.label,
           sequence,
-          category,
+          category: snapshot.category,
         })
-        const lines = buildLines(payment.paymentSchedules)
 
         const receipt = await tx.receipt.create({
           data: {
             paymentId: payment.id,
-            category,
+            category: snapshot.category,
             receiptNumber,
             sequence,
             issueDate: todayInRome(),
             issuedBy: params.adminUserId,
             status: ReceiptStatus.VALID,
-            payerName: fullName(payer.person),
-            payerFiscalCode: payer.person.fiscalCode,
-            payerAddress: composeAddress(payer.person),
-            athleteName: fullName(payment.athlete),
-            athleteFiscalCode: payment.athlete.fiscalCode,
-            description: buildDescription(payment),
-            amountCents: payment.amountCents,
-            lines: lines ?? undefined,
+            payerName: snapshot.payerName,
+            payerFiscalCode: snapshot.payerFiscalCode,
+            payerAddress: snapshot.payerAddress,
+            athleteName: snapshot.athleteName,
+            athleteFiscalCode: snapshot.athleteFiscalCode,
+            description: snapshot.description,
+            amountCents: snapshot.amountCents,
+            lines: snapshot.lines ?? undefined,
           },
           select: RECEIPT_INFO_SELECT,
         })
@@ -362,8 +403,8 @@ export async function issueReceiptCore(params: {
               receiptNumber,
               sequence,
               paymentId: payment.id,
-              payerSource: payer.source,
-              lines: lines?.length ?? 1,
+              payerSource: snapshot.payerSource,
+              lines: snapshot.lines?.length ?? 1,
             },
           },
         })

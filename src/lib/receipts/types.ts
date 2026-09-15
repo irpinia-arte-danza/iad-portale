@@ -59,3 +59,8 @@ export type IssueReceiptResult =
 export function receiptPdfHref(receiptId: string): string {
   return `/ricevute/${receiptId}`
 }
+
+// Anteprima PDF prima dell'emissione: solo admin, numero previsto, filigrana
+export function receiptPreviewPdfHref(paymentId: string): string {
+  return `/ricevute/anteprima/${paymentId}`
+}
