@@ -12,7 +12,10 @@ import {
 import { COURSE_TYPE_LABELS } from "@/lib/schemas/course"
 
 import type { AthleteEnrollment } from "../queries"
-import { EnrollCourseDialog } from "./enroll-course-dialog"
+import {
+  EnrollCourseDialog,
+  type EnrollmentAcademicYear,
+} from "./enroll-course-dialog"
 import { EnrollmentRowActions } from "./enrollment-row-actions"
 
 type ActiveCourse = {
@@ -27,7 +30,9 @@ interface EnrollmentsSectionProps {
   athleteFirstName: string
   enrollments: AthleteEnrollment[]
   activeCourses: ActiveCourse[]
-  currentAcademicYearLabel: string | null
+  currentAcademicYear: EnrollmentAcademicYear | null
+  // L'allieva ha già la quota associativa dell'anno corrente
+  hasAssociationFee: boolean
 }
 
 function formatDate(date: Date): string {
@@ -48,7 +53,8 @@ export function EnrollmentsSection({
   athleteFirstName,
   enrollments,
   activeCourses,
-  currentAcademicYearLabel,
+  currentAcademicYear,
+  hasAssociationFee,
 }: EnrollmentsSectionProps) {
   const activeCourseIdsForYear = enrollments
     .filter(
@@ -71,7 +77,8 @@ export function EnrollmentsSection({
           <EnrollCourseDialog
             athleteId={athleteId}
             activeCourses={activeCourses}
-            currentAcademicYearLabel={currentAcademicYearLabel}
+            currentAcademicYear={currentAcademicYear}
+            hasAssociationFee={hasAssociationFee}
             enrolledCourseIds={activeCourseIdsForYear}
           />
         </div>

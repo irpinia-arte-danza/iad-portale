@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Loader2, Plus } from "lucide-react"
+import { AlertTriangle, Loader2, Plus } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -34,11 +34,14 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
+import { enrollmentPreview } from "@/lib/fees/enrollment-preview"
 import {
   enrollmentCreateSchema,
   type EnrollmentCreateValues,
 } from "@/lib/schemas/enrollment"
 import { COURSE_TYPE_LABELS } from "@/lib/schemas/course"
+import { toDateOnly, todayDateOnly } from "@/lib/utils/date-only"
+import { formatDateShort, formatEur, formatMeseIt } from "@/lib/utils/format"
 
 import { createEnrollment } from "../enrollments-actions"
 
@@ -49,17 +52,22 @@ type ActiveCourse = {
   monthlyFeeCents: number
 }
 
+// Anno accademico corrente: serve all'anteprima di rate e quota associativa
+export type EnrollmentAcademicYear = {
+  label: string
+  startDate: Date
+  monthlyRenewalDay: number
+  associationFeeCents: number
+}
+
 interface EnrollCourseDialogProps {
   athleteId: string
   activeCourses: ActiveCourse[]
-  currentAcademicYearLabel: string | null
+  currentAcademicYear: EnrollmentAcademicYear | null
+  // L'allieva ha già la quota associativa dell'anno corrente
+  hasAssociationFee: boolean
   enrolledCourseIds: string[]
 }
-
-const euroFormatter = new Intl.NumberFormat("it-IT", {
-  style: "currency",
-  currency: "EUR",
-})
 
 function toDateInputValue(date: Date): string {
   const y = date.getFullYear()
@@ -68,10 +76,15 @@ function toDateInputValue(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
+function monthName(date: Date): string {
+  return formatMeseIt(date).toLowerCase()
+}
+
 export function EnrollCourseDialog({
   athleteId,
   activeCourses,
-  currentAcademicYearLabel,
+  currentAcademicYear,
+  hasAssociationFee,
   enrolledCourseIds,
 }: EnrollCourseDialogProps) {
   const [open, setOpen] = useState(false)
@@ -85,6 +98,8 @@ export function EnrollCourseDialog({
       notes: "",
     },
   })
+  const watchedCourseId = useWatch({ control: form.control, name: "courseId" })
+  const watchedDate = useWatch({ control: form.control, name: "enrollmentDate" })
 
   function onSubmit(values: EnrollmentCreateValues) {
     startTransition(async () => {
@@ -102,8 +117,28 @@ export function EnrollCourseDialog({
   const availableCourses = activeCourses.filter(
     (c) => !enrolledCourseIds.includes(c.id),
   )
-  const noAcademicYear = !currentAcademicYearLabel
+  const noAcademicYear = !currentAcademicYear
   const noCoursesAvailable = availableCourses.length === 0
+
+  // Anteprima di cosa genera l'iscrizione, con le stesse regole del server
+  const selectedCourse =
+    availableCourses.find((c) => c.id === watchedCourseId) ?? null
+  const validDate =
+    watchedDate instanceof Date && !Number.isNaN(watchedDate.getTime())
+      ? toDateOnly(watchedDate)
+      : null
+  const preview =
+    selectedCourse && validDate && currentAcademicYear
+      ? enrollmentPreview({
+          enrollmentDate: validDate,
+          monthlyFeeCents: selectedCourse.monthlyFeeCents,
+          academicYear: currentAcademicYear,
+          hasAssociationFee,
+        })
+      : null
+  const today = todayDateOnly()
+  const yearSlash = currentAcademicYear?.label.replace("-", "/") ?? ""
+  const associationNotSet = preview?.association.kind === "not-set"
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -122,10 +157,10 @@ export function EnrollCourseDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {currentAcademicYearLabel && (
+        {currentAcademicYear && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>Anno accademico:</span>
-            <Badge variant="secondary">{currentAcademicYearLabel}</Badge>
+            <Badge variant="secondary">{currentAcademicYear.label}</Badge>
           </div>
         )}
 
@@ -154,8 +189,7 @@ export function EnrollCourseDialog({
                       <SelectContent>
                         {availableCourses.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
-                            {c.name} ·{" "}
-                            {euroFormatter.format(c.monthlyFeeCents / 100)}/mese
+                            {c.name} · {formatEur(c.monthlyFeeCents)}/mese
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -211,6 +245,84 @@ export function EnrollCourseDialog({
                 )}
               />
 
+              {preview && selectedCourse ? (
+                <div
+                  className="space-y-2 rounded-md border bg-muted/40 p-3 text-sm"
+                  aria-live="polite"
+                >
+                  <p className="font-medium">Con questa iscrizione</p>
+
+                  {preview.zeroFeeCourse ? (
+                    <p className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-destructive">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>
+                        «{selectedCourse.name}» ha quota mensile 0 €:
+                        l&apos;iscrizione non genera nessuna rata. Se è un
+                        errore, imposta prima la quota del corso.
+                      </span>
+                    </p>
+                  ) : preview.monthly ? (
+                    <p>
+                      <span className="font-mono tabular-nums">
+                        {preview.monthly.count}
+                      </span>{" "}
+                      {preview.monthly.count === 1
+                        ? "rata mensile"
+                        : "rate mensili"}{" "}
+                      da{" "}
+                      <span className="font-mono tabular-nums">
+                        {formatEur(preview.monthly.amountCents)}
+                      </span>
+                      {preview.monthly.count === 1
+                        ? `, ${monthName(preview.monthly.firstDueDate)}`
+                        : `, da ${monthName(preview.monthly.firstDueDate)} a ${monthName(preview.monthly.lastDueDate)}`}
+                      <span className="block text-xs text-muted-foreground">
+                        Prima scadenza{" "}
+                        {formatDateShort(preview.monthly.firstDueDate)}
+                        {preview.monthly.firstDueDate.getTime() < today.getTime()
+                          ? " — già in ritardo"
+                          : ""}
+                        . L&apos;importo ridotto si registra all&apos;incasso.
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="flex gap-2 text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>
+                        Nessuna rata mensile: la data è dopo la fine dei corsi
+                        (giugno).
+                      </span>
+                    </p>
+                  )}
+
+                  {preview.association.kind === "new" ? (
+                    <p>
+                      Quota associativa {yearSlash}:{" "}
+                      <span className="font-mono tabular-nums">
+                        {formatEur(preview.association.amountCents)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {" "}
+                        · scadenza {formatDateShort(preview.association.dueDate)}
+                      </span>
+                    </p>
+                  ) : preview.association.kind === "existing" ? (
+                    <p className="text-muted-foreground">
+                      Quota associativa {yearSlash}: già presente.
+                    </p>
+                  ) : (
+                    <p className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-destructive">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>
+                        Quota associativa {yearSlash} non impostata:
+                        l&apos;iscrizione verrebbe rifiutata. Impostala in Anni
+                        accademici.
+                      </span>
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
@@ -220,12 +332,14 @@ export function EnrollCourseDialog({
                 >
                   Annulla
                 </Button>
-                <Button type="submit" disabled={isPending}>
+                <Button type="submit" disabled={isPending || associationNotSet}>
                   {isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Iscrizione...
                     </>
+                  ) : preview?.zeroFeeCourse ? (
+                    "Iscrivi senza rate"
                   ) : (
                     "Iscrivi"
                   )}
