@@ -48,7 +48,7 @@ export function ScheduleUnwaiveDialog({
     startTransition(async () => {
       const result = await unwaiveSchedule(schedule.id)
       if (result.ok) {
-        toast.success("Condono annullato")
+        toast.success("Scadenza di nuovo dovuta")
         onOpenChange(false)
         onSuccess?.()
       } else {
@@ -61,11 +61,11 @@ export function ScheduleUnwaiveDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Annullare il condono?</AlertDialogTitle>
+          <AlertDialogTitle>Ripristinare la scadenza come dovuta?</AlertDialogTitle>
           <AlertDialogDescription>
             {schedule.courseName} — scadenza {formatDate(schedule.dueDate)}. La
-            scadenza tornerà in stato &ldquo;In scadenza&rdquo; e il motivo del
-            condono precedente verrà cancellato.
+            scadenza tornerà da pagare e il motivo verrà cancellato (resta
+            nell&apos;audit).
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -74,10 +74,10 @@ export function ScheduleUnwaiveDialog({
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Annullamento…
+                Ripristino…
               </>
             ) : (
-              "Annulla condono"
+              "Ripristina come dovuta"
             )}
           </Button>
         </AlertDialogFooter>

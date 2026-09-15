@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
+import { eurToCents, planCollection } from "@/lib/payments/collection-plan"
 import {
   FEE_TYPE_LABELS,
   PAYMENT_METHOD_LABELS,
@@ -21,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -71,6 +73,11 @@ function centsToEur(cents: number): number {
   return Math.round(cents) / 100
 }
 
+function parseEurInput(value: string): number {
+  const parsed = parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 function isOverdue(dueDate: Date): boolean {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -93,6 +100,7 @@ export function PaymentForm({
       athleteId: "",
       parentId: "",
       paymentScheduleIds: [],
+      scheduleAmountsEur: {},
       feeType: "OTHER",
       method: "CASH",
       amountEur: 0,
@@ -106,6 +114,7 @@ export function PaymentForm({
   const watchedFeeType = form.watch("feeType")
   const watchedAmount = form.watch("amountEur")
   const selectedIds = form.watch("paymentScheduleIds")
+  const rowAmounts = form.watch("scheduleAmountsEur") ?? {}
 
   const selectedAthlete = useMemo(
     () => athletes.find((a) => a.id === watchedAthleteId),
@@ -118,10 +127,6 @@ export function PaymentForm({
 
   const selectedOptions = options.filter((o) => selectedIds.includes(o.id))
   const selectedCategory = selectedOptions[0]?.category ?? null
-  const selectedTotalCents = selectedOptions.reduce(
-    (sum, o) => sum + o.amountCents,
-    0,
-  )
   const isMulti = selectedOptions.length >= 2
   const single = selectedOptions.length === 1 ? selectedOptions[0] : null
   const hasSeparateNumbering =
@@ -131,31 +136,93 @@ export function PaymentForm({
     ...new Set(selectedOptions.map((o) => FEE_TYPE_LABELS[o.feeType])),
   ].join(" + ")
 
-  // Spunta/togli: il totale si somma da solo. Con una sola scadenza l'importo
-  // resta modificabile; con più scadenze è la loro somma.
+  // Importo incassato di una riga: quello scritto, altrimenti la scadenza
+  function rowCents(option: OpenScheduleOption): number {
+    const eur = rowAmounts[option.id]
+    return eur === undefined ? option.amountCents : eurToCents(eur)
+  }
+
+  // Stesse regole del server: con più scadenze niente righe a zero, oltre il
+  // dovuto o con un totale diverso dalla somma
+  const multiPlan = isMulti
+    ? planCollection({
+        schedules: selectedOptions.map((o) => ({
+          id: o.id,
+          amountCents: o.amountCents,
+          description: o.description,
+        })),
+        totalCents: selectedOptions.reduce((sum, o) => sum + rowCents(o), 0),
+        rowCents: Object.fromEntries(selectedOptions.map((o) => [o.id, rowCents(o)])),
+      })
+    : null
+  const multiError = multiPlan && !multiPlan.ok ? multiPlan.error : null
+
+  const singleCollectedCents = eurToCents(watchedAmount)
+  const singleReduced =
+    single !== null &&
+    singleCollectedCents > 0 &&
+    singleCollectedCents < single.amountCents
+  const singleAbove =
+    single !== null && singleCollectedCents > single.amountCents
+  const hasReducedRow =
+    singleReduced ||
+    (isMulti && selectedOptions.some((o) => rowCents(o) < o.amountCents))
+
+  const selectedTotalCents = isMulti
+    ? selectedOptions.reduce((sum, o) => sum + rowCents(o), 0)
+    : singleCollectedCents
+
+  function setTotalFrom(ids: string[], amounts: Record<string, number>) {
+    const chosen = options.filter((o) => ids.includes(o.id))
+    const totalCents = chosen.reduce((sum, o) => {
+      const eur = amounts[o.id]
+      return sum + (eur === undefined ? o.amountCents : eurToCents(eur))
+    }, 0)
+    form.setValue("amountEur", centsToEur(totalCents), { shouldValidate: true })
+  }
+
+  // Spunta/togli: la riga entra con l'importo della scadenza e il totale si
+  // ricalcola. Un importo già cambiato su una riga resta.
   function toggleSchedule(option: OpenScheduleOption, checked: boolean) {
     const current = form.getValues("paymentScheduleIds")
     const next = checked
       ? [...current, option.id]
       : current.filter((id) => id !== option.id)
+    const amounts = { ...(form.getValues("scheduleAmountsEur") ?? {}) }
+    if (checked) amounts[option.id] = centsToEur(option.amountCents)
+    else delete amounts[option.id]
+
     form.setValue("paymentScheduleIds", next, { shouldValidate: true })
+    form.setValue("scheduleAmountsEur", amounts)
 
     const chosen = options.filter((o) => next.includes(o.id))
     if (chosen.length > 0) {
       form.setValue("feeType", chosen[0].feeType)
-      form.setValue(
-        "amountEur",
-        centsToEur(chosen.reduce((sum, o) => sum + o.amountCents, 0)),
-        { shouldValidate: true },
-      )
+      setTotalFrom(next, amounts)
     } else {
       form.setValue("amountEur", 0)
     }
   }
 
+  function setRowAmount(optionId: string, eur: number) {
+    const amounts = { ...(form.getValues("scheduleAmountsEur") ?? {}), [optionId]: eur }
+    form.setValue("scheduleAmountsEur", amounts)
+    setTotalFrom(form.getValues("paymentScheduleIds"), amounts)
+  }
+
   function onSubmit(values: PaymentCreateValues) {
+    const ids = values.paymentScheduleIds
+    const payload: PaymentCreateValues = {
+      ...values,
+      // Solo le righe spuntate
+      scheduleAmountsEur: Object.fromEntries(
+        Object.entries(values.scheduleAmountsEur ?? {}).filter(([id]) =>
+          ids.includes(id),
+        ),
+      ),
+    }
     startTransition(async () => {
-      const result = await registerPayment(values)
+      const result = await registerPayment(payload)
       if (result.ok) {
         toast.success("Pagamento registrato")
         for (const warning of result.data?.warnings ?? []) {
@@ -184,6 +251,7 @@ export function PaymentForm({
                   field.onChange(value)
                   form.setValue("parentId", "")
                   form.setValue("paymentScheduleIds", [])
+                  form.setValue("scheduleAmountsEur", {})
                   form.setValue("amountEur", 0)
                 }}
               >
@@ -221,14 +289,19 @@ export function PaymentForm({
                     !checked &&
                     selectedCategory !== null &&
                     option.category !== selectedCategory
+                  const editable = checked && isMulti
+                  const collected = rowCents(option)
                   return (
-                    <li key={option.id}>
+                    <li
+                      key={option.id}
+                      className="flex min-h-11 items-center gap-3 px-3 py-2"
+                    >
                       <label
                         className={cn(
-                          "flex min-h-11 items-center gap-3 px-3 py-2",
+                          "flex min-w-0 flex-1 items-center gap-3",
                           blocked
                             ? "cursor-not-allowed opacity-50"
-                            : "cursor-pointer hover:bg-muted/50",
+                            : "cursor-pointer",
                         )}
                       >
                         <Checkbox
@@ -248,10 +321,42 @@ export function PaymentForm({
                             {isOverdue(option.dueDate) ? " · in ritardo" : ""}
                           </span>
                         </span>
+                      </label>
+                      {editable ? (
+                        <span className="flex shrink-0 flex-col items-end gap-0.5">
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0.01"
+                            max={option.amountCents / 100}
+                            aria-label={`Importo incassato per ${option.description}`}
+                            className="h-9 w-24 text-right font-mono tabular-nums"
+                            value={
+                              rowAmounts[option.id] === 0
+                                ? ""
+                                : (rowAmounts[option.id] ??
+                                  centsToEur(option.amountCents))
+                            }
+                            disabled={isPending}
+                            onChange={(e) =>
+                              setRowAmount(option.id, parseEurInput(e.target.value))
+                            }
+                          />
+                          {collected !== option.amountCents ? (
+                            <span className="text-xs text-muted-foreground">
+                              invece di{" "}
+                              <span className="font-mono tabular-nums">
+                                {formatEur(option.amountCents)}
+                              </span>
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : (
                         <span className="shrink-0 font-mono text-sm tabular-nums">
                           {formatEur(option.amountCents)}
                         </span>
-                      </label>
+                      )}
                     </li>
                   )
                 })}
@@ -274,6 +379,9 @@ export function PaymentForm({
                   {formatEur(selectedTotalCents)}
                 </span>
               </div>
+            ) : null}
+            {multiError ? (
+              <p className="text-sm text-destructive">{multiError}</p>
             ) : null}
           </div>
         )}
@@ -364,29 +472,46 @@ export function PaymentForm({
                     min="0.01"
                     placeholder="0.00"
                     readOnly={isMulti}
-                    className={isMulti ? "bg-muted font-mono" : undefined}
+                    className={cn(
+                      "font-mono tabular-nums",
+                      isMulti ? "bg-muted" : undefined,
+                    )}
                     value={field.value === 0 ? "" : field.value}
-                    onChange={(e) =>
-                      field.onChange(
-                        e.target.value === ""
-                          ? 0
-                          : parseFloat(e.target.value),
-                      )
-                    }
+                    onChange={(e) => {
+                      const eur = parseEurInput(e.target.value)
+                      field.onChange(eur)
+                      // Una scadenza: l'importo del pagamento è quello della riga
+                      if (single) {
+                        form.setValue("scheduleAmountsEur", { [single.id]: eur })
+                      }
+                    }}
                   />
                 </FormControl>
                 {isMulti ? (
                   <p className="text-xs text-muted-foreground">
-                    Somma delle scadenze selezionate. Per incassare un importo
-                    diverso, togli le scadenze che non vengono pagate.
+                    Somma delle righe. Se una quota è ridotta cambia il suo
+                    importo nell&apos;elenco: la scadenza si allinea e risulta
+                    pagata.
                   </p>
-                ) : single &&
-                  watchedAmount > 0 &&
-                  Math.round(watchedAmount * 100) !== single.amountCents ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-400">
-                    Diverso dall&apos;importo della scadenza (
-                    {formatEur(single.amountCents)}): la scadenza verrà
-                    comunque chiusa.
+                ) : singleReduced && single ? (
+                  <p className="text-xs text-muted-foreground">
+                    La scadenza passa da{" "}
+                    <span className="font-mono tabular-nums">
+                      {formatEur(single.amountCents)}
+                    </span>{" "}
+                    a{" "}
+                    <span className="font-mono tabular-nums">
+                      {formatEur(singleCollectedCents)}
+                    </span>{" "}
+                    e risulta pagata: nessun residuo.
+                  </p>
+                ) : singleAbove && single ? (
+                  <p className="text-xs text-destructive">
+                    Supera l&apos;importo della scadenza (
+                    <span className="font-mono tabular-nums">
+                      {formatEur(single.amountCents)}
+                    </span>
+                    ): se è denaro di un&apos;altra quota, registralo a parte.
                   </p>
                 ) : null}
                 <FormMessage />
@@ -463,11 +588,21 @@ export function PaymentForm({
               <FormControl>
                 <Textarea
                   rows={2}
-                  placeholder="Note interne sul pagamento…"
+                  placeholder={
+                    hasReducedRow
+                      ? "Motivo, es. iscritta dal 15/09"
+                      : "Note interne sul pagamento…"
+                  }
                   {...field}
                   value={field.value ?? ""}
                 />
               </FormControl>
+              {selectedOptions.length > 0 ? (
+                <FormDescription>
+                  Restano interne: la ricevuta riporta la causale della
+                  scadenza.
+                </FormDescription>
+              ) : null}
               <FormMessage />
             </FormItem>
           )}
@@ -476,7 +611,7 @@ export function PaymentForm({
         <div className="flex sm:justify-end">
           <Button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || multiError !== null || singleAbove}
             className="w-full sm:w-auto"
           >
             {isPending ? (

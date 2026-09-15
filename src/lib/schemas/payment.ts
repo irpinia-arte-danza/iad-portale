@@ -58,6 +58,11 @@ export const paymentCreateSchema = z.object({
     .number({ message: "Importo obbligatorio" })
     .min(0.01, "Importo deve essere positivo")
     .max(10000, "Importo troppo alto"),
+  // Importo incassato per scadenza (id → euro), usato con più scadenze.
+  // Zero e importi oltre il dovuto li rifiuta planCollection con il motivo.
+  scheduleAmountsEur: z
+    .record(uuidSchema, z.number().min(0).max(10000, "Importo troppo alto"))
+    .optional(),
   paymentDate: z.date().refine(isNotInFuture, {
     message: "La data di pagamento non può essere nel futuro",
   }),

@@ -71,7 +71,7 @@ export async function getPaymentDetail(
 export async function registerPayment(
   values: PaymentCreateValues,
 ): Promise<ActionResult<{ id: string; warnings: string[] }>> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const parsed = paymentCreateSchema.safeParse(values)
   if (!parsed.success) {
@@ -82,7 +82,7 @@ export async function registerPayment(
   }
 
   try {
-    const result = await registerPaymentCore(parsed.data)
+    const result = await registerPaymentCore(parsed.data, { userId })
     if (!result.ok) return result
 
     revalidatePath("/admin/payments")

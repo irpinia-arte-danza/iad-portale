@@ -148,10 +148,11 @@ function buildLines(schedules: ScheduleLine[]): ReceiptLine[] | null {
   }))
 }
 
-// Causale di una ricevuta a scadenza singola, come prima dell'incasso
-// multiplo: quota associativa sempre con l'anno (le note restano interne);
-// per le altre le note del pagamento se presenti, altrimenti ricostruita da
-// stage, saggio o costume. Le mensili bastano tipo quota e periodo.
+// Causale di una ricevuta a scadenza singola: quota associativa sempre con
+// l'anno; stage, saggio e costume dalla scadenza; alle mensili bastano tipo
+// quota e periodo. Le note del pagamento fanno da descrizione solo per un
+// pagamento libero: con una scadenza restano interne (es. il motivo di una
+// quota ridotta, "iscritta dal 15/09").
 function buildDescription(payment: PaymentForReceipt): string | null {
   const schedules = payment.paymentSchedules
   if (schedules.length >= 2) return null
@@ -163,8 +164,7 @@ function buildDescription(payment: PaymentForReceipt): string | null {
     )
   }
 
-  if (payment.notes) return payment.notes
-  if (!schedule) return null
+  if (!schedule) return payment.notes ?? null
 
   switch (schedule.feeType) {
     case "STAGE":
