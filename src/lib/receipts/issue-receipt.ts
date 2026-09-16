@@ -17,6 +17,7 @@ import {
 } from "@/lib/payments/schedule-lines"
 import { prisma } from "@/lib/prisma"
 
+import { composeAddress } from "./person-data"
 import {
   feeTypeToReceiptCategory,
   formatReceiptNumber,
@@ -109,23 +110,6 @@ function fullName(p: { firstName: string; lastName: string }): string {
   return `${p.firstName} ${p.lastName}`.trim()
 }
 
-function composeAddress(p: Person): string | null {
-  const street = [p.residenceStreet, p.residenceNumber]
-    .filter(Boolean)
-    .join(" ")
-    .trim()
-  const place = [
-    p.residenceCap,
-    p.residenceCity,
-    p.residenceProvince ? `(${p.residenceProvince})` : null,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .trim()
-  const full = [street, place].filter((s) => s.length > 0).join(" — ")
-  return full.length > 0 ? full : null
-}
-
 // Intestatario della ricevuta: pagante indicato sul pagamento, altrimenti il
 // genitore che paga le quote, altrimenti il primo genitore, altrimenti
 // l'allieva (maggiorenne o senza genitori collegati).
@@ -205,16 +189,22 @@ function buildWarnings(
     )
   }
 
+  // Del pagante sulla ricevuta compaiono solo nome e codice fiscale: è
+  // l'unico dato mancante che vale la pena segnalare.
   if (!payer.person.fiscalCode) {
     warnings.push(
       "Manca il codice fiscale del pagante: la ricevuta non sarà utilizzabile per la detrazione nel 730.",
     )
   }
-  if (payer.source !== "ATHLETE" && !payment.athlete.fiscalCode) {
+
+  // Dell'allieva la ricevuta riporta l'anagrafica completa. L'avviso vale
+  // sempre, anche quando è lei stessa a pagare: è il caso in cui quei dati
+  // compaiono due volte sul documento.
+  if (!payment.athlete.fiscalCode) {
     warnings.push("Manca il codice fiscale dell'allieva.")
   }
-  if (!composeAddress(payer.person)) {
-    warnings.push("Manca l'indirizzo di residenza del pagante.")
+  if (!composeAddress(payment.athlete)) {
+    warnings.push("Manca l'indirizzo di residenza dell'allieva.")
   }
 
   return warnings
@@ -248,6 +238,8 @@ export type ReceiptSnapshot = {
   payerSource: ReceiptPayerSource
   athleteName: string
   athleteFiscalCode: string | null
+  // Residenza dell'allieva: compare sulla ricevuta accanto al codice fiscale
+  athleteAddress: string | null
   description: string | null
   amountCents: number
   lines: ReceiptLine[] | null
@@ -271,6 +263,7 @@ export function buildReceiptSnapshot(payment: PaymentForReceipt): ReceiptSnapsho
     payerSource: payer.source,
     athleteName: fullName(payment.athlete),
     athleteFiscalCode: payment.athlete.fiscalCode,
+    athleteAddress: composeAddress(payment.athlete),
     description: buildDescription(payment),
     amountCents: payment.amountCents,
     lines: buildLines(payment.paymentSchedules),
@@ -389,6 +382,7 @@ export async function issueReceiptCore(params: {
             payerEmail: snapshot.payerEmail,
             athleteName: snapshot.athleteName,
             athleteFiscalCode: snapshot.athleteFiscalCode,
+            athleteAddress: snapshot.athleteAddress,
             description: snapshot.description,
             amountCents: snapshot.amountCents,
             lines: snapshot.lines ?? undefined,
