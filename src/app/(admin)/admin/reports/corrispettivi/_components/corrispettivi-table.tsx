@@ -49,7 +49,7 @@ export function CorrispettiviTable({
           <TableHeader>
             <TableRow>
               <TableHead>Allieva</TableHead>
-              <TableHead>Tipo quota</TableHead>
+              <TableHead>Causale</TableHead>
               <TableHead className="hidden md:table-cell">Corso</TableHead>
               <TableHead className="hidden sm:table-cell">Metodo</TableHead>
               <TableHead className="text-right">Importo</TableHead>

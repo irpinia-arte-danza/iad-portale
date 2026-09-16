@@ -82,7 +82,7 @@ export function IbanCard({ iban, asdName, asdEmail }: Props) {
         <div className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-xs">
           <p className="font-medium">Causale suggerita</p>
           <p className="text-muted-foreground">
-            Quota [nome allieva] [mese o periodo]
+            Contributo [nome allieva] [mese o periodo]
           </p>
         </div>
 

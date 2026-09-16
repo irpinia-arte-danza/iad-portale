@@ -91,7 +91,7 @@ export function BilancioEntrateSection({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tipo quota</TableHead>
+                    <TableHead>Causale</TableHead>
                     <TableHead className="text-right">Nr.</TableHead>
                     <TableHead className="text-right">Totale</TableHead>
                     <TableHead className="text-right">%</TableHead>

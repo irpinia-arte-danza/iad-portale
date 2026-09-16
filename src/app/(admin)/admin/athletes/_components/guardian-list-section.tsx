@@ -84,7 +84,7 @@ export function GuardianListSection({
                   </div>
                   <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                     {rel.isPrimaryContact && <span>⭐ Contatto principale</span>}
-                    {rel.isPrimaryPayer && <span>💰 Paga le quote</span>}
+                    {rel.isPrimaryPayer && <span>💰 Paga i contributi</span>}
                     {rel.isPickupAuthorized && <span>🚪 Può prelevare</span>}
                   </div>
                   {(rel.parent.email || rel.parent.phone) && (

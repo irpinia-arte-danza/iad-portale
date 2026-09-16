@@ -43,9 +43,9 @@ const baseStageObject = {
     .min(1, "Capienza minima 1")
     .max(500, "Capienza massima 500"),
   feeEur: z
-    .number({ message: "Quota obbligatoria" })
-    .min(0, "Quota non può essere negativa")
-    .max(2000, "Quota troppo alta"),
+    .number({ message: "Contributo obbligatorio" })
+    .min(0, "Il contributo non può essere negativo")
+    .max(2000, "Contributo troppo alto"),
   registrationOpen: z.boolean(),
   registrationDeadline: z.date().nullable().optional(),
 } as const

@@ -174,7 +174,7 @@ export function ReminderTab({
           <CardHeader>
             <CardTitle>Milestone</CardTitle>
             <CardDescription>
-              Definisci quando inviare promemoria e solleciti rispetto alla data di scadenza della quota.
+              Definisci quando inviare promemoria e solleciti rispetto alla data di scadenza del contributo.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">

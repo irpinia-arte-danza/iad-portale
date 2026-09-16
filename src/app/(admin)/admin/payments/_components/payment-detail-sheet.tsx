@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { receiptPdfHref } from "@/lib/receipts/types"
 import {
   compareScheduleLines,
-  describeSchedule,
+  describeScheduleAdmin,
   paymentFeeTypeLabel,
   scheduleAdminHref,
 } from "@/lib/payments/schedule-lines"
@@ -322,7 +322,7 @@ function PaymentDetailBody({
                     href={scheduleAdminHref(schedule, payment.athlete.id)}
                     className="min-w-0 hover:underline"
                   >
-                    {describeSchedule(schedule)}
+                    {describeScheduleAdmin(schedule)}
                   </Link>
                   <span className="shrink-0 font-mono">
                     {CURRENCY.format(schedule.amountCents / 100)}

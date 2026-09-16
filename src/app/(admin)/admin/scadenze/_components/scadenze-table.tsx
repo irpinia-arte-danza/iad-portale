@@ -35,6 +35,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { associationFeeDescription } from "@/lib/fees/association-fee-label"
 import { formatDateShort, formatEur } from "@/lib/utils/format"
 import { generateCSV } from "@/lib/utils/csv"
 
@@ -176,7 +177,7 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
         <div className="text-4xl">✨</div>
         <h3 className="mt-3 text-base font-medium">Nessuna scadenza aperta</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Nessuna quota corrisponde ai filtri selezionati.
+          Nessun contributo corrisponde ai filtri selezionati.
         </p>
       </div>
     )
@@ -212,7 +213,7 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
               <TableHead>Allieva</TableHead>
               <TableHead className="hidden md:table-cell">Genitore</TableHead>
               <TableHead className="hidden lg:table-cell">Telefono</TableHead>
-              <TableHead className="hidden sm:table-cell">Corso / quota</TableHead>
+              <TableHead className="hidden sm:table-cell">Corso / causale</TableHead>
               <TableHead className="text-right">Importo</TableHead>
               <TableHead>Scadenza</TableHead>
               <TableHead className="hidden lg:table-cell">
@@ -252,7 +253,7 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                       </Link>
                       {s.feeType === "ASSOCIATION" ? (
                         <span className="text-xs text-muted-foreground sm:hidden">
-                          {s.notes ?? "Quota associativa"}
+                          {associationFeeDescription(s.academicYear.label)}
                         </span>
                       ) : null}
                     </div>
@@ -292,7 +293,7 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                       <Badge variant="secondary">{s.course.name}</Badge>
                     ) : s.feeType === "ASSOCIATION" ? (
                       <Badge variant="outline">
-                        {s.notes ?? "Quota associativa"}
+                        {associationFeeDescription(s.academicYear.label)}
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground">—</span>

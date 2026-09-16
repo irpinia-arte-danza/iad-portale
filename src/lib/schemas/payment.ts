@@ -23,10 +23,13 @@ const PAYMENT_METHOD_VALUES = [
   "OTHER",
 ] as const satisfies ReadonlyArray<PaymentMethod>
 
+// Etichette per la famiglia (ricevuta, PDF, portale genitori) e per il
+// gestionale. "Contributo" è il termine corretto per una ASD; i valori
+// dell'enum FeeType nel database restano invariati.
 export const FEE_TYPE_LABELS: Record<FeeType, string> = {
-  ASSOCIATION: "Quota associativa",
-  MONTHLY: "Quota mensile",
-  TRIMESTER: "Quota trimestrale",
+  ASSOCIATION: "Contributo di iscrizione",
+  MONTHLY: "Contributo mensile",
+  TRIMESTER: "Contributo trimestrale",
   STAGE: "Stage",
   SHOWCASE_1: "Saggio (1° acconto)",
   SHOWCASE_2: "Saggio (saldo)",
@@ -52,7 +55,7 @@ export const paymentCreateSchema = z.object({
     .array(uuidSchema)
     .max(24, "Troppe scadenze in un solo pagamento"),
   // Con scadenze spuntate lo ricalcola il server dalla prima scadenza
-  feeType: z.enum(FEE_TYPE_VALUES, { message: "Tipo quota non valido" }),
+  feeType: z.enum(FEE_TYPE_VALUES, { message: "Causale non valida" }),
   method: z.enum(PAYMENT_METHOD_VALUES, { message: "Metodo non valido" }),
   amountEur: z
     .number({ message: "Importo obbligatorio" })

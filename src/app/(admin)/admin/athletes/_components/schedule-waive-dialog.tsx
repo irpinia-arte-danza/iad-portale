@@ -94,8 +94,8 @@ export function ScheduleWaiveDialog({
           <AlertDialogTitle>Segnare la scadenza come non dovuta?</AlertDialogTitle>
           <AlertDialogDescription>
             {schedule.courseName} — scadenza {formatDate(schedule.dueDate)} —{" "}
-            {formatEur(schedule.amountCents)}. Questa quota non è dovuta e non
-            verrà richiesta. Indica il motivo (es. mese di chiusura, borsa di
+            {formatEur(schedule.amountCents)}. Questo contributo non è dovuto e non
+            verrà richiesto. Indica il motivo (es. mese di chiusura, borsa di
             studio).
           </AlertDialogDescription>
         </AlertDialogHeader>

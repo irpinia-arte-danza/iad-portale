@@ -25,7 +25,7 @@ interface CorrispettiviExportButtonsProps {
 const CSV_HEADERS = [
   "Data",
   "Allieva",
-  "Tipo quota",
+  "Causale",
   "Corso",
   "Metodo",
   "Importo (€)",

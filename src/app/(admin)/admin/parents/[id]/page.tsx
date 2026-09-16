@@ -130,7 +130,7 @@ export default async function ParentDetailPage({ params }: PageProps) {
                               </Badge>
                             )}
                             {rel.isPrimaryPayer && (
-                              <Badge variant="secondary">Paga le quote</Badge>
+                              <Badge variant="secondary">Paga i contributi</Badge>
                             )}
                           </div>
                         </div>

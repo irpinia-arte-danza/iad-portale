@@ -4,7 +4,7 @@ import type { FeeType, PaymentMethod, ReceiptStatus } from "@prisma/client"
 
 export type ReceiptPayerSource =
   | "PAYMENT" // pagante indicato sul pagamento
-  | "PRIMARY_PAYER" // genitore segnato "paga le quote"
+  | "PRIMARY_PAYER" // genitore segnato "paga i contributi"
   | "GUARDIAN" // primo genitore collegato
   | "ATHLETE" // nessun genitore: allieva stessa
 

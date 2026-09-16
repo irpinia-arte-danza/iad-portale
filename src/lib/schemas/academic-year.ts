@@ -12,7 +12,7 @@ export const academicYearSchema = z
     endDate: z.date(),
     associationFeeEur: z
       .number()
-      .min(0, { message: "Quota non valida" })
+      .min(0, { message: "Contributo non valido" })
       .max(1000),
     monthlyRenewalDay: z
       .number()

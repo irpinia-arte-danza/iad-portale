@@ -152,20 +152,20 @@ function buildLines(schedules: ScheduleLine[]): ReceiptLine[] | null {
   }))
 }
 
-// Causale di una ricevuta a scadenza singola: quota associativa sempre con
-// l'anno; stage, saggio e costume dalla scadenza; alle mensili bastano tipo
-// quota e periodo. Le note del pagamento fanno da descrizione solo per un
-// pagamento libero: con una scadenza restano interne (es. il motivo di una
-// quota ridotta, "iscritta dal 15/09").
+// Causale di una ricevuta a scadenza singola: contributo di iscrizione sempre
+// con l'anno; stage, saggio e costume dalla scadenza; alle mensili bastano
+// causale e periodo. Le note del pagamento fanno da descrizione solo per un
+// pagamento libero: con una scadenza restano interne (es. il motivo di un
+// contributo ridotto, "iscritta dal 15/09").
 function buildDescription(payment: PaymentForReceipt): string | null {
   const schedules = payment.paymentSchedules
   if (schedules.length >= 2) return null
 
   const schedule = schedules[0] ?? null
+  // Dicitura calcolata dall'anno, mai dalle note della scadenza: le ricevute
+  // già emesse non cambiano comunque, perché la causale è congelata sulla riga.
   if (payment.feeType === "ASSOCIATION") {
-    return (
-      schedule?.notes ?? associationFeeDescription(payment.academicYear.label)
-    )
+    return associationFeeDescription(payment.academicYear.label)
   }
 
   if (!schedule) return payment.notes ?? null
@@ -199,11 +199,11 @@ function buildWarnings(
 
   if (payer.source === "PRIMARY_PAYER") {
     warnings.push(
-      `Il pagamento non indica il pagante: la ricevuta sarà intestata a ${payerName}, segnato come genitore che paga le quote.`,
+      `Il pagamento non indica il pagante: la ricevuta sarà intestata a ${payerName}, segnato come genitore che paga i contributi.`,
     )
   } else if (payer.source === "GUARDIAN") {
     warnings.push(
-      `Il pagamento non indica il pagante e nessun genitore è segnato come "paga le quote": la ricevuta sarà intestata a ${payerName}.`,
+      `Il pagamento non indica il pagante e nessun genitore è segnato come "paga i contributi": la ricevuta sarà intestata a ${payerName}.`,
     )
   } else if (payer.source === "ATHLETE") {
     warnings.push(

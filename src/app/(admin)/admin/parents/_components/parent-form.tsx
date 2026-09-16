@@ -211,7 +211,7 @@ export function ParentForm({
                     Riceve solleciti pagamento
                   </FormLabel>
                   <FormDescription>
-                    Email automatiche per quote in scadenza o in ritardo.
+                    Email automatiche per contributi in scadenza o in ritardo.
                   </FormDescription>
                 </div>
               </FormItem>

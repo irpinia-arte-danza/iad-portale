@@ -45,7 +45,7 @@ export default async function CoursesPage({ searchParams }: PageProps) {
       <ResourceHeader
         breadcrumbs={[{ label: "Corsi" }]}
         title="Corsi"
-        description="Catalogo corsi, fasce d'età e quote mensili."
+        description="Catalogo corsi, fasce d'età e contributi mensili."
         action={
           <CourseCreateDialog
             teachers={teachers}

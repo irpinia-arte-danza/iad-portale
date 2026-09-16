@@ -84,7 +84,7 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
             <TableHead className="hidden sm:table-cell">Tipo</TableHead>
             <TableHead className="hidden md:table-cell">Età</TableHead>
             <TableHead className="hidden md:table-cell font-mono">
-              Quota mensile
+              Contributo mensile
             </TableHead>
             <TableHead className="hidden lg:table-cell">Insegnante</TableHead>
             <TableHead className="text-center">Iscrizioni</TableHead>

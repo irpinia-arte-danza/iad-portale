@@ -189,7 +189,7 @@ export function CorrispettiviFilters({
         </div>
 
         <div className="space-y-1">
-          <Label>Tipo quota</Label>
+          <Label>Causale</Label>
           <Select
             value={defaultFeeType ?? ALL}
             onValueChange={(value) =>

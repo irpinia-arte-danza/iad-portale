@@ -54,7 +54,7 @@ export default async function ShowcasePage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
-              Crea il saggio per definire date, scadenze caparra/saldo e quote.
+              Crea il saggio per definire date, scadenze caparra/saldo e contributi.
               Le partecipazioni si gestiscono dalla scheda del saggio.
             </p>
             <ShowcaseCreateDialog academicYearId={academicYear.id} />

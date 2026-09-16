@@ -256,9 +256,9 @@ export function EnrollCourseDialog({
                     <p className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-destructive">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                       <span>
-                        «{selectedCourse.name}» ha quota mensile 0 €:
+                        «{selectedCourse.name}» ha contributo mensile 0 €:
                         l&apos;iscrizione non genera nessuna rata. Se è un
-                        errore, imposta prima la quota del corso.
+                        errore, imposta prima il contributo del corso.
                       </span>
                     </p>
                   ) : preview.monthly ? (
@@ -297,7 +297,7 @@ export function EnrollCourseDialog({
 
                   {preview.association.kind === "new" ? (
                     <p>
-                      Quota associativa {yearSlash}:{" "}
+                      Contributo di iscrizione {yearSlash}:{" "}
                       <span className="font-mono tabular-nums">
                         {formatEur(preview.association.amountCents)}
                       </span>
@@ -308,14 +308,14 @@ export function EnrollCourseDialog({
                     </p>
                   ) : preview.association.kind === "existing" ? (
                     <p className="text-muted-foreground">
-                      Quota associativa {yearSlash}: già presente.
+                      Contributo di iscrizione {yearSlash}: già presente.
                     </p>
                   ) : (
                     <p className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-destructive">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                       <span>
-                        Quota associativa {yearSlash} non impostata:
-                        l&apos;iscrizione verrebbe rifiutata. Impostala in Anni
+                        Contributo di iscrizione {yearSlash} non impostato:
+                        l&apos;iscrizione verrebbe rifiutata. Impostalo in Anni
                         accademici.
                       </span>
                     </p>

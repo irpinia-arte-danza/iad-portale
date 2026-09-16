@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { associationFeeDescription } from "@/lib/fees/association-fee-label"
 import {
   computeScheduleDisplayStatus,
   type ScheduleDisplayStatus,
@@ -62,7 +63,7 @@ function flatten(
 ): FlattenedSchedule[] {
   const association = associationSchedules.map((s) => ({
     ...s,
-    courseName: s.notes ?? "Quota associativa",
+    courseName: associationFeeDescription(s.academicYear.label),
     enrollmentId: null,
   }))
   const monthly = enrollments.flatMap((e) =>
@@ -132,7 +133,7 @@ export function SchedulesSection({
         <CardHeader>
           <CardTitle>Scadenze</CardTitle>
           <CardDescription>
-            Quota associativa annuale e quote mensili, generate automaticamente
+            Contributo di iscrizione annuale e contributi mensili, generati automaticamente
             all&apos;iscrizione ai corsi.
           </CardDescription>
         </CardHeader>

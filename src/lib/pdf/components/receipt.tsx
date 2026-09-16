@@ -231,7 +231,7 @@ export function ReceiptPdf({
 
   const paymentNotice = receiptPaymentNotice(receipt.paymentMethods)
 
-  // Più scadenze: tutti i tipi quota coperti ("Quota associativa + Quota mensile")
+  // Più scadenze: tutte le causali coperte ("Contributo di iscrizione + Contributo mensile")
   const feeTypeLabel = receipt.lines
     ? [...new Set(receipt.lines.map((line) => FEE_TYPE_LABELS[line.feeType]))].join(
         " + ",
@@ -305,12 +305,12 @@ export function ReceiptPdf({
           </View>
         </View>
 
-        {/* Causale */}
+        {/* Dettaglio: causale, data, modalità, periodo */}
         <View style={pdfStyles.section}>
-          <Text style={pdfStyles.sectionTitle}>Causale</Text>
+          <Text style={pdfStyles.sectionTitle}>Dettaglio del pagamento</Text>
           <View style={pdfStyles.fieldGrid}>
             <View style={pdfStyles.fieldBox}>
-              <Text style={pdfStyles.fieldLabel}>Tipo quota</Text>
+              <Text style={pdfStyles.fieldLabel}>Causale</Text>
               <Text style={pdfStyles.fieldValue}>
                 {feeTypeLabel}
               </Text>

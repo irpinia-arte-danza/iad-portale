@@ -15,7 +15,7 @@ export default async function StagesPage() {
       <ResourceHeader
         breadcrumbs={[{ label: "Stage" }]}
         title="Stage workshop"
-        description="Eventi occasionali a iscrizione, con quota e capienza dedicata."
+        description="Eventi occasionali a iscrizione, con contributo e capienza dedicata."
         action={<StageCreateDialog />}
       />
       <ResourceContent>
