@@ -146,10 +146,12 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
       },
       orderBy: [{ enrollmentDate: "desc" }],
     },
-    // Quota associativa annuale: collegata all'allieva, non a un corso
+    // Contributo di iscrizione annuale: collegato all'allieva, non a un corso
     paymentSchedules: {
       where: { feeType: "ASSOCIATION" },
       orderBy: { dueDate: "desc" },
+      // Serve alla dicitura del contributo ("… 2026/2027")
+      include: { academicYear: { select: { label: true } } },
     },
     // Sprint 1.B: certificati medici (corrente + storico). Filtra non-deleted.
     medicalCertificates: {

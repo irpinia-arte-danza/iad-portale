@@ -176,11 +176,11 @@ async function main() {
     {
       slug: "sollecito-scadenza",
       name: "Sollecito scadenza pagamento",
-      description: "Email per quote scadute non pagate",
+      description: "Email per contributi scaduti non pagati",
       category: EmailCategory.SOLLECITO,
-      subject: "Promemoria: quota {mese} - {allieva_nome}",
+      subject: "Promemoria: contributo di {mese} - {allieva_nome}",
       bodyHtml: `<p>Gentile {genitore_nome},</p>
-<p>le ricordiamo che la quota di <strong>{mese}</strong> per {allieva_nome} risulta ancora da saldare.</p>
+<p>le ricordiamo che il contributo di <strong>{mese}</strong> per {allieva_nome} risulta ancora da saldare.</p>
 <ul>
   <li><strong>Importo</strong>: {importo}</li>
   <li><strong>Scadenza</strong>: {data_scadenza}</li>
@@ -191,7 +191,7 @@ async function main() {
 <p><small>Email automatica, non rispondere.<br>
 A.S.D. IAD Irpinia Arte Danza</small></p>`,
       bodyText: `Gentile {genitore_nome},
-la quota di {mese} per {allieva_nome} è da saldare.
+il contributo di {mese} per {allieva_nome} è da saldare.
 Importo: {importo}
 Scadenza: {data_scadenza}
 Info: info@irpiniaartedanza.it
@@ -202,9 +202,9 @@ A.S.D. IAD Irpinia Arte Danza`,
       name: "Promemoria scadenza in arrivo",
       description: "Avviso anticipato 7gg prima scadenza",
       category: EmailCategory.PROMEMORIA,
-      subject: "Scadenza in arrivo - quota {mese}",
+      subject: "Scadenza in arrivo - contributo di {mese}",
       bodyHtml: `<p>Gentile {genitore_nome},</p>
-<p>la quota di {mese} per {allieva_nome} scade il <strong>{data_scadenza}</strong>.</p>
+<p>il contributo di {mese} per {allieva_nome} scade il <strong>{data_scadenza}</strong>.</p>
 <p>Importo: <strong>{importo}</strong></p>
 <p>Grazie per il pagamento puntuale.</p>
 <hr>
@@ -253,7 +253,7 @@ A.S.D. IAD Irpinia Arte Danza`,
 <p>confermiamo il ricevimento del pagamento per {allieva_nome}:</p>
 <ul>
   <li>Importo: <strong>{importo}</strong></li>
-  <li>Tipo: {tipo_quota}</li>
+  <li>Causale: {tipo_quota}</li>
   <li>Data: {data_pagamento}</li>
   <li>Metodo: {metodo}</li>
 </ul>

@@ -262,7 +262,7 @@ export function CourseForm({
             name="monthlyFeeEur"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Quota mensile (€)</FormLabel>
+                <FormLabel>Contributo mensile (€)</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -287,7 +287,7 @@ export function CourseForm({
             name="trimesterFeeEur"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Quota trim. (€)</FormLabel>
+                <FormLabel>Contributo trim. (€)</FormLabel>
                 <FormControl>
                   <Input
                     type="number"

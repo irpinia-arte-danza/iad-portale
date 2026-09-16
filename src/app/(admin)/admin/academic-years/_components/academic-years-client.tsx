@@ -175,7 +175,7 @@ export function AcademicYearsClient({ years }: Props) {
             <TableRow>
               <TableHead>Anno</TableHead>
               <TableHead>Periodo</TableHead>
-              <TableHead className="hidden md:table-cell">Quota</TableHead>
+              <TableHead className="hidden md:table-cell">Contributo</TableHead>
               <TableHead className="hidden md:table-cell text-center">
                 Iscrizioni
               </TableHead>

@@ -256,7 +256,7 @@ export function StageForm({
             name="feeEur"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Quota (€)</FormLabel>
+                <FormLabel>Contributo (€)</FormLabel>
                 <FormControl>
                   <Input
                     type="number"

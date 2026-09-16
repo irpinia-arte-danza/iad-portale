@@ -89,7 +89,7 @@ export function ShowcaseInfoTab({ showcase }: Props) {
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Totale quota</span>
+              <span className="text-muted-foreground">Totale contributo</span>
               <span className="font-mono font-medium">
                 {EUR.format(total)}
               </span>

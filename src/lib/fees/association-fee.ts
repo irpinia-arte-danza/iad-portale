@@ -18,20 +18,19 @@ import {
 // - l'importo è quello dell'anno accademico (Anni accademici), mai a zero
 // ─────────────────────────────────────────────────────────────────────────
 
-// "2026-2027" → "2026/2027"
-export function academicYearSlashLabel(academicYearLabel: string): string {
-  return academicYearLabel.replace("-", "/")
-}
+// Le diciture vivono in association-fee-label.ts (funzioni pure, importabili
+// anche dai componenti client); qui si ri-esportano per i chiamanti server.
+import {
+  academicYearSlashLabel,
+  associationFeeDescription,
+} from "./association-fee-label"
 
-// "2026-2027" → "Quota associativa 2026/2027"
-export function associationFeeDescription(academicYearLabel: string): string {
-  return `Quota associativa ${academicYearSlashLabel(academicYearLabel)}`
-}
+export { academicYearSlashLabel, associationFeeDescription }
 
 export class AssociationFeeNotSetError extends Error {
   constructor(academicYearLabel: string) {
     super(
-      `Quota associativa ${academicYearSlashLabel(academicYearLabel)} non impostata: inseriscila in Anni accademici prima di iscrivere l'allieva.`,
+      `Contributo di iscrizione ${academicYearSlashLabel(academicYearLabel)} non impostato: inseriscilo in Anni accademici prima di iscrivere l'allieva.`,
     )
     this.name = "AssociationFeeNotSetError"
   }

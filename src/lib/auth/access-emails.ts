@@ -591,7 +591,7 @@ async function sendAccessInviteUnsafe({
       area_nome: kind === "PARENT" ? "area genitori" : "area insegnanti",
       descrizione_area:
         kind === "PARENT"
-          ? "consultare quote, ricevute, presenze e orari delle tue figlie"
+          ? "consultare contributi, ricevute, presenze e orari delle tue figlie"
           : "vedere le tue classi e segnare le presenze",
       link_accesso: confirmLink,
       link_recupero: `${appUrl}/password-dimenticata`,

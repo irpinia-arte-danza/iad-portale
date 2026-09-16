@@ -87,7 +87,7 @@ export async function getMyAthletes(parentId: string) {
 export type MyAthlete = Awaited<ReturnType<typeof getMyAthletes>>[number]
 
 export async function getMyOpenSchedules(parentId: string) {
-  // Scadenze DUE/OVERDUE delle figlie del genitore (corsi, quota associativa,
+  // Scadenze DUE/OVERDUE delle figlie del genitore (corsi, contributo di iscrizione,
   // stage, saggio, costumi)
   const schedules = await prisma.paymentSchedule.findMany({
     where: withActiveCourseOrStageScheduleFilter({
@@ -142,7 +142,9 @@ export async function getMyOpenSchedules(parentId: string) {
       amountCents: true,
       status: true,
       notes: true,
-      // Quota associativa: collegata direttamente all'allieva
+      // Serve alla dicitura del contributo di iscrizione ("… 2026/2027")
+      academicYear: { select: { label: true } },
+      // Contributo di iscrizione: collegato direttamente all'allieva
       athlete: {
         select: { id: true, firstName: true, lastName: true },
       },
@@ -212,6 +214,7 @@ export async function getMyOpenSchedules(parentId: string) {
       amountCents: s.amountCents,
       status: s.status,
       notes: s.notes,
+      academicYearLabel: s.academicYear.label,
       athleteId: athlete?.id ?? "",
       athleteName: athlete
         ? `${athlete.firstName} ${athlete.lastName}`
@@ -281,7 +284,7 @@ export async function getMyPayments(parentId: string) {
     athleteId: p.athlete.id,
     athleteName: `${p.athlete.firstName} ${p.athlete.lastName}`,
     athleteArchived: p.athlete.deletedAt !== null,
-    // "Quota associativa + Quota mensile" se il pagamento copre più scadenze
+    // "Contributo di iscrizione + Contributo mensile" se copre più scadenze
     feeLabel: paymentFeeTypeLabel(p),
     lines:
       p.paymentSchedules.length >= 2

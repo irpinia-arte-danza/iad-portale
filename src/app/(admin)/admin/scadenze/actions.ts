@@ -127,7 +127,7 @@ export async function getScadenzeCSVData(
     "Genitore",
     "Email",
     "Telefono",
-    "Corso / quota",
+    "Corso / causale",
     "Importo",
     "Scadenza",
     "Giorni ritardo",

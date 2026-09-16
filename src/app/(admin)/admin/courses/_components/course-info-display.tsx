@@ -87,7 +87,7 @@ export function CourseInfoDisplay({
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-muted-foreground">Quota mensile</dt>
+            <dt className="text-xs text-muted-foreground">Contributo mensile</dt>
             <dd className="font-mono">
               {euroFormatter.format(course.monthlyFeeCents / 100)}
             </dd>
@@ -95,7 +95,7 @@ export function CourseInfoDisplay({
           {course.trimesterFeeCents !== null && (
             <div>
               <dt className="text-xs text-muted-foreground">
-                Quota trimestrale
+                Contributo trimestrale
               </dt>
               <dd className="font-mono">
                 {euroFormatter.format(course.trimesterFeeCents / 100)}

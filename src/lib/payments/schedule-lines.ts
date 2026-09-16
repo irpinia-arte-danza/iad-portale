@@ -1,5 +1,6 @@
 import type { FeeType, Prisma } from "@prisma/client"
 
+import { associationFeeDescription } from "@/lib/fees/association-fee-label"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { formatMeseIt } from "@/lib/utils/format"
 
@@ -22,6 +23,8 @@ export const SCHEDULE_LINE_SELECT = {
   courseEnrollmentId: true,
   stageEnrollmentId: true,
   costumeAssignmentId: true,
+  // Serve alla dicitura del contributo di iscrizione ("… 2026/2027")
+  academicYear: { select: { label: true } },
   courseEnrollment: {
     select: { athleteId: true, course: { select: { name: true } } },
   },
@@ -59,22 +62,25 @@ function formatDateIt(date: Date): string {
   return `${dd}/${mm}/${d.getUTCFullYear()}`
 }
 
-// Descrizione della scadenza: righe della ricevuta, dettaglio pagamento,
-// storico del genitore, dialog di storno, form di registrazione
+// Descrizione per la famiglia: righe della ricevuta, PDF, portale genitori.
+// Senza nome del corso — sulla ricevuta la famiglia non lo vuole, e il mese
+// con l'anno basta a distinguere le rate. Per il gestionale, dove Giuseppina
+// deve riconoscere due rate dello stesso mese di un'allieva iscritta a due
+// corsi, c'è describeScheduleAdmin.
 export function describeSchedule(s: ScheduleLine): string {
   switch (s.feeType) {
+    // Le note storiche ("Quota associativa 2026/2027") non si leggono più: la
+    // dicitura si calcola sempre dall'anno accademico, così le scadenze già
+    // create parlano come quelle nuove senza toccare il database.
     case "ASSOCIATION":
-      return s.notes ?? FEE_TYPE_LABELS.ASSOCIATION
+      return associationFeeDescription(s.academicYear.label)
     case "MONTHLY": {
+      // formatMeseIt dà mese e anno: "settembre 2026"
       const month = formatMeseIt(new Date(s.dueDate)).toLowerCase()
-      return s.courseEnrollment
-        ? `Quota mensile ${month} — ${s.courseEnrollment.course.name}`
-        : `Quota mensile ${month}`
+      return `Contributo mensile di ${month}`
     }
     case "TRIMESTER":
-      return s.courseEnrollment
-        ? `Quota trimestrale — ${s.courseEnrollment.course.name}`
-        : FEE_TYPE_LABELS.TRIMESTER
+      return FEE_TYPE_LABELS.TRIMESTER
     case "STAGE":
       return s.stageEnrollment
         ? `Iscrizione Stage «${s.stageEnrollment.stage.title}» del ${formatDateIt(s.stageEnrollment.stage.date)}`
@@ -98,6 +104,20 @@ export function describeSchedule(s: ScheduleLine): string {
     default:
       return s.notes ?? FEE_TYPE_LABELS[s.feeType]
   }
+}
+
+// Corso della scadenza, quando c'è (mensili e trimestrali)
+export function scheduleCourseName(s: ScheduleLine): string | null {
+  return s.courseEnrollment?.course.name ?? null
+}
+
+// Descrizione per il gestionale: quella della famiglia più il corso. Vive solo
+// nelle pagine /admin e negli audit; ricevute, PDF e portale genitori usano
+// describeSchedule (schedule-lines.test.ts controlla che resti così).
+export function describeScheduleAdmin(s: ScheduleLine): string {
+  const description = describeSchedule(s)
+  const course = scheduleCourseName(s)
+  return course ? `${description} — ${course}` : description
 }
 
 export function athleteIdOfSchedule(s: ScheduleLine): string | null {
@@ -172,7 +192,7 @@ export function accountingLines(
   return [{ feeType: payment.feeType, amountCents: payment.amountCents }]
 }
 
-// "Quota associativa + Quota mensile"
+// "Contributo di iscrizione + Contributo mensile"
 export function paymentFeeTypeLabel(payment: PaymentForAccounting): string {
   const types = [...new Set(accountingLines(payment).map((l) => l.feeType))]
   types.sort((a, b) => FEE_TYPE_ORDER.indexOf(a) - FEE_TYPE_ORDER.indexOf(b))

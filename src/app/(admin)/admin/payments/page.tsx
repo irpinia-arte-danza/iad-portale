@@ -90,7 +90,7 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
       <ResourceHeader
         breadcrumbs={[{ label: "Pagamenti" }]}
         title="Pagamenti"
-        description="Registro entrate: quote mensili, stage, saggio e altri pagamenti."
+        description="Registro entrate: contributi mensili, stage, saggio e altri pagamenti."
         action={
           <PaymentCreateDialog
             athletes={athletes}

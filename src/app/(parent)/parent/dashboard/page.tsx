@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { requireParent } from "@/lib/auth/require-parent"
+import { associationFeeDescription } from "@/lib/fees/association-fee-label"
 import { receiptPdfHref } from "@/lib/receipts/types"
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { formatDateShort, formatEur } from "@/lib/utils/format"
@@ -229,8 +230,10 @@ export default async function ParentDashboardPage() {
                             >
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium">
-                                  {s.feeType === "ASSOCIATION" && s.notes
-                                    ? s.notes
+                                  {s.feeType === "ASSOCIATION"
+                                    ? associationFeeDescription(
+                                        s.academicYearLabel,
+                                      )
                                     : FEE_TYPE_LABELS[s.feeType]}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
@@ -518,8 +521,8 @@ function SummaryAlert({
           <div className="space-y-1 text-sm">
             <p className="font-semibold">
               {overdueCount === 1
-                ? "1 quota scaduta"
-                : `${overdueCount} quote scadute`}{" "}
+                ? "1 contributo scaduto"
+                : `${overdueCount} contributi scaduti`}{" "}
               · {formatEur(overdueCents)}
             </p>
             <p className="text-xs">
@@ -542,8 +545,8 @@ function SummaryAlert({
           <div className="space-y-1 text-sm">
             <p className="font-semibold">
               {soonCount === 1
-                ? "1 quota in scadenza"
-                : `${soonCount} quote in scadenza`}{" "}
+                ? "1 contributo in scadenza"
+                : `${soonCount} contributi in scadenza`}{" "}
               · {formatEur(soonCents)}
             </p>
             <p className="text-xs">
@@ -565,7 +568,7 @@ function SummaryAlert({
         <div className="space-y-1 text-sm">
           <p className="font-semibold">Tutto in regola</p>
           <p className="text-xs">
-            Nessuna quota in sospeso al momento. Buon allenamento!
+            Nessun contributo in sospeso al momento. Buon allenamento!
           </p>
         </div>
       </CardContent>

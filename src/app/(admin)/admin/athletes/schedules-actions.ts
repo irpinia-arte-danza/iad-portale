@@ -9,7 +9,7 @@ import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   SCHEDULE_LINE_SELECT,
   athleteIdOfSchedule,
-  describeSchedule,
+  describeScheduleAdmin,
 } from "@/lib/payments/schedule-lines"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
@@ -95,7 +95,7 @@ export async function waiveSchedule(
           entityId: idParsed.data,
           changes: {
             change: "WAIVE",
-            schedule: describeSchedule(existing),
+            schedule: describeScheduleAdmin(existing),
             amountCents: existing.amountCents,
             dueDate: dateOnlyIso(existing.dueDate),
             fromStatus: existing.status,
@@ -151,7 +151,7 @@ export async function unwaiveSchedule(
           entityId: idParsed.data,
           changes: {
             change: "UNWAIVE",
-            schedule: describeSchedule(existing),
+            schedule: describeScheduleAdmin(existing),
             amountCents: existing.amountCents,
             dueDate: dateOnlyIso(existing.dueDate),
             previousWaiverReason: existing.waiverReason,

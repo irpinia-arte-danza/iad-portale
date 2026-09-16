@@ -63,7 +63,7 @@ export default async function HomePage() {
             ) : null}
             <CardTitle className="text-xl">{asdName}</CardTitle>
             <CardDescription>
-              Area riservata per famiglie e insegnanti: quote, ricevute,
+              Area riservata per famiglie e insegnanti: contributi, ricevute,
               presenze e orari delle lezioni.
             </CardDescription>
           </CardHeader>

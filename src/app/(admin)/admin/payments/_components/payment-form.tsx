@@ -284,7 +284,7 @@ export function PaymentForm({
             {options.length === 0 ? (
               <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
                 Nessuna scadenza aperta per questa allieva: puoi registrare un
-                pagamento libero scegliendo il tipo quota.
+                pagamento libero scegliendo la causale.
               </p>
             ) : (
               <ul className="divide-y rounded-md border">
@@ -371,7 +371,7 @@ export function PaymentForm({
             )}
             {hasSeparateNumbering ? (
               <p className="text-xs text-muted-foreground">
-                Quote saggio e costumi hanno una numerazione ricevute separata:
+                I contributi saggio e costumi hanno una numerazione ricevute separata:
                 vanno registrate in un pagamento a parte.
               </p>
             ) : null}
@@ -396,7 +396,7 @@ export function PaymentForm({
         <div className="grid gap-4 sm:grid-cols-2">
           {selectedOptions.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-sm font-medium">Tipo quota</p>
+              <p className="text-sm font-medium">Causale</p>
               <p className="text-sm text-muted-foreground">
                 {selectedTypesLabel}
               </p>
@@ -407,7 +407,7 @@ export function PaymentForm({
               name="feeType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tipo quota</FormLabel>
+                  <FormLabel>Causale</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
@@ -459,8 +459,8 @@ export function PaymentForm({
         watchedFeeType === "ASSOCIATION" ? (
           <p className="rounded-md border bg-muted/50 p-3 text-sm">
             {options.some((o) => o.feeType === "ASSOCIATION")
-              ? "La quota associativa dell'anno è nell'elenco sopra: spuntala per chiuderla."
-              : "Nessuna quota associativa aperta per quest'anno. Se l'allieva non è ancora iscritta a un corso, il pagamento verrà abbinato alla quota quando la iscrivi."}
+              ? "Il contributo di iscrizione dell'anno è nell'elenco sopra: spuntalo per chiuderlo."
+              : "Nessun contributo di iscrizione aperto per quest'anno. Se l'allieva non è ancora iscritta a un corso, il pagamento verrà abbinato al contributo quando la iscrivi."}
           </p>
         ) : null}
 
@@ -496,7 +496,7 @@ export function PaymentForm({
                 </FormControl>
                 {isMulti ? (
                   <p className="text-xs text-muted-foreground">
-                    Somma delle righe. Se una quota è ridotta cambia il suo
+                    Somma delle righe. Se un contributo è ridotto cambia il suo
                     importo nell&apos;elenco: la scadenza si allinea e risulta
                     pagata.
                   </p>
@@ -518,7 +518,7 @@ export function PaymentForm({
                     <span className="font-mono tabular-nums">
                       {formatEur(single.amountCents)}
                     </span>
-                    ): se è denaro di un&apos;altra quota, registralo a parte.
+                    ): se è denaro di un altro contributo, registralo a parte.
                   </p>
                 ) : null}
                 <FormMessage />

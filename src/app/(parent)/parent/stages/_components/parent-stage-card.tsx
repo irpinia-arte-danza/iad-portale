@@ -124,7 +124,7 @@ export function ParentStageCard({ stage }: Props) {
         </ul>
 
         <div className="rounded-md border bg-muted/30 p-3 text-sm">
-          <span className="text-muted-foreground">Quota:</span>{" "}
+          <span className="text-muted-foreground">Contributo:</span>{" "}
           <strong className="font-mono tabular-nums">
             € {CURRENCY_IT.format(stage.feeCents / 100)}
           </strong>

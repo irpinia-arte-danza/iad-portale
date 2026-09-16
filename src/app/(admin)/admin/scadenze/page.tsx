@@ -71,7 +71,7 @@ export default async function ScadenzePage({ searchParams }: PageProps) {
       <ResourceHeader
         breadcrumbs={[{ label: "Scadenze" }]}
         title="Scadenze"
-        description="Quote aperte: in ritardo, in scadenza nei prossimi 7 giorni, o tutte."
+        description="Contributi aperti: in ritardo, in scadenza nei prossimi 7 giorni, o tutti."
       />
       <ResourceContent>
         <div className="flex flex-col gap-4">

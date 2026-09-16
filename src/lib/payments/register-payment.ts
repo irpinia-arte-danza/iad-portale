@@ -22,7 +22,7 @@ import {
   SCHEDULE_LINE_SELECT,
   athleteIdOfSchedule,
   compareScheduleLines,
-  describeSchedule,
+  describeScheduleAdmin,
   type ScheduleLine,
 } from "./schedule-lines"
 
@@ -166,7 +166,7 @@ export async function registerPaymentCore(
   if (alreadyPaid) {
     return {
       ok: false,
-      error: `«${describeSchedule(alreadyPaid)}» risulta già pagata: nessun pagamento registrato. Ricarica la pagina e controlla le scadenze.`,
+      error: `«${describeScheduleAdmin(alreadyPaid)}» risulta già pagata: nessun pagamento registrato. Ricarica la pagina e controlla le scadenze.`,
     }
   }
 
@@ -191,12 +191,12 @@ export async function registerPaymentCore(
     return {
       ok: false,
       error:
-        "Quote saggio e costumi hanno una numerazione ricevute separata: registrale in un pagamento a parte",
+        "I contributi saggio e costumi hanno una numerazione ricevute separata: registrali in un pagamento a parte",
     }
   }
 
   const warnings = waived.map(
-    (s) => `«${describeSchedule(s)}» esclusa: risulta non dovuta`,
+    (s) => `«${describeScheduleAdmin(s)}» esclusa: risulta non dovuta`,
   )
 
   // Importo per scadenza: con una scadenza è l'importo del pagamento, con più
@@ -207,7 +207,7 @@ export async function registerPaymentCore(
     schedules: selected.map((s) => ({
       id: s.id,
       amountCents: s.amountCents,
-      description: describeSchedule(s),
+      description: describeScheduleAdmin(s),
     })),
     totalCents: inputCents,
     rowCents: rowAmountsCents(values.scheduleAmountsEur),
@@ -403,7 +403,7 @@ export async function reversePaymentCore(params: {
 
   const reopenedSchedules = [...existing.paymentSchedules]
     .sort(compareScheduleLines)
-    .map(describeSchedule)
+    .map(describeScheduleAdmin)
 
   const cancelledReceiptNumber = await prisma.$transaction(async (tx) => {
     // Tutte le scadenze del pagamento tornano da pagare

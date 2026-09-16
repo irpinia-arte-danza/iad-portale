@@ -25,7 +25,7 @@ function eur(cents: number): number {
 const CORRISPETTIVI_HEADERS = [
   "Data",
   "Allieva",
-  "Tipo quota",
+  "Causale",
   "Corso",
   "Metodo",
   "Importo (€)",

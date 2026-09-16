@@ -390,8 +390,8 @@ function ShowcaseFormFields({
                 />
               </FormControl>
               <FormDescription>
-                Totale = Caparra + Saldo. In modalità «Quota unica» viene
-                richiesta in un&apos;unica scadenza.
+                Totale = Caparra + Saldo. In modalità «Contributo unico» viene
+                richiesto in un&apos;unica scadenza.
               </FormDescription>
               <FormMessage />
             </FormItem>

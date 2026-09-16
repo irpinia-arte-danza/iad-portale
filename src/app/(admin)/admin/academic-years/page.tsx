@@ -12,7 +12,7 @@ export default async function AcademicYearsPage() {
       <ResourceHeader
         breadcrumbs={[{ label: "Anni accademici" }]}
         title="Anni accademici"
-        description="Gestione periodi di iscrizione, quote associative e rollover anno corrente."
+        description="Gestione periodi, contributi di iscrizione e rollover anno corrente."
       />
       <ResourceContent>
         <AcademicYearsClient years={years} />

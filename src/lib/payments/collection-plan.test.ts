@@ -10,17 +10,17 @@ import {
 const september: CollectionSchedule = {
   id: "sep",
   amountCents: 4000,
-  description: "Quota mensile settembre",
+  description: "Contributo mensile di settembre 2026",
 }
 const october: CollectionSchedule = {
   id: "oct",
   amountCents: 4000,
-  description: "Quota mensile ottobre",
+  description: "Contributo mensile di ottobre 2026",
 }
 const association: CollectionSchedule = {
   id: "assoc",
   amountCents: 3000,
-  description: "Quota associativa 2026/2027",
+  description: "Contributo di iscrizione 2026/2027",
 }
 
 describe("planCollection — una scadenza", () => {
@@ -32,7 +32,7 @@ describe("planCollection — una scadenza", () => {
       rows: [
         {
           scheduleId: "sep",
-          description: "Quota mensile settembre",
+          description: "Contributo mensile di settembre 2026",
           dueCents: 4000,
           collectedCents: 2000,
           alignedCents: 2000,
@@ -50,7 +50,7 @@ describe("planCollection — una scadenza", () => {
   it("incasso oltre il dovuto: bloccato", () => {
     const plan = planCollection({ schedules: [september], totalCents: 6000 })
     expect(plan).toMatchObject({ ok: false })
-    expect(!plan.ok && plan.error).toContain("Quota mensile settembre")
+    expect(!plan.ok && plan.error).toContain("Contributo mensile di settembre 2026")
   })
 
   it("incasso ridotto: finisce nell'audit come differenza", () => {
@@ -106,7 +106,7 @@ describe("planCollection — più scadenze", () => {
       rowCents: { sep: 0 },
     })
     expect(plan).toMatchObject({ ok: false })
-    expect(!plan.ok && plan.error).toContain("Quota mensile settembre")
+    expect(!plan.ok && plan.error).toContain("Contributo mensile di settembre 2026")
   })
 
   it("una riga oltre il dovuto: bloccato", () => {

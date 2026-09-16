@@ -41,7 +41,7 @@ export function ScadenzeKpiWidget({ kpi }: ScadenzeKpiWidgetProps) {
               Nessuna scadenza aperta
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Tutte le quote sono saldate o future.
+              Tutti i contributi sono saldati o futuri.
             </p>
           </div>
         ) : (

@@ -481,7 +481,7 @@ export async function confirmParticipation(
             amountCents: total,
             status: ScheduleStatus.DUE,
             createdBy: userId,
-            notes: `Saggio «${participation.showcase.title}» — Quota unica`,
+            notes: `Saggio «${participation.showcase.title}» — Contributo unico`,
           },
         })
       } else {

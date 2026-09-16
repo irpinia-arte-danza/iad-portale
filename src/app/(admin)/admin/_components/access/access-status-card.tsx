@@ -31,7 +31,7 @@ function describe(kind: AccessProfileKind, status: AccessStatus): string {
       return `Per inviare l'accesso serve un indirizzo email. ${editHint} e aggiungila.`
     case "NEVER_INVITED":
       return kind === "PARENT"
-        ? "Non ha ancora ricevuto l'email di accesso. Inviala quando i dati (figlie, iscrizioni, quote) sono completi."
+        ? "Non ha ancora ricevuto l'email di accesso. Inviala quando i dati (figlie, iscrizioni, contributi) sono completi."
         : "Non ha ancora ricevuto l'email di accesso. Inviala quando i corsi sono assegnati."
     case "INVITED":
       return `Email di accesso inviata il ${formatAccessDate(status.invitedAt)}, password non ancora scelta. Se il link è scaduto o l'email non è arrivata, reinvia: il link precedente smetterà di funzionare.`

@@ -111,7 +111,7 @@ export function AcademicYearFormDialog({
               : "Modifica anno accademico"}
           </DialogTitle>
           <DialogDescription>
-            Periodo da settembre a giugno/agosto. Quota associativa annuale e
+            Periodo da settembre a giugno/agosto. Contributo di iscrizione annuale e
             giorno di scadenza mensile.
           </DialogDescription>
         </DialogHeader>
@@ -194,7 +194,7 @@ export function AcademicYearFormDialog({
                 name="associationFeeEur"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quota associativa (€)</FormLabel>
+                    <FormLabel>Contributo di iscrizione (€)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"

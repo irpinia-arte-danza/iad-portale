@@ -138,7 +138,7 @@ export function GuardianRelationFields({
                   )}
                 </FormControl>
                 <div className="space-y-1 leading-none">
-                  <FormLabel className="cursor-pointer">Paga le quote</FormLabel>
+                  <FormLabel className="cursor-pointer">Paga i contributi</FormLabel>
                   <FormDescription>
                     {isLocked
                       ? `Ruolo attualmente assegnato a ${lockedPrimaryPayerName}. Modifica quella relazione per liberarlo.`

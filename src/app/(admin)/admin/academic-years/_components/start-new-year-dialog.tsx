@@ -224,7 +224,7 @@ export function StartNewYearDialog({
                 name="associationFeeEur"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quota associativa (€)</FormLabel>
+                    <FormLabel>Contributo di iscrizione (€)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"

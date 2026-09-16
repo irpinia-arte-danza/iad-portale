@@ -49,7 +49,7 @@ function row(schedule: CollectionSchedule, collectedCents: number): CollectionRo
 }
 
 function overDueError(schedule: CollectionSchedule, collectedCents: number): string {
-  return `«${schedule.description}»: ${formatEur(collectedCents)} supera l'importo della scadenza (${formatEur(schedule.amountCents)}). Se è denaro di un'altra quota, registralo a parte.`
+  return `«${schedule.description}»: ${formatEur(collectedCents)} supera l'importo della scadenza (${formatEur(schedule.amountCents)}). Se è denaro di un altro contributo, registralo a parte.`
 }
 
 export function planCollection(params: {

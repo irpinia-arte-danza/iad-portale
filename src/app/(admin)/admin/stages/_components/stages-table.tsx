@@ -68,7 +68,7 @@ export function StagesTable({ stages }: { stages: StageListItem[] }) {
             <TableHead>Orario</TableHead>
             <TableHead>Luogo</TableHead>
             <TableHead className="text-right">Iscritti</TableHead>
-            <TableHead className="text-right">Quota</TableHead>
+            <TableHead className="text-right">Contributo</TableHead>
             <TableHead>Stato</TableHead>
             <TableHead>Iscrizioni</TableHead>
           </TableRow>

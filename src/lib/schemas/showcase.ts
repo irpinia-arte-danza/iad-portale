@@ -4,7 +4,7 @@ import { PaymentMode } from "@prisma/client"
 import { uuidSchema } from "./common"
 
 export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
-  SINGLE: "Quota unica",
+  SINGLE: "Contributo unico",
   SPLIT: "Caparra + Saldo",
 }
 

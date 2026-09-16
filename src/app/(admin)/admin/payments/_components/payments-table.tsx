@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table"
 import {
   compareScheduleLines,
-  describeSchedule,
+  describeScheduleAdmin,
   paymentFeeTypeLabel,
 } from "@/lib/payments/schedule-lines"
 import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
@@ -105,7 +105,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
             const receiptCancelled = p.receipt?.status === "CANCELLED"
             const scheduleDescriptions = [...p.paymentSchedules]
               .sort(compareScheduleLines)
-              .map(describeSchedule)
+              .map(describeScheduleAdmin)
             return (
               <TableRow
                 key={p.id}
