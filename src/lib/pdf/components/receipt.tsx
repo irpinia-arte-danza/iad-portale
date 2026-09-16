@@ -26,11 +26,14 @@ export type ReceiptBrand = {
 export type ReceiptData = {
   receiptNumber: string
   issueDate: Date
+  // Del pagante la ricevuta riporta solo nome e codice fiscale: l'indirizzo
+  // resta congelato sulla riga, ma non compare sul documento
   payerName: string
   payerFiscalCode: string | null
-  payerAddress: string | null
+  // Dell'allieva: nome, codice fiscale e residenza
   athleteName: string
   athleteFiscalCode: string | null
+  athleteAddress: string | null
   feeType: FeeType
   description: string | null
   // Righe della causale (pagamento che chiude più scadenze), null = singola
@@ -108,6 +111,8 @@ const styles = {
     color: pdfColors.muted,
     marginTop: 2,
   },
+  // Due box affiancati: pagante (nome, C.F.) e allieva (nome, C.F.,
+  // residenza). Lo scarto è di una riga, non vale la pena impilarli.
   partyRow: {
     flexDirection: "row" as const,
     gap: 12,
@@ -270,7 +275,8 @@ export function ReceiptPdf({
           </Text>
         </View>
 
-        {/* Party row: pagante + per conto di */}
+        {/* Chi paga e per chi: del pagante nome e codice fiscale, dell'allieva
+            anche la residenza */}
         <View style={styles.partyRow}>
           <View style={styles.partyBox}>
             <Text style={styles.partyLabel}>Ricevuto da</Text>
@@ -280,9 +286,6 @@ export function ReceiptPdf({
                 C.F. {receipt.payerFiscalCode}
               </Text>
             ) : null}
-            {receipt.payerAddress ? (
-              <Text style={styles.partyMeta}>{receipt.payerAddress}</Text>
-            ) : null}
           </View>
           <View style={styles.partyBox}>
             <Text style={styles.partyLabel}>Per conto di (allieva)</Text>
@@ -291,6 +294,9 @@ export function ReceiptPdf({
               <Text style={styles.partyMeta}>
                 C.F. {receipt.athleteFiscalCode}
               </Text>
+            ) : null}
+            {receipt.athleteAddress ? (
+              <Text style={styles.partyMeta}>{receipt.athleteAddress}</Text>
             ) : null}
           </View>
         </View>

@@ -44,12 +44,14 @@ export async function loadReceiptForPdf(receiptId: string) {
       pdfPath: true,
       payerName: true,
       payerFiscalCode: true,
-      payerAddress: true,
+      // payer_address resta congelato sulla riga ma non compare più sul PDF:
+      // della persona che paga la ricevuta riporta nome e codice fiscale
       // Destinatario congelato: serve all'invio per email, non al PDF
       payerId: true,
       payerEmail: true,
       athleteName: true,
       athleteFiscalCode: true,
+      athleteAddress: true,
       description: true,
       amountCents: true,
       lines: true,
@@ -177,10 +179,12 @@ export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> 
       issueDate: receipt.issueDate,
       payerName: receipt.payerName ?? athleteNameOf(receipt),
       payerFiscalCode: receipt.payerFiscalCode,
-      payerAddress: receipt.payerAddress,
       athleteName: athleteNameOf(receipt),
       athleteFiscalCode:
         receipt.athleteFiscalCode ?? payment.athlete.fiscalCode ?? null,
+      // Solo dal congelato: su una ricevuta emessa prima di questo campo
+      // resta vuoto, e il documento non inventa dati che non aveva
+      athleteAddress: receipt.athleteAddress,
       feeType: payment.feeType,
       description: receipt.description,
       lines: parseReceiptLines(receipt.lines),

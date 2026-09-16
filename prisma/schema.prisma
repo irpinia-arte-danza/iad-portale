@@ -912,6 +912,9 @@ model Receipt {
   payerEmail        String? @map("payer_email")
   athleteName       String? @map("athlete_name")
   athleteFiscalCode String? @map("athlete_fiscal_code")
+  // Residenza dell'allieva, congelata come il resto: compare sulla ricevuta
+  // e deve restare quella del giorno dell'emissione
+  athleteAddress String? @map("athlete_address")
   description       String?
   amountCents       Int?    @map("amount_cents")
   // Righe della causale quando il pagamento chiude più scadenze:
