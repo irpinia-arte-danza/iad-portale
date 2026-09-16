@@ -70,8 +70,6 @@ export async function renderReceiptPreviewPdf(
       feeType: payment.feeType,
       description: snapshot.description,
       lines: snapshot.lines,
-      periodStart: payment.periodStart,
-      periodEnd: payment.periodEnd,
       amountCents: snapshot.amountCents,
       method: payment.method,
       paymentMethods: [payment.method],

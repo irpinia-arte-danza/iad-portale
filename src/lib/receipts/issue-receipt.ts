@@ -74,8 +74,6 @@ const PAYMENT_FOR_RECEIPT_SELECT = {
   paymentDate: true,
   method: true,
   notes: true,
-  periodStart: true,
-  periodEnd: true,
   academicYear: { select: { label: true } },
   parent: { select: PERSON_SELECT },
   athlete: {
@@ -152,11 +150,11 @@ function buildLines(schedules: ScheduleLine[]): ReceiptLine[] | null {
   }))
 }
 
-// Causale di una ricevuta a scadenza singola: contributo di iscrizione sempre
-// con l'anno; stage, saggio e costume dalla scadenza; alle mensili bastano
-// causale e periodo. Le note del pagamento fanno da descrizione solo per un
-// pagamento libero: con una scadenza restano interne (es. il motivo di un
-// contributo ridotto, "iscritta dal 15/09").
+// Causale di una ricevuta a scadenza singola: la stessa descrizione che la
+// famiglia legge nelle righe ("Contributo mensile di settembre 2026"). Porta
+// il mese, che prima stava nel campo Periodo del PDF. Le note del pagamento
+// fanno da descrizione solo per un pagamento libero: con una scadenza restano
+// interne (es. il motivo di un contributo ridotto, "iscritta dal 15/09").
 function buildDescription(payment: PaymentForReceipt): string | null {
   const schedules = payment.paymentSchedules
   if (schedules.length >= 2) return null
@@ -170,15 +168,7 @@ function buildDescription(payment: PaymentForReceipt): string | null {
 
   if (!schedule) return payment.notes ?? null
 
-  switch (schedule.feeType) {
-    case "STAGE":
-    case "SHOWCASE_1":
-    case "SHOWCASE_2":
-    case "COSTUME":
-      return describeSchedule(schedule)
-    default:
-      return null
-  }
+  return describeSchedule(schedule)
 }
 
 function toInfo(receipt: IssuedReceiptInfo): IssuedReceiptInfo {

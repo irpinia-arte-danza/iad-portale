@@ -35,8 +35,6 @@ export type ReceiptData = {
   description: string | null
   // Righe della causale (pagamento che chiude più scadenze), null = singola
   lines: ReceiptLine[] | null
-  periodStart: Date | null
-  periodEnd: Date | null
   amountCents: number
   method: PaymentMethod
   // Metodi di tutti i pagamenti coperti dalla ricevuta (oggi uno solo: una
@@ -238,14 +236,6 @@ export function ReceiptPdf({
       )
     : FEE_TYPE_LABELS[receipt.feeType]
 
-  let periodLine: string | null = null
-  // Il campo ha già l'etichetta "Periodo": qui solo le date
-  if (receipt.periodStart && receipt.periodEnd) {
-    periodLine = `${formatDateIt(receipt.periodStart)} – ${formatDateIt(receipt.periodEnd)}`
-  } else if (receipt.periodStart) {
-    periodLine = `dal ${formatDateIt(receipt.periodStart)}`
-  }
-
   return (
     <Document>
       <Page size="A4" style={pdfStyles.page}>
@@ -305,7 +295,7 @@ export function ReceiptPdf({
           </View>
         </View>
 
-        {/* Dettaglio: causale, data, modalità, periodo */}
+        {/* Dettaglio: causale, data, modalità */}
         <View style={pdfStyles.section}>
           <Text style={pdfStyles.sectionTitle}>Dettaglio del pagamento</Text>
           <View style={pdfStyles.fieldGrid}>
@@ -327,12 +317,6 @@ export function ReceiptPdf({
                 {PAYMENT_METHOD_LABELS[receipt.method]}
               </Text>
             </View>
-            {periodLine ? (
-              <View style={pdfStyles.fieldBox}>
-                <Text style={pdfStyles.fieldLabel}>Periodo</Text>
-                <Text style={pdfStyles.fieldValue}>{periodLine}</Text>
-              </View>
-            ) : null}
             {receipt.description && !receipt.lines ? (
               <View style={{ ...pdfStyles.fieldBox, width: "100%" }}>
                 <Text style={pdfStyles.fieldLabel}>Descrizione</Text>

@@ -56,8 +56,6 @@ export async function loadReceiptForPdf(receiptId: string) {
           feeType: true,
           method: true,
           paymentDate: true,
-          periodStart: true,
-          periodEnd: true,
           amountCents: true,
           athlete: {
             select: { firstName: true, lastName: true, fiscalCode: true },
@@ -183,8 +181,6 @@ export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> 
       feeType: payment.feeType,
       description: receipt.description,
       lines: parseReceiptLines(receipt.lines),
-      periodStart: payment.periodStart,
-      periodEnd: payment.periodEnd,
       amountCents: receipt.amountCents ?? payment.amountCents,
       method: payment.method,
       // Una ricevuta copre un solo pagamento (payment_id unico)
