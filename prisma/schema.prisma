@@ -905,6 +905,11 @@ model Receipt {
   payerName         String? @map("payer_name")
   payerFiscalCode   String? @map("payer_fiscal_code")
   payerAddress      String? @map("payer_address")
+  // Destinatario congelato: a chi va mandata la ricevuta anche se in futuro
+  // cambiano i genitori collegati o il pagante indicato sul pagamento.
+  // Nessuna FK: la ricevuta si conserva 10 anni, il genitore può sparire.
+  payerId           String? @map("payer_id") @db.Uuid
+  payerEmail        String? @map("payer_email")
   athleteName       String? @map("athlete_name")
   athleteFiscalCode String? @map("athlete_fiscal_code")
   description       String?
@@ -1162,6 +1167,9 @@ model EmailLog {
   athleteId         String? @map("athlete_id") @db.Uuid
   parentId          String? @map("parent_id") @db.Uuid
   paymentScheduleId String? @map("payment_schedule_id") @db.Uuid
+  // Ricevuta allegata all'email: da qui si ricava se e quando è stata
+  // inviata, senza aggiungere campi sulla ricevuta stessa
+  receiptId         String? @map("receipt_id") @db.Uuid
 
   status        EmailStatus
   providerId    String?     @map("provider_id")
@@ -1182,6 +1190,7 @@ model EmailLog {
   @@index([parentId, sentAt])
   @@index([paymentScheduleId])
   @@index([paymentScheduleId, milestoneKey])
+  @@index([receiptId, sentAt])
   @@map("email_logs")
 }
 
@@ -1357,6 +1366,7 @@ enum AuditAction {
   // Sprint ricevuta lato admin
   RECEIPT_ISSUE
   RECEIPT_CANCEL
+  RECEIPT_EMAIL_SENT
 }
 
 model AuditLog {

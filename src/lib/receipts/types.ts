@@ -60,6 +60,13 @@ export function receiptPdfHref(receiptId: string): string {
   return `/ricevute/${receiptId}`
 }
 
+// Stesso documento, ma salvato nei Download invece di aprirsi nel
+// visualizzatore. Una sola route: stessi controlli di accesso, cambia solo
+// il Content-Disposition.
+export function receiptPdfDownloadHref(receiptId: string): string {
+  return `/ricevute/${receiptId}?download=1`
+}
+
 // Anteprima PDF prima dell'emissione: solo admin, numero previsto, filigrana
 export function receiptPreviewPdfHref(paymentId: string): string {
   return `/ricevute/anteprima/${paymentId}`

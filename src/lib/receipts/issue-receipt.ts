@@ -49,8 +49,12 @@ import type {
 // ─────────────────────────────────────────────────────────────────────────
 
 const PERSON_SELECT = {
+  id: true,
   firstName: true,
   lastName: true,
+  // Congelata sulla ricevuta: è l'indirizzo a cui la si invierà, anche fra
+  // mesi, anche se nel frattempo cambiano i genitori collegati
+  email: true,
   fiscalCode: true,
   residenceStreet: true,
   residenceNumber: true,
@@ -238,6 +242,9 @@ export type ReceiptSnapshot = {
   payerName: string
   payerFiscalCode: string | null
   payerAddress: string | null
+  // Destinatario dell'invio per email, congelato come il resto
+  payerId: string | null
+  payerEmail: string | null
   payerSource: ReceiptPayerSource
   athleteName: string
   athleteFiscalCode: string | null
@@ -257,6 +264,10 @@ export function buildReceiptSnapshot(payment: PaymentForReceipt): ReceiptSnapsho
     payerName: fullName(payer.person),
     payerFiscalCode: payer.person.fiscalCode,
     payerAddress: composeAddress(payer.person),
+    // payerId resta vuoto se il pagante è l'allieva stessa: la colonna
+    // identifica un genitore, non un'allieva
+    payerId: payer.source === "ATHLETE" ? null : payer.person.id,
+    payerEmail: payer.person.email,
     payerSource: payer.source,
     athleteName: fullName(payment.athlete),
     athleteFiscalCode: payment.athlete.fiscalCode,
@@ -374,6 +385,8 @@ export async function issueReceiptCore(params: {
             payerName: snapshot.payerName,
             payerFiscalCode: snapshot.payerFiscalCode,
             payerAddress: snapshot.payerAddress,
+            payerId: snapshot.payerId,
+            payerEmail: snapshot.payerEmail,
             athleteName: snapshot.athleteName,
             athleteFiscalCode: snapshot.athleteFiscalCode,
             description: snapshot.description,

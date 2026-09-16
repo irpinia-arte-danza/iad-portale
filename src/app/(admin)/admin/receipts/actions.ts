@@ -7,6 +7,12 @@ import {
   buildIssuePreview,
   issueReceiptCore,
 } from "@/lib/receipts/issue-receipt"
+import { getReceiptEmailState } from "@/lib/receipts/receipt-email-status"
+import type { ReceiptEmailState } from "@/lib/receipts/receipt-email"
+import {
+  sendReceiptEmailCore,
+  type SendReceiptEmailResult,
+} from "@/lib/receipts/send-receipt-email"
 import type {
   IssueReceiptResult,
   ReceiptIssuePreview,
@@ -54,4 +60,47 @@ export async function issueReceipt(
     revalidatePath("/admin/receipts")
   }
   return result
+}
+
+// "Invia per email" / "Invia di nuovo": manda la ricevuta al pagante congelato
+// sul documento, con il PDF archiviato in allegato. skipRevalidate per l'invio
+// multiplo, che aggiorna la pagina una sola volta alla fine.
+export async function sendReceiptByEmail(
+  receiptId: string,
+  options?: { skipRevalidate?: boolean },
+): Promise<SendReceiptEmailResult> {
+  const { userId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(receiptId)
+  if (!idParsed.success) {
+    return {
+      ok: false,
+      code: "NOT_FOUND",
+      error: "Identificativo ricevuta non valido",
+    }
+  }
+
+  const result = await sendReceiptEmailCore({
+    receiptId: idParsed.data,
+    adminUserId: userId,
+  })
+
+  if (result.ok && !options?.skipRevalidate) {
+    revalidatePath("/admin/receipts")
+    revalidatePath("/admin/payments")
+  }
+  return result
+}
+
+// Stato dell'invio per il pannello del pagamento, che carica la ricevuta a
+// parte rispetto all'elenco.
+export async function getReceiptEmailInfo(
+  receiptId: string,
+): Promise<ReceiptEmailState | null> {
+  await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(receiptId)
+  if (!idParsed.success) return null
+
+  return getReceiptEmailState(idParsed.data)
 }

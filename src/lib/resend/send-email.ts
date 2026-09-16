@@ -15,6 +15,7 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailSendResult>
       html: payload.html,
       text: payload.text,
       replyTo: payload.replyTo ?? EMAIL_CONFIG.replyTo,
+      attachments: payload.attachments,
     });
 
     if (error) {
