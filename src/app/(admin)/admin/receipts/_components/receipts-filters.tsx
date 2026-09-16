@@ -19,11 +19,18 @@ interface ReceiptsFiltersProps {
   year: number
   status?: ReceiptStatus
   search: string
+  sent?: "si" | "no"
 }
 
 const ALL = "__all__"
 
-export function ReceiptsFilters({ years, year, status, search }: ReceiptsFiltersProps) {
+export function ReceiptsFilters({
+  years,
+  year,
+  status,
+  search,
+  sent,
+}: ReceiptsFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -113,6 +120,20 @@ export function ReceiptsFilters({ years, year, status, search }: ReceiptsFilters
             <SelectItem value={ALL}>Tutte</SelectItem>
             <SelectItem value="VALID">Valide</SelectItem>
             <SelectItem value="CANCELLED">Annullate</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={sent ?? ALL}
+          onValueChange={(next) => updateParam("sent", next)}
+        >
+          <SelectTrigger className="sm:w-44" aria-label="Invio per email">
+            <SelectValue placeholder="Inviate e non" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Inviate e non</SelectItem>
+            <SelectItem value="no">Da inviare</SelectItem>
+            <SelectItem value="si">Già inviate</SelectItem>
           </SelectContent>
         </Select>
       </div>

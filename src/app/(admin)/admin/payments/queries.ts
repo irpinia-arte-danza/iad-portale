@@ -134,6 +134,10 @@ const paymentWithRelations = Prisma.validator<Prisma.PaymentDefaultArgs>()({
         status: true,
         cancelledAt: true,
         cancelReason: true,
+        // Destinatario congelato: il pannello mostra se la ricevuta è
+        // inviabile e a chi, senza ricavarlo di nuovo dal pagamento
+        payerName: true,
+        payerEmail: true,
       },
     },
     paymentSchedules: { select: SCHEDULE_LINE_SELECT },

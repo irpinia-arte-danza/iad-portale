@@ -2,12 +2,22 @@ import { Prisma, ReceiptStatus } from "@prisma/client"
 
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { todayInRome } from "@/lib/receipts/numbering"
+import {
+  receiptEmailBlocker,
+  wasSent,
+  type ReceiptEmailState,
+} from "@/lib/receipts/receipt-email"
+import { getReceiptEmailStates } from "@/lib/receipts/receipt-email-status"
 import { prisma } from "@/lib/prisma"
+
+// "si" = solo già inviate, "no" = solo da inviare
+export type ReceiptSentFilter = "si" | "no"
 
 export type ReceiptListFilters = {
   year: number
   status?: ReceiptStatus
   search?: string
+  sent?: ReceiptSentFilter
 }
 
 const receiptListItem = Prisma.validator<Prisma.ReceiptDefaultArgs>()({
@@ -18,6 +28,8 @@ const receiptListItem = Prisma.validator<Prisma.ReceiptDefaultArgs>()({
     issueDate: true,
     status: true,
     payerName: true,
+    // Destinatario congelato: decide se la ricevuta è inviabile
+    payerEmail: true,
     athleteName: true,
     amountCents: true,
     cancelledAt: true,
@@ -33,6 +45,14 @@ const receiptListItem = Prisma.validator<Prisma.ReceiptDefaultArgs>()({
 })
 
 export type ReceiptListItem = Prisma.ReceiptGetPayload<typeof receiptListItem>
+
+// Riga dell'elenco con lo stato dell'invio, ricavato da EmailLog
+export type ReceiptListRow = ReceiptListItem & {
+  emailState: ReceiptEmailState
+  // Motivo per cui non si può inviare (annullata, pagante senza email); null
+  // se si può. Decide anche cosa è selezionabile per l'invio multiplo.
+  emailBlocker: string | null
+}
 
 // Registro ricevute di un anno solare (data di emissione), in ordine di
 // numero: la vista che chiede il commercialista.
@@ -77,12 +97,31 @@ export async function listReceipts(filters: ReceiptListFilters) {
     }),
   ])
 
+  const emailStates = await getReceiptEmailStates(items.map((r) => r.id))
+
+  const rows: ReceiptListRow[] = items.map((r) => ({
+    ...r,
+    emailState: emailStates[r.id],
+    emailBlocker: receiptEmailBlocker(r),
+  }))
+
+  // Il filtro "inviate / da inviare" si applica qui e non nella query: lo
+  // stato non è una colonna di receipts, si ricava da EmailLog. Le ricevute
+  // di un anno sono poche decine, la differenza non si nota.
+  const filtered = filters.sent
+    ? rows.filter((r) => wasSent(r.emailState) === (filters.sent === "si"))
+    : rows
+
   return {
-    items,
+    items: filtered,
     summary: {
       validCount: validTotals._count._all,
       validAmountCents: validTotals._sum.amountCents ?? 0,
       cancelledCount,
+      // Sul totale dell'anno, non sul filtro: dice quante restano da mandare
+      notSentCount: rows.filter(
+        (r) => !wasSent(r.emailState) && r.emailBlocker === null,
+      ).length,
     },
   }
 }

@@ -45,6 +45,9 @@ export async function loadReceiptForPdf(receiptId: string) {
       payerName: true,
       payerFiscalCode: true,
       payerAddress: true,
+      // Destinatario congelato: serve all'invio per email, non al PDF
+      payerId: true,
+      payerEmail: true,
       athleteName: true,
       athleteFiscalCode: true,
       description: true,

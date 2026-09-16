@@ -1,31 +1,22 @@
-import Link from "next/link"
-import { Printer } from "lucide-react"
 import type { ReceiptStatus } from "@prisma/client"
 
-import { Badge } from "@/components/ui/badge"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { todayInRome } from "@/lib/receipts/numbering"
-import { receiptPdfHref } from "@/lib/receipts/types"
-import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { getDailyEmailQuota } from "@/lib/resend/daily-quota"
+import { formatEur } from "@/lib/utils/format"
 
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
 
-import { listReceiptYears, listReceipts } from "./queries"
+import { listReceiptYears, listReceipts, type ReceiptSentFilter } from "./queries"
 import { ReceiptsFilters } from "./_components/receipts-filters"
+import { ReceiptsTable } from "./_components/receipts-table"
 
 interface PageProps {
   searchParams: Promise<{
     year?: string
     status?: string
     search?: string
+    sent?: string
   }>
 }
 
@@ -38,15 +29,21 @@ function parseStatus(value: string | undefined): ReceiptStatus | undefined {
   return value === "VALID" || value === "CANCELLED" ? value : undefined
 }
 
+function parseSent(value: string | undefined): ReceiptSentFilter | undefined {
+  return value === "si" || value === "no" ? value : undefined
+}
+
 export default async function ReceiptsPage({ searchParams }: PageProps) {
   const resolved = await searchParams
   const year = parseYear(resolved.year, todayInRome().getUTCFullYear())
   const status = parseStatus(resolved.status)
   const search = resolved.search ?? ""
+  const sent = parseSent(resolved.sent)
 
-  const [{ items, summary }, years] = await Promise.all([
-    listReceipts({ year, status, search }),
+  const [{ items, summary }, years, quota] = await Promise.all([
+    listReceipts({ year, status, search, sent }),
     listReceiptYears(),
+    getDailyEmailQuota(),
   ])
 
   return (
@@ -63,6 +60,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
             year={year}
             status={status}
             search={search}
+            sent={sent}
           />
 
           <p className="text-sm text-muted-foreground">
@@ -74,90 +72,22 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
             {summary.cancelledCount > 0
               ? ` · ${summary.cancelledCount} ${summary.cancelledCount === 1 ? "annullata" : "annullate"}`
               : ""}
+            {summary.notSentCount > 0
+              ? ` · ${summary.notSentCount} da inviare per email`
+              : ""}
           </p>
 
           {items.length === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center">
               <h3 className="text-sm font-medium">Nessuna ricevuta trovata</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Le ricevute si emettono dall&apos;elenco o dal dettaglio pagamenti.
+                {sent
+                  ? "Nessuna ricevuta con questo stato di invio: prova a togliere il filtro."
+                  : "Le ricevute si emettono dall'elenco o dal dettaglio pagamenti."}
               </p>
             </div>
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Numero</TableHead>
-                    <TableHead>Emessa il</TableHead>
-                    <TableHead>Allieva</TableHead>
-                    <TableHead className="hidden md:table-cell">Pagante</TableHead>
-                    <TableHead className="text-right">Importo</TableHead>
-                    <TableHead>Stato</TableHead>
-                    <TableHead className="w-[60px]">
-                      <span className="sr-only">PDF</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((r) => {
-                    const cancelled = r.status === "CANCELLED"
-                    return (
-                      <TableRow key={r.id}>
-                        <TableCell
-                          className={
-                            cancelled
-                              ? "font-mono text-xs text-muted-foreground line-through"
-                              : "font-mono text-xs font-medium"
-                          }
-                        >
-                          {r.receiptNumber}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {formatDateShort(r.issueDate)}
-                        </TableCell>
-                        <TableCell>
-                          {r.payment ? (
-                            <Link
-                              href={`/admin/athletes/${r.payment.athleteId}`}
-                              className="hover:underline"
-                            >
-                              {r.athleteName ?? "—"}
-                            </Link>
-                          ) : (
-                            r.athleteName ?? "—"
-                          )}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {r.payerName ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatEur(r.amountCents ?? r.payment?.amountCents ?? 0)}
-                        </TableCell>
-                        <TableCell>
-                          {cancelled ? (
-                            <Badge variant="destructive">Annullata</Badge>
-                          ) : (
-                            <Badge variant="outline">Valida</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <a
-                            href={receiptPdfHref(r.id)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label={`Apri PDF ricevuta ${r.receiptNumber}`}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-muted"
-                          >
-                            <Printer className="h-4 w-4" />
-                          </a>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <ReceiptsTable items={items} quota={quota} />
           )}
         </div>
       </ResourceContent>

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { FileText, Printer } from "lucide-react"
+import { FileText } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -15,7 +15,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import { receiptPdfHref } from "@/lib/receipts/types"
 import {
   compareScheduleLines,
   describeScheduleAdmin,
@@ -25,6 +24,7 @@ import {
 import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { formatDateShort } from "@/lib/utils/format"
 
+import { ReceiptEmailActions } from "../../receipts/_components/receipt-email-actions"
 import { ReceiptIssueDialog } from "../../receipts/_components/receipt-issue-dialog"
 import { useReceiptIssue } from "../../receipts/_components/use-receipt-issue"
 import { getPaymentDetail } from "../actions"
@@ -221,16 +221,12 @@ function PaymentDetailBody({
                 Annullata per storno: {receipt.cancelReason}
               </p>
             ) : null}
-            <Button asChild variant="outline" className="min-h-11 w-full">
-              <a
-                href={receiptPdfHref(receipt.id)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Printer className="h-4 w-4" />
-                {receiptCancelled ? "Apri ricevuta annullata" : "Ristampa ricevuta"}
-              </a>
-            </Button>
+            <ReceiptEmailActions
+              receiptId={receipt.id}
+              status={receipt.status}
+              payerName={receipt.payerName}
+              payerEmail={receipt.payerEmail}
+            />
           </>
         ) : isReversed ? (
           <p className="text-sm text-muted-foreground">

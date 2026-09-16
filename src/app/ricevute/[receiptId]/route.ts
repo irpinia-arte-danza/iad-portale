@@ -202,11 +202,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const { ascii, utf8 } = receiptPdfFileName(receipt)
   const body = new Uint8Array(pdf)
 
+  // ?download=1 salva il file invece di aprirlo nel visualizzatore. Stessa
+  // route e stessi controlli: su iPad guardare prima di scaricare resta il
+  // comportamento predefinito.
+  const disposition =
+    request.nextUrl.searchParams.get("download") === "1" ? "attachment" : "inline"
+
   return new NextResponse(body, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(utf8)}`,
+      "Content-Disposition": `${disposition}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(utf8)}`,
       "Content-Length": String(body.byteLength),
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
