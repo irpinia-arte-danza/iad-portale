@@ -11,6 +11,8 @@ import {
 import { prisma } from "@/lib/prisma"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 
+import { receiptPdfFileName as buildReceiptPdfFileName } from "./pdf-file-name"
+
 import type { ReceiptLine } from "./types"
 
 // Caricamento e rendering del PDF di una ricevuta già emessa. Il rendering
@@ -198,37 +200,14 @@ export async function renderReceiptPdf(receipt: LoadedReceipt): Promise<Buffer> 
   )
 }
 
-const FILENAME_FORBIDDEN = new Set(['"', "<", ">", ":", "|", "?", "*"])
-
-function stripUnsafeFileChars(value: string): string {
-  let out = ""
-  for (const ch of value) {
-    const code = ch.charCodeAt(0)
-    if (code < 0x20 || code === 0x7f || FILENAME_FORBIDDEN.has(ch)) continue
-    out += ch
-  }
-  return out
-}
-
-// Nome file con numero ricevuta e allieva. Doppia forma per il header
-// Content-Disposition: ASCII (compatibilità) + UTF-8 (accenti).
+// Nome del file: la regola vive in pdf-file-name.ts, pura, perché la usa
+// anche il client per il file passato a navigator.share().
 export function receiptPdfFileName(receipt: LoadedReceipt): {
   ascii: string
   utf8: string
 } {
-  const base = stripUnsafeFileChars(
-    `Ricevuta ${receipt.receiptNumber} - ${athleteNameOf(receipt)}`.replace(
-      /[/\\]/g,
-      "-",
-    ),
-  )
-    .replace(/\s+/g, " ")
-    .trim()
-
-  const ascii = base
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^A-Za-z0-9 ._-]/g, "_")
-
-  return { ascii: `${ascii}.pdf`, utf8: `${base}.pdf` }
+  return buildReceiptPdfFileName({
+    receiptNumber: receipt.receiptNumber,
+    athleteName: athleteNameOf(receipt),
+  })
 }
