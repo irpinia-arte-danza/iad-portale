@@ -223,6 +223,13 @@ function PaymentDetailBody({
             ) : null}
             <ReceiptEmailActions
               receiptId={receipt.id}
+              receiptNumber={receipt.receiptNumber}
+              // Nome congelato: il file condiviso si chiama come quello
+              // scaricato, anche se l'anagrafica è cambiata dopo l'emissione
+              athleteName={
+                receipt.athleteName ??
+                `${payment.athlete.firstName} ${payment.athlete.lastName}`.trim()
+              }
               status={receipt.status}
               payerName={receipt.payerName}
               payerEmail={receipt.payerEmail}

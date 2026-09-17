@@ -29,6 +29,7 @@ import { formatDateShort, formatEur } from "@/lib/utils/format"
 import { sendReceiptByEmail } from "../actions"
 import type { ReceiptListRow } from "../queries"
 import { BulkSendReceiptsDialog } from "./bulk-send-receipts-dialog"
+import { ShareReceiptButton } from "./share-receipt-button"
 
 type Props = {
   items: ReceiptListRow[]
@@ -228,6 +229,12 @@ export function ReceiptsTable({ items, quota }: Props) {
                       >
                         <Download className="h-4 w-4" />
                       </a>
+                      <ShareReceiptButton
+                        receiptId={r.id}
+                        receiptNumber={r.receiptNumber}
+                        athleteName={r.athleteName ?? ""}
+                        variant="icon"
+                      />
                       {sendable ? (
                         <Button
                           variant="ghost"

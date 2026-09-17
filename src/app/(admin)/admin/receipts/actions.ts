@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 
+import { AuditAction } from "@prisma/client"
+
 import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   buildIssuePreview,
@@ -9,6 +11,9 @@ import {
 } from "@/lib/receipts/issue-receipt"
 import { getReceiptEmailState } from "@/lib/receipts/receipt-email-status"
 import type { ReceiptEmailState } from "@/lib/receipts/receipt-email"
+import type { ReceiptShareState } from "@/lib/receipts/receipt-share"
+import { getReceiptShareState } from "@/lib/receipts/receipt-share-status"
+import { prisma } from "@/lib/prisma"
 import {
   sendReceiptEmailCore,
   type SendReceiptEmailResult,
@@ -92,15 +97,53 @@ export async function sendReceiptByEmail(
   return result
 }
 
-// Stato dell'invio per il pannello del pagamento, che carica la ricevuta a
-// parte rispetto all'elenco.
-export async function getReceiptEmailInfo(
+export type ReceiptDeliveryInfo = {
+  email: ReceiptEmailState
+  share: ReceiptShareState
+}
+
+// Come la ricevuta è uscita dal gestionale: per email (si sa a chi) e per
+// condivisione (si sa solo quando). Per il pannello del pagamento, che carica
+// la ricevuta a parte rispetto all'elenco.
+export async function getReceiptDeliveryInfo(
   receiptId: string,
-): Promise<ReceiptEmailState | null> {
+): Promise<ReceiptDeliveryInfo | null> {
   await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(receiptId)
   if (!idParsed.success) return null
 
-  return getReceiptEmailState(idParsed.data)
+  const [email, share] = await Promise.all([
+    getReceiptEmailState(idParsed.data),
+    getReceiptShareState(idParsed.data),
+  ])
+  return { email, share }
+}
+
+// Traccia una condivisione riuscita dal foglio di iOS. Registra che il
+// documento è uscito dal gestionale e quando: il destinatario si sceglie
+// fuori dalla pagina e non è visibile da qui, quindi non finisce in EmailLog.
+// Non restituisce errori all'interfaccia: se la traccia non si scrive, la
+// condivisione è comunque avvenuta e bloccare l'utente non servirebbe.
+export async function recordReceiptShared(receiptId: string): Promise<void> {
+  const { userId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(receiptId)
+  if (!idParsed.success) return
+
+  const receipt = await prisma.receipt.findUnique({
+    where: { id: idParsed.data },
+    select: { receiptNumber: true },
+  })
+  if (!receipt) return
+
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: AuditAction.RECEIPT_SHARED,
+      entityType: "Receipt",
+      entityId: idParsed.data,
+      changes: { receiptNumber: receipt.receiptNumber },
+    },
+  })
 }

@@ -1370,6 +1370,9 @@ enum AuditAction {
   RECEIPT_ISSUE
   RECEIPT_CANCEL
   RECEIPT_EMAIL_SENT
+  // Condivisione del PDF dal foglio di iOS: si sa che è uscita dal
+  // gestionale, non a chi è andata (il contatto si sceglie fuori dalla pagina)
+  RECEIPT_SHARED
 }
 
 model AuditLog {

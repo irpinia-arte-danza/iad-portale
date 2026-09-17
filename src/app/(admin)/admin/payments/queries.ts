@@ -138,6 +138,8 @@ const paymentWithRelations = Prisma.validator<Prisma.PaymentDefaultArgs>()({
         // inviabile e a chi, senza ricavarlo di nuovo dal pagamento
         payerName: true,
         payerEmail: true,
+        // Nome del file PDF condiviso, uguale a quello scaricato
+        athleteName: true,
       },
     },
     paymentSchedules: { select: SCHEDULE_LINE_SELECT },
