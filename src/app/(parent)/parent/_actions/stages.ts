@@ -1,5 +1,9 @@
 import "server-only"
 
+import {
+  athleteScopeWhere,
+  type PortalScope,
+} from "@/lib/auth/portal-scope"
 import { prisma } from "@/lib/prisma"
 
 function startOfUTCToday(): Date {
@@ -32,8 +36,8 @@ export type ParentStageItem = {
   }[]
 }
 
-export async function listStagesForParent(
-  parentId: string,
+export async function listStagesForPortal(
+  scope: PortalScope,
 ): Promise<ParentStageItem[]> {
   const today = startOfUTCToday()
 
@@ -52,19 +56,12 @@ export async function listStagesForParent(
 
   if (stages.length === 0) return []
 
-  // 2) Allieve attive del genitore
-  const myAthletes = await prisma.athleteParent.findMany({
-    where: {
-      parentId,
-      athlete: { deletedAt: null },
-    },
-    select: {
-      athlete: {
-        select: { id: true, firstName: true, lastName: true },
-      },
-    },
+  // 2) Allieve attive dell'ambito: le figlie collegate, oppure sé stessa
+  const athletes = await prisma.athlete.findMany({
+    where: { deletedAt: null, ...athleteScopeWhere(scope) },
+    select: { id: true, firstName: true, lastName: true },
+    orderBy: { firstName: "asc" },
   })
-  const athletes = myAthletes.map((r) => r.athlete)
   if (athletes.length === 0) return []
 
   // 3) Iscrizioni esistenti per quegli stage/atleti
@@ -118,7 +115,7 @@ export async function listStagesForParent(
       }
     })
     .filter((s) => {
-      // Mostra solo stage con almeno una figlia non già iscritta E iscrizioni aperte
+      // Solo stage con almeno un'allieva non già iscritta e iscrizioni aperte
       const hasEnrollable = s.myAthletes.some((a) => !a.alreadyEnrolled)
       const deadlineOk =
         !s.registrationDeadline || s.registrationDeadline >= today
@@ -126,9 +123,9 @@ export async function listStagesForParent(
     })
 }
 
-export async function countOpenStagesForParent(
-  parentId: string,
+export async function countOpenStagesForPortal(
+  scope: PortalScope,
 ): Promise<number> {
-  const stages = await listStagesForParent(parentId)
+  const stages = await listStagesForPortal(scope)
   return stages.length
 }

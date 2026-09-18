@@ -1,15 +1,17 @@
 import { Sparkles } from "lucide-react"
 
-import { requireParent } from "@/lib/auth/require-parent"
+import { requirePortalAccess } from "@/lib/auth/require-portal-access"
+import { portalWording } from "@/lib/portal/wording"
 
-import { listStagesForParent } from "../_actions/stages"
+import { listStagesForPortal } from "../_actions/stages"
 import { ParentStageCard } from "./_components/parent-stage-card"
 
 export const dynamic = "force-dynamic"
 
 export default async function ParentStagesPage() {
-  const { parentId } = await requireParent()
-  const stages = await listStagesForParent(parentId)
+  const { scope } = await requirePortalAccess()
+  const stages = await listStagesForPortal(scope)
+  const wording = portalWording(scope)
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
@@ -21,8 +23,7 @@ export default async function ParentStagesPage() {
           </h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Eventi occasionali aperti all&apos;iscrizione. Iscrivi le tue figlie
-          e ricevi la scadenza di pagamento in dashboard.
+          {wording.stagesPageIntro}
         </p>
       </header>
 
@@ -33,7 +34,12 @@ export default async function ParentStagesPage() {
       ) : (
         <div className="space-y-4">
           {stages.map((s) => (
-            <ParentStageCard key={s.id} stage={s} />
+            <ParentStageCard
+              key={s.id}
+              stage={s}
+              wording={wording}
+              selfService={scope.kind === "athlete"}
+            />
           ))}
         </div>
       )}

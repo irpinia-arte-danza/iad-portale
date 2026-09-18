@@ -1,6 +1,6 @@
 import Image from "next/image"
 
-import { requireParent } from "@/lib/auth/require-parent"
+import { requirePortalAccess } from "@/lib/auth/require-portal-access"
 import { prisma } from "@/lib/prisma"
 import { LogoutButton } from "@/components/auth/logout-button"
 
@@ -11,7 +11,7 @@ export default async function ParentLayout({
 }: {
   children: React.ReactNode
 }) {
-  await requireParent()
+  await requirePortalAccess()
 
   const brand = await prisma.brandSettings.findUnique({
     where: { id: 1 },

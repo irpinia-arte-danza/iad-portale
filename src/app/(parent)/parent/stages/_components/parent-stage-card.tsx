@@ -19,6 +19,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
+import type { PortalWording } from "@/lib/portal/wording"
+
 import type { ParentStageItem } from "../../_actions/stages"
 import { parentEnrollAthletesInStage } from "../../_actions/stage-actions"
 
@@ -35,9 +37,13 @@ const CURRENCY_IT = new Intl.NumberFormat("it-IT", {
 
 type Props = {
   stage: ParentStageItem
+  wording: PortalWording
+  // Un'allieva che accede per sé iscrive una persona sola: sé stessa. Niente
+  // elenco da spuntare, che sarebbe una lista con il proprio nome dentro.
+  selfService: boolean
 }
 
-export function ParentStageCard({ stage }: Props) {
+export function ParentStageCard({ stage, wording, selfService }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -58,21 +64,28 @@ export function ParentStageCard({ stage }: Props) {
   }
 
   function onSubmit() {
-    if (selected.size === 0) {
-      toast.error("Seleziona almeno una figlia")
+    const athleteIds = selfService
+      ? enrollable.map((a) => a.id)
+      : Array.from(selected)
+    if (athleteIds.length === 0) {
+      toast.error(wording.stageSelectNone)
       return
     }
     startTransition(async () => {
       const res = await parentEnrollAthletesInStage({
         stageId: stage.id,
-        athleteIds: Array.from(selected),
+        athleteIds,
       })
       if (!res.ok) {
         toast.error(res.error)
         return
       }
       const { enrolled, failed } = res.data!
-      if (enrolled > 0) toast.success(`${enrolled} iscritte`)
+      if (enrolled > 0) {
+        toast.success(
+          selfService ? "Iscrizione registrata" : `${enrolled} iscritte`,
+        )
+      }
       if (failed.length > 0) {
         toast.warning(`${failed.length} non iscritte: ${failed[0].reason}`)
       }
@@ -138,10 +151,14 @@ export function ParentStageCard({ stage }: Props) {
 
         {alreadyEnrolled.length > 0 && (
           <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
-            Già iscritte:{" "}
-            {alreadyEnrolled
-              .map((a) => `${a.firstName}${a.paid ? " (pagato)" : ""}`)
-              .join(", ")}
+            {selfService ? "Sei già iscritta" : "Già iscritte:"}{" "}
+            {selfService
+              ? alreadyEnrolled.some((a) => a.paid)
+                ? "(pagato)"
+                : ""
+              : alreadyEnrolled
+                  .map((a) => `${a.firstName}${a.paid ? " (pagato)" : ""}`)
+                  .join(", ")}
           </div>
         )}
 
@@ -152,38 +169,37 @@ export function ParentStageCard({ stage }: Props) {
               disabled={enrollable.length === 0 || full}
             >
               <UserPlus className="h-4 w-4" />
-              Iscrivi le mie figlie
+              {wording.stageEnrollButton}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Iscrivi a «{stage.title}»</DialogTitle>
+              <DialogTitle>Iscrizione a «{stage.title}»</DialogTitle>
               <DialogDescription>
-                Seleziona le figlie da iscrivere. Verrà creata una scadenza
-                pagamento di € {CURRENCY_IT.format(stage.feeCents / 100)} per
-                ciascuna.
+                {wording.stageSelectHint} Importo: €{" "}
+                {CURRENCY_IT.format(stage.feeCents / 100)}
+                {selfService ? "." : " per ciascuna."}
               </DialogDescription>
             </DialogHeader>
-            <ul className="divide-y rounded-md border">
-              {enrollable.map((a) => (
-                <li
-                  key={a.id}
-                  className="flex items-center gap-3 px-3 py-2"
-                >
-                  <Checkbox
-                    id={`p-a-${stage.id}-${a.id}`}
-                    checked={selected.has(a.id)}
-                    onCheckedChange={() => toggle(a.id)}
-                  />
-                  <label
-                    htmlFor={`p-a-${stage.id}-${a.id}`}
-                    className="cursor-pointer text-sm"
-                  >
-                    {a.firstName} {a.lastName}
-                  </label>
-                </li>
-              ))}
-            </ul>
+            {selfService ? null : (
+              <ul className="divide-y rounded-md border">
+                {enrollable.map((a) => (
+                  <li key={a.id} className="flex items-center gap-3 px-3 py-2">
+                    <Checkbox
+                      id={`p-a-${stage.id}-${a.id}`}
+                      checked={selected.has(a.id)}
+                      onCheckedChange={() => toggle(a.id)}
+                    />
+                    <label
+                      htmlFor={`p-a-${stage.id}-${a.id}`}
+                      className="cursor-pointer text-sm"
+                    >
+                      {a.firstName} {a.lastName}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
             <DialogFooter>
               <Button
                 variant="outline"
@@ -198,6 +214,8 @@ export function ParentStageCard({ stage }: Props) {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Iscrizione…
                   </>
+                ) : selfService ? (
+                  "Conferma"
                 ) : (
                   `Iscrivi (${selected.size})`
                 )}

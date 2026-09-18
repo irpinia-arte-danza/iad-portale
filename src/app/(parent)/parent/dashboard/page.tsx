@@ -16,7 +16,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { requireParent } from "@/lib/auth/require-parent"
+import { requirePortalAccess } from "@/lib/auth/require-portal-access"
+import { portalWording } from "@/lib/portal/wording"
 import { associationFeeDescription } from "@/lib/fees/association-fee-label"
 import { receiptPdfHref } from "@/lib/receipts/types"
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
@@ -31,13 +32,13 @@ import {
   getMyAttendanceStats,
   getMyOpenSchedules,
   getMyPayments,
-  getParentProfile,
+  getPortalProfile,
   type MyOpenSchedule,
   type MyPayment,
   type GeneralCourseSchedule,
   type MyAthleteSchedule,
 } from "../_actions/queries"
-import { countOpenStagesForParent } from "../_actions/stages"
+import { countOpenStagesForPortal } from "../_actions/stages"
 
 import { IbanCard } from "./_components/iban-card"
 
@@ -77,7 +78,8 @@ function groupByDay<T extends { dayOfWeek: number }>(
 }
 
 export default async function ParentDashboardPage() {
-  const { parentId } = await requireParent()
+  const { scope } = await requirePortalAccess()
+  const wording = portalWording(scope)
 
   const [
     profile,
@@ -90,15 +92,15 @@ export default async function ParentDashboardPage() {
     attendance,
     openStagesCount,
   ] = await Promise.all([
-    getParentProfile(parentId),
-    getMyAthletes(parentId),
-    getMyOpenSchedules(parentId),
-    getMyPayments(parentId),
-    getMyAthleteSchedules(parentId),
+    getPortalProfile(scope),
+    getMyAthletes(scope),
+    getMyOpenSchedules(scope),
+    getMyPayments(scope),
+    getMyAthleteSchedules(scope),
     getGeneralCourseSchedules(),
     getBrandIban(),
-    getMyAttendanceStats(parentId),
-    countOpenStagesForParent(parentId),
+    getMyAttendanceStats(scope),
+    countOpenStagesForPortal(scope),
   ])
 
   const overdue = openSchedules.filter((s) => classifySchedule(s) === "overdue")
@@ -128,7 +130,7 @@ export default async function ParentDashboardPage() {
       {/* Header welcome */}
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Ciao {profile?.firstName ?? "Genitore"}
+          Ciao {profile?.firstName ?? wording.greetingFallback}
         </h1>
         <p className="text-sm text-muted-foreground">
           Benvenuta nella tua area riservata.
@@ -165,22 +167,20 @@ export default async function ParentDashboardPage() {
                     ? "1 stage aperto all'iscrizione"
                     : `${openStagesCount} stage aperti all'iscrizione`}
                 </p>
-                <p className="text-xs">Tocca per vedere e iscrivere le tue figlie.</p>
+                <p className="text-xs">{wording.stagesCardHint}</p>
               </div>
             </CardContent>
           </Card>
         </Link>
       )}
 
-      {/* Sezione Le mie figlie */}
+      {/* Chi segue: le figlie di un genitore, o sé stessa */}
       <section id="figlie" className="space-y-3">
-        <h2 className="text-lg font-semibold">Le mie figlie</h2>
+        <h2 className="text-lg font-semibold">{wording.peopleSectionTitle}</h2>
         {athletes.length === 0 ? (
           <Card>
             <CardContent className="py-6 text-center text-sm text-muted-foreground">
-              Nessuna allieva associata al tuo account.
-              <br />
-              Contatta la segreteria per assistenza.
+              {wording.peopleSectionEmpty}
             </CardContent>
           </Card>
         ) : (
@@ -461,7 +461,9 @@ export default async function ParentDashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Le mie figlie</CardTitle>
+            <CardTitle className="text-base">
+              {wording.scheduleCardTitle}
+            </CardTitle>
             <CardDescription>
               Corsi attivi dell&apos;anno accademico in corso.
             </CardDescription>
@@ -469,7 +471,7 @@ export default async function ParentDashboardPage() {
           <CardContent className="p-0">
             {myAthleteSchedules.length === 0 ? (
               <p className="px-4 pb-4 pt-0 text-sm text-muted-foreground">
-                Nessun orario disponibile per le tue figlie.
+                {wording.scheduleCardEmpty}
               </p>
             ) : (
               <ScheduleList items={myAthleteSchedules} />

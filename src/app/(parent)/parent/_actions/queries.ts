@@ -1,5 +1,9 @@
 import "server-only"
 
+import {
+  athleteScopeWhere,
+  type PortalScope,
+} from "@/lib/auth/portal-scope"
 import { prisma } from "@/lib/prisma"
 import {
   SCHEDULE_LINE_SELECT,
@@ -10,14 +14,30 @@ import {
 import { withActiveCourseOrStageScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 // ─────────────────────────────────────────────────────────────────────────
-// Tutte le query sono filtrate per parentId per RLS applicativo (defense
-// in depth oltre alle policy DB Supabase). I caller passano il parentId
-// ottenuto da requireParent().
+// Tutte le query sono filtrate per ambito (athleteScopeWhere) per RLS
+// applicativo (defense in depth oltre alle policy DB Supabase). I caller
+// passano lo scope ottenuto da requirePortalAccess(): le figlie collegate
+// per un genitore, sé stessa per un'allieva maggiorenne.
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function getParentProfile(parentId: string) {
-  return prisma.parent.findUnique({
-    where: { id: parentId },
+// Chi sta guardando: serve al saluto in dashboard. Stessa forma per
+// entrambi, così chi la usa non deve sapere chi è entrato.
+export async function getPortalProfile(scope: PortalScope) {
+  if (scope.kind === "parent") {
+    return prisma.parent.findUnique({
+      where: { id: scope.parentId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+      },
+    })
+  }
+
+  return prisma.athlete.findUnique({
+    where: { id: scope.athleteId },
     select: {
       id: true,
       firstName: true,
@@ -28,65 +48,77 @@ export async function getParentProfile(parentId: string) {
   })
 }
 
-export async function getMyAthletes(parentId: string) {
-  // Allieve attive (non eliminate) collegate al genitore via AthleteParent
-  const relations = await prisma.athleteParent.findMany({
-    where: {
-      parentId,
-      athlete: { deletedAt: null },
-    },
+export async function getMyAthletes(scope: PortalScope) {
+  // Le allieve dell'ambito: le figlie collegate, oppure sé stessa
+  const athletes = await prisma.athlete.findMany({
+    where: { deletedAt: null, ...athleteScopeWhere(scope) },
     select: {
-      relationship: true,
-      isPrimaryPayer: true,
-      athlete: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      status: true,
+      photoUrl: true,
+      enrollments: {
+        where: {
+          withdrawalDate: null,
+          academicYear: { isCurrent: true },
+        },
         select: {
           id: true,
-          firstName: true,
-          lastName: true,
-          status: true,
-          photoUrl: true,
-          enrollments: {
-            where: {
-              withdrawalDate: null,
-              academicYear: { isCurrent: true },
-            },
+          course: {
             select: {
               id: true,
-              course: {
-                select: {
-                  id: true,
-                  name: true,
-                  type: true,
-                },
-              },
+              name: true,
+              type: true,
             },
           },
         },
       },
     },
-    orderBy: { athlete: { firstName: "asc" } },
+    orderBy: { firstName: "asc" },
   })
 
-  return relations.map((r) => ({
-    id: r.athlete.id,
-    firstName: r.athlete.firstName,
-    lastName: r.athlete.lastName,
-    status: r.athlete.status,
-    photoUrl: r.athlete.photoUrl,
-    relationship: r.relationship,
-    isPrimaryPayer: r.isPrimaryPayer,
-    enrollments: r.athlete.enrollments.map((e) => ({
-      id: e.id,
-      courseId: e.course.id,
-      courseName: e.course.name,
-      courseType: e.course.type,
-    })),
-  }))
+  // Parentela e "paga i contributi" descrivono il legame con il genitore che
+  // sta guardando: per un'allieva che accede per sé non esistono.
+  const relations =
+    scope.kind === "parent" && athletes.length > 0
+      ? await prisma.athleteParent.findMany({
+          where: {
+            parentId: scope.parentId,
+            athleteId: { in: athletes.map((a) => a.id) },
+          },
+          select: {
+            athleteId: true,
+            relationship: true,
+            isPrimaryPayer: true,
+          },
+        })
+      : []
+  const relationByAthlete = new Map(relations.map((r) => [r.athleteId, r]))
+
+  return athletes.map((a) => {
+    const relation = relationByAthlete.get(a.id) ?? null
+    return {
+      id: a.id,
+      firstName: a.firstName,
+      lastName: a.lastName,
+      status: a.status,
+      photoUrl: a.photoUrl,
+      relationship: relation?.relationship ?? null,
+      isPrimaryPayer: relation?.isPrimaryPayer ?? false,
+      enrollments: a.enrollments.map((e) => ({
+        id: e.id,
+        courseId: e.course.id,
+        courseName: e.course.name,
+        courseType: e.course.type,
+      })),
+    }
+  })
 }
 
 export type MyAthlete = Awaited<ReturnType<typeof getMyAthletes>>[number]
 
-export async function getMyOpenSchedules(parentId: string) {
+export async function getMyOpenSchedules(scope: PortalScope) {
   // Scadenze DUE/OVERDUE delle figlie del genitore (corsi, contributo di iscrizione,
   // stage, saggio, costumi)
   const schedules = await prisma.paymentSchedule.findMany({
@@ -97,7 +129,7 @@ export async function getMyOpenSchedules(parentId: string) {
           courseEnrollment: {
             athlete: {
               deletedAt: null,
-              parentRelations: { some: { parentId } },
+              ...athleteScopeWhere(scope),
             },
           },
         },
@@ -105,7 +137,7 @@ export async function getMyOpenSchedules(parentId: string) {
           stageEnrollment: {
             athlete: {
               deletedAt: null,
-              parentRelations: { some: { parentId } },
+              ...athleteScopeWhere(scope),
             },
           },
         },
@@ -113,7 +145,7 @@ export async function getMyOpenSchedules(parentId: string) {
           showcaseParticipation: {
             athlete: {
               deletedAt: null,
-              parentRelations: { some: { parentId } },
+              ...athleteScopeWhere(scope),
             },
           },
         },
@@ -122,7 +154,7 @@ export async function getMyOpenSchedules(parentId: string) {
             participation: {
               athlete: {
                 deletedAt: null,
-                parentRelations: { some: { parentId } },
+                ...athleteScopeWhere(scope),
               },
             },
           },
@@ -130,7 +162,7 @@ export async function getMyOpenSchedules(parentId: string) {
         {
           athlete: {
             deletedAt: null,
-            parentRelations: { some: { parentId } },
+            ...athleteScopeWhere(scope),
           },
         },
       ],
@@ -235,7 +267,7 @@ export type MyOpenSchedule = Awaited<
   ReturnType<typeof getMyOpenSchedules>
 >[number]
 
-export async function getMyPayments(parentId: string) {
+export async function getMyPayments(scope: PortalScope) {
   // Pagamenti delle figlie (cross-allieve, ordinati cronologici desc).
   // Anche gli stornati: restano nello storico con il loro stato.
   const payments = await prisma.payment.findMany({
@@ -243,7 +275,7 @@ export async function getMyPayments(parentId: string) {
       status: { in: ["PAID", "REVERSED"] },
       deletedAt: null,
       athlete: {
-        parentRelations: { some: { parentId } },
+        ...athleteScopeWhere(scope),
       },
     },
     select: {
@@ -303,7 +335,7 @@ export async function getMyPayments(parentId: string) {
 
 export type MyPayment = Awaited<ReturnType<typeof getMyPayments>>[number]
 
-export async function getMyAthleteSchedules(parentId: string) {
+export async function getMyAthleteSchedules(scope: PortalScope) {
   // Orari corsi delle figlie del genitore (validi alla data corrente)
   const today = new Date()
   const schedules = await prisma.courseSchedule.findMany({
@@ -317,7 +349,7 @@ export async function getMyAthleteSchedules(parentId: string) {
             academicYear: { isCurrent: true },
             athlete: {
               deletedAt: null,
-              parentRelations: { some: { parentId } },
+              ...athleteScopeWhere(scope),
             },
           },
         },
@@ -412,7 +444,7 @@ export type AttendanceStats = {
 // Stats presenze per allieva nell'AA corrente. Mappa athleteId → stats.
 // Allieve senza alcuna presenza registrata NON appaiono nella mappa
 // (caller mostra empty state). Sprint 4.A.1.
-export async function getMyAttendanceStats(parentId: string): Promise<{
+export async function getMyAttendanceStats(scope: PortalScope): Promise<{
   byAthlete: Map<string, AttendanceStats>
   academicYearLabel: string | null
 }> {
@@ -431,7 +463,7 @@ export async function getMyAttendanceStats(parentId: string): Promise<{
     where: {
       athlete: {
         deletedAt: null,
-        parentRelations: { some: { parentId } },
+        ...athleteScopeWhere(scope),
       },
       lesson: { academicYearId: currentYear.id },
     },
