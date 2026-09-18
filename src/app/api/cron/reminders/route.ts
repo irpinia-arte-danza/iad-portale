@@ -8,6 +8,7 @@ import {
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
@@ -155,6 +156,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
                 id: true,
                 firstName: true,
                 lastName: true,
+                // Destinataria quando non ha genitori collegati (corso adulti)
+                email: true,
+                // Serve al limite dei 18 anni per il ripiego sull allieva
+                dateOfBirth: true,
                 parentRelations: {
                   where: { parent: { deletedAt: null } },
                   orderBy: [
@@ -203,7 +208,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     type SendableItem = {
       scheduleId: string
       athleteId: string
-      parentId: string
+      // null quando il sollecito va all'allieva stessa
+      parentId: string | null
       recipientEmail: string
       recipientName: string
       subject: string
@@ -221,14 +227,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       }
       if (!sched.courseEnrollment) continue // stage: niente cron solleciti
       const athlete = sched.courseEnrollment.athlete
-      const parent = athlete.parentRelations[0]?.parent ?? null
-      if (!parent || !parent.email) {
+      // Il genitore collegato, oppure l'allieva stessa se non ne ha
+      const resolved = resolveCommunicationRecipient(athlete)
+      if (!resolved.ok) {
         s.skippedNoEmail++
         continue
       }
+      const recipient = resolved.recipient
 
       const vars = {
-        genitore_nome: `${parent.firstName} ${parent.lastName}`,
+        genitore_nome: recipient.name,
         allieva_nome: `${athlete.firstName} ${athlete.lastName}`,
         importo: (sched.amountCents / 100).toLocaleString("it-IT", {
           minimumFractionDigits: 2,
@@ -249,9 +257,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         sendable.push({
           scheduleId: sched.id,
           athleteId: athlete.id,
-          parentId: parent.id,
-          recipientEmail: parent.email,
-          recipientName: `${parent.firstName} ${parent.lastName}`,
+          parentId: recipient.parentId,
+          recipientEmail: recipient.email,
+          recipientName: recipient.name,
           subject: rendered.subject,
           html: rendered.bodyHtml,
           text: rendered.bodyText,

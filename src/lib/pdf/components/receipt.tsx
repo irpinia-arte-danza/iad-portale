@@ -1,6 +1,7 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer"
 
 import { receiptPaymentNotice } from "@/lib/payments/traceability"
+import { isSelfIssued } from "@/lib/receipts/receipt-parties"
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import type { FeeType, PaymentMethod } from "@prisma/client"
 import type { ReceiptLine } from "@/lib/receipts/types"
@@ -125,6 +126,14 @@ const styles = {
     borderRadius: 2,
     padding: 8,
   },
+  // Riquadro unico quando chi paga e l'allieva sono la stessa persona
+  partyBoxFull: {
+    borderWidth: 0.5,
+    borderColor: pdfColors.border,
+    borderRadius: 2,
+    padding: 8,
+    marginBottom: 12,
+  },
   partyLabel: {
     fontSize: 8,
     color: pdfColors.muted,
@@ -234,6 +243,13 @@ export function ReceiptPdf({
 
   const paymentNotice = receiptPaymentNotice(receipt.paymentMethods)
 
+  // Allieva maggiorenne che paga per sé: un riquadro solo, invece della
+  // stessa persona ripetuta due volte. Si deduce dai dati congelati, quindi
+  // vale anche sulle ricevute emesse prima di questa modifica.
+  const selfIssued = isSelfIssued(receipt)
+  const selfIssuedFiscalCode =
+    receipt.payerFiscalCode ?? receipt.athleteFiscalCode
+
   // Più scadenze: tutte le causali coperte ("Contributo di iscrizione + Contributo mensile")
   const feeTypeLabel = receipt.lines
     ? [...new Set(receipt.lines.map((line) => FEE_TYPE_LABELS[line.feeType]))].join(
@@ -275,31 +291,45 @@ export function ReceiptPdf({
           </Text>
         </View>
 
-        {/* Chi paga e per chi: del pagante nome e codice fiscale, dell'allieva
-            anche la residenza */}
-        <View style={styles.partyRow}>
-          <View style={styles.partyBox}>
+        {/* Chi paga e per chi. Quando sono la stessa persona (allieva
+            maggiorenne che paga per sé) il riquadro è uno solo: non c'è
+            nessun conto terzo da indicare. */}
+        {selfIssued ? (
+          <View style={styles.partyBoxFull}>
             <Text style={styles.partyLabel}>Ricevuto da</Text>
             <Text style={styles.partyName}>{receipt.payerName}</Text>
-            {receipt.payerFiscalCode ? (
-              <Text style={styles.partyMeta}>
-                C.F. {receipt.payerFiscalCode}
-              </Text>
-            ) : null}
-          </View>
-          <View style={styles.partyBox}>
-            <Text style={styles.partyLabel}>Per conto di (allieva)</Text>
-            <Text style={styles.partyName}>{receipt.athleteName}</Text>
-            {receipt.athleteFiscalCode ? (
-              <Text style={styles.partyMeta}>
-                C.F. {receipt.athleteFiscalCode}
-              </Text>
+            {selfIssuedFiscalCode ? (
+              <Text style={styles.partyMeta}>C.F. {selfIssuedFiscalCode}</Text>
             ) : null}
             {receipt.athleteAddress ? (
               <Text style={styles.partyMeta}>{receipt.athleteAddress}</Text>
             ) : null}
           </View>
-        </View>
+        ) : (
+          <View style={styles.partyRow}>
+            <View style={styles.partyBox}>
+              <Text style={styles.partyLabel}>Ricevuto da</Text>
+              <Text style={styles.partyName}>{receipt.payerName}</Text>
+              {receipt.payerFiscalCode ? (
+                <Text style={styles.partyMeta}>
+                  C.F. {receipt.payerFiscalCode}
+                </Text>
+              ) : null}
+            </View>
+            <View style={styles.partyBox}>
+              <Text style={styles.partyLabel}>Per conto di (allieva)</Text>
+              <Text style={styles.partyName}>{receipt.athleteName}</Text>
+              {receipt.athleteFiscalCode ? (
+                <Text style={styles.partyMeta}>
+                  C.F. {receipt.athleteFiscalCode}
+                </Text>
+              ) : null}
+              {receipt.athleteAddress ? (
+                <Text style={styles.partyMeta}>{receipt.athleteAddress}</Text>
+              ) : null}
+            </View>
+          </View>
+        )}
 
         {/* Dettaglio: causale, data, modalità */}
         <View style={pdfStyles.section}>

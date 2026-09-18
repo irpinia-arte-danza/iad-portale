@@ -12,6 +12,7 @@ import {
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { academicYearSlashLabel } from "@/lib/fees/association-fee"
 import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
@@ -43,6 +44,10 @@ const SCHEDULE_ATHLETE_SELECT = {
   id: true,
   firstName: true,
   lastName: true,
+  // Destinataria quando non ha genitori collegati (corso adulti)
+  email: true,
+  // Serve al limite dei 18 anni per il ripiego sull allieva
+  dateOfBirth: true,
   parentRelations: {
     where: { parent: { deletedAt: null } },
     orderBy: [{ isPrimaryPayer: "desc" }, { isPrimaryContact: "desc" }],
@@ -124,7 +129,7 @@ export async function getScadenzeCSVData(
 
   const headers = [
     "Allieva",
-    "Genitore",
+    "Contatto",
     "Email",
     "Telefono",
     "Corso / causale",
@@ -140,6 +145,8 @@ export async function getScadenzeCSVData(
     if (!athlete) return []
 
     const parent = athlete.parentRelations[0]?.parent ?? null
+    // Chi riceverebbe il sollecito: il genitore, o l'allieva se non ne ha
+    const contact = resolveCommunicationRecipient(athlete)
     const email = emailMap.get(s.id)
 
     const dueUTC = new Date(
@@ -156,8 +163,8 @@ export async function getScadenzeCSVData(
     return [
       [
         `${athlete.lastName} ${athlete.firstName}`,
-        parent ? `${parent.lastName} ${parent.firstName}` : "—",
-        parent?.email ?? "",
+        contact.ok ? contact.recipient.name : "—",
+        contact.ok ? contact.recipient.email : "",
         parent?.phone ?? "",
         s.courseEnrollment?.course.name ?? s.notes ?? "—",
         CURRENCY_IT.format(s.amountCents / 100),
@@ -315,7 +322,8 @@ export async function sendReminderBatch(
   type SendableItem = {
     scheduleId: string
     athleteId: string
-    parentId: string
+    // null quando il sollecito va all'allieva stessa
+    parentId: string | null
     recipientEmail: string
     recipientName: string
     subject: string
@@ -329,25 +337,26 @@ export async function sendReminderBatch(
   for (const s of schedules) {
     const athlete = s.courseEnrollment?.athlete ?? s.athlete
     if (!athlete) continue // stage, saggio, costumi: fuori dai solleciti
-    const parent = athlete.parentRelations[0]?.parent ?? null
+    // Il genitore collegato, oppure l'allieva stessa se non ne ha. I solleciti
+    // di pagamento non guardano l'interruttore delle comunicazioni: resta
+    // com'era.
+    const resolved = resolveCommunicationRecipient(athlete)
 
-    if (!parent || !parent.email) {
+    if (!resolved.ok) {
       results.push({
         scheduleId: s.id,
-        recipientEmail: parent?.email ?? "",
-        recipientName: parent
-          ? `${parent.firstName} ${parent.lastName}`
-          : `${athlete.firstName} ${athlete.lastName}`,
+        recipientEmail: "",
+        recipientName: `${athlete.firstName} ${athlete.lastName}`,
         status: "SKIPPED",
-        error: parent
-          ? "Genitore senza email"
-          : "Nessun genitore collegato",
+        error: resolved.message,
       })
       continue
     }
 
+    const recipient = resolved.recipient
+
     const vars = {
-      genitore_nome: `${parent.firstName} ${parent.lastName}`,
+      genitore_nome: recipient.name,
       allieva_nome: `${athlete.firstName} ${athlete.lastName}`,
       importo: (s.amountCents / 100).toLocaleString("it-IT", {
         minimumFractionDigits: 2,
@@ -368,9 +377,9 @@ export async function sendReminderBatch(
       sendable.push({
         scheduleId: s.id,
         athleteId: athlete.id,
-        parentId: parent.id,
-        recipientEmail: parent.email,
-        recipientName: `${parent.firstName} ${parent.lastName}`,
+        parentId: recipient.parentId,
+        recipientEmail: recipient.email,
+        recipientName: recipient.name,
         subject: rendered.subject,
         html: rendered.bodyHtml,
         text: rendered.bodyText,
@@ -378,8 +387,8 @@ export async function sendReminderBatch(
     } catch (err) {
       results.push({
         scheduleId: s.id,
-        recipientEmail: parent.email,
-        recipientName: `${parent.firstName} ${parent.lastName}`,
+        recipientEmail: recipient.email,
+        recipientName: recipient.name,
         status: "FAILED",
         error: err instanceof Error ? err.message : "Errore rendering template",
       })

@@ -11,6 +11,7 @@ import {
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
 import { enrollAthleteCore } from "@/lib/stages/enroll-athlete"
@@ -557,14 +558,15 @@ export async function sendStageInvites(
       id: true,
       firstName: true,
       lastName: true,
+      // Destinataria quando non ha genitori collegati (corso adulti)
+      email: true,
+      // Serve al limite dei 18 anni per il ripiego sull allieva
+      dateOfBirth: true,
+      // Nessun filtro su email e consenso: un genitore senza email deve
+      // restare visibile qui, altrimenti l'allieva sembrerebbe senza
+      // genitori e riceverebbe lei l'invito
       parentRelations: {
-        where: {
-          parent: {
-            deletedAt: null,
-            receivesEmailCommunications: true,
-            email: { not: null },
-          },
-        },
+        where: { parent: { deletedAt: null } },
         orderBy: [
           { isPrimaryPayer: "desc" },
           { isPrimaryContact: "desc" },
@@ -577,6 +579,7 @@ export async function sendStageInvites(
               firstName: true,
               lastName: true,
               email: true,
+              receivesEmailCommunications: true,
             },
           },
         },
@@ -603,9 +606,10 @@ export async function sendStageInvites(
 
   type SendableItem = {
     athleteId: string
-    parentId: string
-    parentEmail: string
-    parentName: string
+    // null quando l'invito va all'allieva stessa
+    parentId: string | null
+    recipientEmail: string
+    recipientName: string
     athleteName: string
     subject: string
     html: string
@@ -617,16 +621,15 @@ export async function sendStageInvites(
   const signupUrl = `${appUrl}/parent/stages`
 
   for (const athlete of athletes) {
-    const rel = athlete.parentRelations[0]
-    if (!rel) {
-      skippedNoCommsConsent += 1
+    const resolved = resolveCommunicationRecipient(athlete, {
+      requireCommunicationsConsent: true,
+    })
+    if (!resolved.ok) {
+      if (resolved.reason === "OPTED_OUT") skippedNoCommsConsent += 1
+      else skippedNoEmail += 1
       continue
     }
-    const parent = rel.parent
-    if (!parent.email) {
-      skippedNoEmail += 1
-      continue
-    }
+    const recipient = resolved.recipient
     totalEligible += 1
     if (alreadyAthleteIds.has(athlete.id)) {
       alreadySent += 1
@@ -634,7 +637,7 @@ export async function sendStageInvites(
     }
 
     const vars = {
-      genitore_nome: `${parent.firstName} ${parent.lastName}`,
+      genitore_nome: recipient.name,
       allieva_nome: `${athlete.firstName} ${athlete.lastName}`,
       stage_titolo: stage.title,
       stage_data: DATE_IT.format(stage.date),
@@ -651,9 +654,9 @@ export async function sendStageInvites(
       const rendered = await renderTemplate("stage-invite", vars)
       sendable.push({
         athleteId: athlete.id,
-        parentId: parent.id,
-        parentEmail: parent.email,
-        parentName: `${parent.firstName} ${parent.lastName}`,
+        parentId: recipient.parentId,
+        recipientEmail: recipient.email,
+        recipientName: recipient.name,
         athleteName: `${athlete.firstName} ${athlete.lastName}`,
         subject: rendered.subject,
         html: rendered.bodyHtml,
@@ -670,7 +673,7 @@ export async function sendStageInvites(
 
   if (sendable.length > 0) {
     const batchItems: BatchItem[] = sendable.map((item) => ({
-      to: item.parentEmail,
+      to: item.recipientEmail,
       subject: item.subject,
       html: item.html,
       text: item.text ?? undefined,
@@ -686,8 +689,8 @@ export async function sendStageInvites(
       else failed += 1
       return {
         sentBy: admin.userId,
-        recipientEmail: item.parentEmail,
-        recipientName: item.parentName,
+        recipientEmail: item.recipientEmail,
+        recipientName: item.recipientName,
         templateSlug: "stage-invite",
         subject: item.subject,
         bodyHtml: item.html,

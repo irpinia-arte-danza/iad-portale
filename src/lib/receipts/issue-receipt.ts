@@ -17,6 +17,10 @@ import {
 } from "@/lib/payments/schedule-lines"
 import { prisma } from "@/lib/prisma"
 
+import { isTraceablePaymentMethod } from "@/lib/payments/traceability"
+import { isMinorAt } from "@/lib/utils/age"
+
+import { MINOR_PAYER_BLOCKER } from "./payer-rules"
 import { composeAddress } from "./person-data"
 import {
   feeTypeToReceiptCategory,
@@ -84,6 +88,8 @@ const PAYMENT_FOR_RECEIPT_SELECT = {
   athlete: {
     select: {
       ...PERSON_SELECT,
+      // Serve a fermare l'emissione di una ricevuta intestata a una minorenne
+      dateOfBirth: true,
       parentRelations: {
         where: { parent: { deletedAt: null } },
         orderBy: [
@@ -159,6 +165,21 @@ function buildDescription(payment: PaymentForReceipt): string | null {
   return describeSchedule(schedule)
 }
 
+// Una ricevuta intestata a una minorenne non serve a nessuno per il 730:
+// l'emissione si ferma, non si limita ad avvisare. Vale sia nell'anteprima
+// sia lato server, perché l'emissione si può chiedere anche senza passare
+// dall'anteprima. L'età si valuta alla data di emissione.
+function minorPayerBlocker(
+  payment: PaymentForReceipt,
+  issueDate: Date,
+): string | null {
+  const payer = resolvePayer(payment)
+  if (payer.source !== "ATHLETE") return null
+  return isMinorAt(payment.athlete.dateOfBirth, issueDate)
+    ? MINOR_PAYER_BLOCKER
+    : null
+}
+
 function toInfo(receipt: IssuedReceiptInfo): IssuedReceiptInfo {
   return {
     id: receipt.id,
@@ -189,9 +210,11 @@ function buildWarnings(
     )
   }
 
-  // Del pagante sulla ricevuta compaiono solo nome e codice fiscale: è
-  // l'unico dato mancante che vale la pena segnalare.
-  if (!payer.person.fiscalCode) {
+  // Il codice fiscale del pagante serve alla detrazione, e la detrazione vale
+  // solo con pagamento tracciabile (stessa regola della dicitura sul PDF).
+  // Su un pagamento in contanti l'avviso segnalerebbe un problema che non
+  // c'è, e gli avvisi che non servono insegnano a non leggere gli altri.
+  if (!payer.person.fiscalCode && isTraceablePaymentMethod(payment.method)) {
     warnings.push(
       "Manca il codice fiscale del pagante: la ricevuta non sarà utilizzabile per la detrazione nel 730.",
     )
@@ -277,10 +300,11 @@ export async function buildIssuePreview(
   if (!payment) return null
 
   const payer = resolvePayer(payment)
-  const blocker =
-    !payment.receipt && payment.status === PaymentStatus.REVERSED
+  const blocker = payment.receipt
+    ? null
+    : payment.status === PaymentStatus.REVERSED
       ? "Il pagamento è stornato: non si può emettere la ricevuta."
-      : null
+      : minorPayerBlocker(payment, todayInRome())
 
   return {
     paymentId: payment.id,
@@ -330,6 +354,9 @@ export async function issueReceiptCore(params: {
             error: "Il pagamento è stornato: non si può emettere la ricevuta.",
           }
         }
+
+        const minorBlocker = minorPayerBlocker(payment, todayInRome())
+        if (minorBlocker) return { ok: false, error: minorBlocker }
 
         // Assegnazione atomica del numero. L'UPDATE con incremento prende il
         // lock sulla riga del contatore fino al commit: un'emissione

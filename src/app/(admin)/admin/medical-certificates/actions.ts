@@ -10,6 +10,7 @@ import {
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
 import {
@@ -50,7 +51,8 @@ export type CertReminderBatchResponse = {
 type SendableTarget = {
   athleteId: string
   athleteName: string
-  parentId: string
+  // null quando il promemoria va all'allieva stessa
+  parentId: string | null
   parentName: string
   recipientEmail: string
   certType: string
@@ -65,6 +67,10 @@ async function loadTargets(athleteIds: string[]) {
       id: true,
       firstName: true,
       lastName: true,
+      // Destinataria quando non ha genitori collegati (corso adulti)
+      email: true,
+      // Serve al limite dei 18 anni per il ripiego sull allieva
+      dateOfBirth: true,
       medicalCertificates: {
         where: { deletedAt: null },
         orderBy: CURRENT_CERTIFICATE_ORDER,
@@ -161,13 +167,17 @@ export async function sendCertReminders(
 
     const athleteName = `${t.lastName} ${t.firstName}`
     const cert = t.medicalCertificates[0] ?? null
-    const parent = t.parentRelations[0]?.parent ?? null
+    // Il genitore collegato, oppure l'allieva stessa se non ne ha
+    const resolved = resolveCommunicationRecipient(t, {
+      requireCommunicationsConsent: true,
+    })
+    const knownEmail = resolved.ok ? resolved.recipient.email : ""
 
     if (!cert) {
       results.push({
         athleteId,
         athleteName,
-        recipientEmail: parent?.email ?? "",
+        recipientEmail: knownEmail,
         status: "SKIPPED",
         reason:
           "Nessun certificato registrato — il promemoria si applica solo a certificati esistenti",
@@ -180,43 +190,32 @@ export async function sendCertReminders(
       results.push({
         athleteId,
         athleteName,
-        recipientEmail: parent?.email ?? "",
+        recipientEmail: knownEmail,
         status: "SKIPPED",
         reason: "Certificato ancora valido (>30 giorni alla scadenza)",
       })
       continue
     }
 
-    if (!parent || !parent.email) {
+    if (!resolved.ok) {
       results.push({
         athleteId,
         athleteName,
-        recipientEmail: parent?.email ?? "",
+        recipientEmail: "",
         status: "SKIPPED",
-        reason: parent
-          ? "Genitore senza email"
-          : "Nessun genitore collegato",
+        reason: resolved.message,
       })
       continue
     }
 
-    if (!parent.receivesEmailCommunications) {
-      results.push({
-        athleteId,
-        athleteName,
-        recipientEmail: parent.email,
-        status: "SKIPPED",
-        reason: "Genitore ha disattivato le comunicazioni email",
-      })
-      continue
-    }
+    const recipient = resolved.recipient
 
     const sentToday = recentCounts.get(athleteId) ?? 0
     if (sentToday >= RATE_LIMIT_PER_DAY) {
       results.push({
         athleteId,
         athleteName,
-        recipientEmail: parent.email,
+        recipientEmail: recipient.email,
         status: "SKIPPED",
         reason: `Già inviati ${sentToday} promemoria nelle ultime 24h (limite ${RATE_LIMIT_PER_DAY})`,
       })
@@ -227,9 +226,9 @@ export async function sendCertReminders(
     sendable.push({
       athleteId,
       athleteName,
-      parentId: parent.id,
-      parentName: `${parent.firstName} ${parent.lastName}`,
-      recipientEmail: parent.email,
+      parentId: recipient.parentId,
+      parentName: recipient.name,
+      recipientEmail: recipient.email,
       certType:
         MEDICAL_CERT_TYPE_LABELS[normalizeCertType(cert.type)] ?? cert.type,
       expiryDate: cert.expiryDate,
