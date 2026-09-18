@@ -1,7 +1,8 @@
 // Tipi e costanti condivisi client/server per lo stato dell'accesso al
-// portale di genitori e insegnanti. Nessun import server-only qui.
+// portale di genitori, insegnanti e allieve maggiorenni che accedono per sé.
+// Nessun import server-only qui.
 
-export type AccessProfileKind = "PARENT" | "TEACHER"
+export type AccessProfileKind = "PARENT" | "TEACHER" | "ATHLETE"
 
 // milestoneKey degli EmailLog: rendono leggibile lo storico e servono a
 // ricavare lo stato INVITATO senza duplicare stato su Parent/Teacher.
@@ -37,6 +38,9 @@ export function isInvitable(status: AccessStatus): boolean {
 export type AccessInviteErrorCode =
   | "NOT_FOUND"
   | "NO_EMAIL"
+  // Profilo che non può avere un accesso proprio (es. allieva minorenne, o
+  // con un genitore collegato: l'accesso è del genitore)
+  | "NOT_ELIGIBLE"
   | "ALREADY_ACTIVE"
   | "EMAIL_CONFLICT"
   | "RATE_LIMIT"

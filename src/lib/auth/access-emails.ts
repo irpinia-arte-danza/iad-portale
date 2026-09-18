@@ -7,6 +7,8 @@ import { sendEmail } from "@/lib/resend/send-email"
 import { substituteVariables } from "@/lib/resend/template-vars"
 import { createAdminClient } from "@/lib/supabase/admin-client"
 
+import { athleteAccessEligibility } from "./athlete-access"
+
 import { resolveAccountState, type AccountState } from "./account-state"
 import {
   ACCESS_INVITE_MILESTONE,
@@ -261,6 +263,9 @@ type DeliverParams = {
   link: string
   sentBy: string
   parentId: string | null
+  // Allieva con accesso proprio: collega il log al suo profilo, così lo
+  // stato dell'accesso si ricava come per i genitori
+  athleteId?: string | null
   triggeredBy: EmailTrigger
   milestoneKey: string
 }
@@ -287,6 +292,7 @@ async function deliverAndLog(params: DeliverParams): Promise<DeliverResult> {
       bodyHtml: redactLink(params.email.html, params.link),
       bodyText: redactLink(params.email.text, params.link),
       parentId: params.parentId,
+      athleteId: params.athleteId ?? null,
       status: result.success ? EmailStatus.SENT : EmailStatus.FAILED,
       providerId: result.success ? result.providerId : null,
       errorMessage: result.success ? null : result.error,
@@ -316,6 +322,9 @@ const USER_WITH_PROFILES_SELECT = {
   teacherProfile: {
     select: { id: true, firstName: true, lastName: true, deletedAt: true },
   },
+  athleteProfile: {
+    select: { id: true, firstName: true, lastName: true, deletedAt: true },
+  },
 } satisfies Prisma.UserSelect
 
 type UserWithProfiles = Prisma.UserGetPayload<{
@@ -340,6 +349,10 @@ function describeConflict(
   if (teacher && !teacher.deletedAt && !(kind === "TEACHER" && teacher.id === profileId)) {
     return `Questa email è già usata dall'insegnante ${teacher.firstName} ${teacher.lastName}.`
   }
+  const athlete = user.athleteProfile
+  if (athlete && !athlete.deletedAt && !(kind === "ATHLETE" && athlete.id === profileId)) {
+    return `Questa email è già usata dall'allieva ${athlete.firstName} ${athlete.lastName}.`
+  }
   return null
 }
 
@@ -350,6 +363,7 @@ async function retireStaleUser(userId: string, adminUserId: string): Promise<voi
   await prisma.$transaction([
     prisma.parent.updateMany({ where: { userId }, data: { userId: null } }),
     prisma.teacher.updateMany({ where: { userId }, data: { userId: null } }),
+    prisma.athlete.updateMany({ where: { userId }, data: { userId: null } }),
     prisma.user.update({
       where: { id: userId },
       data: {
@@ -378,9 +392,35 @@ async function loadProfile(kind: AccessProfileKind, profileId: string) {
     email: true,
     userId: true,
   } as const
-  return kind === "PARENT"
-    ? prisma.parent.findFirst({ where: { id: profileId, deletedAt: null }, select })
-    : prisma.teacher.findFirst({ where: { id: profileId, deletedAt: null }, select })
+  if (kind === "PARENT") {
+    return prisma.parent.findFirst({ where: { id: profileId, deletedAt: null }, select })
+  }
+  if (kind === "TEACHER") {
+    return prisma.teacher.findFirst({ where: { id: profileId, deletedAt: null }, select })
+  }
+  return prisma.athlete.findFirst({ where: { id: profileId, deletedAt: null }, select })
+}
+
+// La regola sta in athleteAccessEligibility: qui si leggono solo i dati che
+// le servono. Il controllo vive nel motore, così non si aggira passando da
+// un'altra strada.
+async function athleteAccessBlocker(athleteId: string): Promise<string | null> {
+  const [athlete, linkedParents] = await Promise.all([
+    prisma.athlete.findUnique({
+      where: { id: athleteId },
+      select: { dateOfBirth: true },
+    }),
+    prisma.athleteParent.count({
+      where: { athleteId, parent: { deletedAt: null } },
+    }),
+  ])
+  if (!athlete) return "Allieva non trovata"
+
+  const eligibility = athleteAccessEligibility({
+    dateOfBirth: athlete.dateOfBirth,
+    linkedParents,
+  })
+  return eligibility.ok ? null : eligibility.message
 }
 
 type InviteParams = {
@@ -414,7 +454,19 @@ async function sendAccessInviteUnsafe({
 }: InviteParams): Promise<AccessInviteResult> {
   const profile = await loadProfile(kind, profileId)
   if (!profile) {
-    return fail("NOT_FOUND", kind === "PARENT" ? "Genitore non trovato" : "Insegnante non trovato")
+    return fail(
+      "NOT_FOUND",
+      kind === "PARENT"
+        ? "Genitore non trovato"
+        : kind === "TEACHER"
+          ? "Insegnante non trovato"
+          : "Allieva non trovata",
+    )
+  }
+
+  if (kind === "ATHLETE") {
+    const blocker = await athleteAccessBlocker(profile.id)
+    if (blocker) return fail("NOT_ELIGIBLE", blocker)
   }
 
   const email = normalizeEmail(profile.email)
@@ -527,7 +579,12 @@ async function sendAccessInviteUnsafe({
 
   // 4. Collega account e profilo
   const authUserId = link.authUserId
-  const role = kind === "PARENT" ? UserRole.PARENT : UserRole.TEACHER
+  const role =
+    kind === "PARENT"
+      ? UserRole.PARENT
+      : kind === "TEACHER"
+        ? UserRole.TEACHER
+        : UserRole.ATHLETE
   await prisma.$transaction(async (tx) => {
     // Un account appartiene a un solo profilo: sgancia eventuali profili nel
     // cestino ancora collegati (quelli attivi sono già esclusi sopra).
@@ -542,6 +599,13 @@ async function sendAccessInviteUnsafe({
       where: {
         userId: authUserId,
         ...(kind === "TEACHER" ? { NOT: { id: profile.id } } : {}),
+      },
+      data: { userId: null },
+    })
+    await tx.athlete.updateMany({
+      where: {
+        userId: authUserId,
+        ...(kind === "ATHLETE" ? { NOT: { id: profile.id } } : {}),
       },
       data: { userId: null },
     })
@@ -566,8 +630,10 @@ async function sendAccessInviteUnsafe({
     })
     if (kind === "PARENT") {
       await tx.parent.update({ where: { id: profile.id }, data: { userId: authUserId } })
-    } else {
+    } else if (kind === "TEACHER") {
       await tx.teacher.update({ where: { id: profile.id }, data: { userId: authUserId } })
+    } else {
+      await tx.athlete.update({ where: { id: profile.id }, data: { userId: authUserId } })
     }
   })
 
@@ -578,6 +644,7 @@ async function sendAccessInviteUnsafe({
       milestoneKey: { in: [...ACCESS_MILESTONES] },
       status: { not: EmailStatus.FAILED },
       parentId: kind === "PARENT" ? profile.id : null,
+      athleteId: kind === "ATHLETE" ? profile.id : null,
     },
   })
   const reinvite = previousInvites > 0
@@ -588,11 +655,18 @@ async function sendAccessInviteUnsafe({
     ACCESS_TEMPLATE_SLUG,
     {
       destinatario_nome: recipientName,
-      area_nome: kind === "PARENT" ? "area genitori" : "area insegnanti",
+      area_nome:
+        kind === "PARENT"
+          ? "area genitori"
+          : kind === "TEACHER"
+            ? "area insegnanti"
+            : "area riservata",
       descrizione_area:
         kind === "PARENT"
           ? "consultare contributi, ricevute, presenze e orari delle tue figlie"
-          : "vedere le tue classi e segnare le presenze",
+          : kind === "TEACHER"
+            ? "vedere le tue classi e segnare le presenze"
+            : "consultare i tuoi contributi, le ricevute, le presenze e gli orari",
       link_accesso: confirmLink,
       link_recupero: `${appUrl}/password-dimenticata`,
       ...(await getBrandVars()),
@@ -607,6 +681,7 @@ async function sendAccessInviteUnsafe({
     link: confirmLink,
     sentBy: adminUserId,
     parentId: kind === "PARENT" ? profile.id : null,
+    athleteId: kind === "ATHLETE" ? profile.id : null,
     triggeredBy: EmailTrigger.ADMIN_MANUAL,
     milestoneKey: reinvite ? ACCESS_REINVITE_MILESTONE : ACCESS_INVITE_MILESTONE,
   })
@@ -615,8 +690,14 @@ async function sendAccessInviteUnsafe({
   await prisma.auditLog.create({
     data: {
       userId: adminUserId,
-      action: kind === "PARENT" ? "INVITE_PARENT" : "INVITE_TEACHER",
-      entityType: kind === "PARENT" ? "Parent" : "Teacher",
+      action:
+        kind === "PARENT"
+          ? "INVITE_PARENT"
+          : kind === "TEACHER"
+            ? "INVITE_TEACHER"
+            : "INVITE_ATHLETE",
+      entityType:
+        kind === "PARENT" ? "Parent" : kind === "TEACHER" ? "Teacher" : "Athlete",
       entityId: profile.id,
       changes: {
         email,
@@ -647,7 +728,12 @@ async function resolveRecipientName(
           where: { id: state.teacherId },
           select: { firstName: true, lastName: true },
         })
-      : null
+      : state.athleteId
+        ? await prisma.athlete.findUnique({
+            where: { id: state.athleteId },
+            select: { firstName: true, lastName: true },
+          })
+        : null
   const name = [profile?.firstName ?? fallback.firstName, profile?.lastName ?? fallback.lastName]
     .filter(Boolean)
     .join(" ")

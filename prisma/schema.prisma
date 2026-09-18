@@ -1327,6 +1327,8 @@ enum AuditAction {
   INVITE_PARENT
   // Teacher portal (Sprint 5)
   INVITE_TEACHER
+  // Accesso proprio di un'allieva maggiorenne (corso adulti)
+  INVITE_ATHLETE
   // Fase 1.A — CourseSchedule CRUD + AcademicYear management
   SCHEDULE_CREATE
   SCHEDULE_UPDATE

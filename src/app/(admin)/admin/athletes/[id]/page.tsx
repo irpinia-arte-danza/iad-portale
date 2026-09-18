@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation"
 
+import { getAccessStatus } from "@/lib/auth/access-status"
+import { athleteAccessEligibility } from "@/lib/auth/athlete-access"
 import { prisma } from "@/lib/prisma"
 
 import { EmailLogTable } from "../../_components/email-log/table"
@@ -16,6 +18,7 @@ import { EnrollmentsSection } from "../_components/enrollments-section"
 import { GuardianListSection } from "../_components/guardian-list-section"
 import { SchedulesSection } from "../_components/schedules-section"
 import { getAthleteById, getAthleteForPDF } from "../queries"
+import { AthleteAccessSection } from "./_components/athlete-access-section"
 import { AthletePDFButton } from "./_components/athlete-pdf-button"
 import { MedicalCertSection } from "./_components/medical-cert-section"
 
@@ -68,6 +71,20 @@ export default async function AthleteDetailPage({ params }: PageProps) {
 
   const fullName = `${athlete.lastName} ${athlete.firstName}`
 
+  // Stessa regola che applica il motore dell'invito: la sezione compare solo
+  // dove l'accesso si può davvero dare
+  const canHaveOwnAccess = athleteAccessEligibility({
+    dateOfBirth: athlete.dateOfBirth,
+    linkedParents: athlete.parentRelations.length,
+  }).ok
+  const accessStatus = canHaveOwnAccess
+    ? await getAccessStatus("ATHLETE", {
+        id: athlete.id,
+        email: athlete.email,
+        userId: athlete.userId,
+      })
+    : null
+
   return (
     <>
       <ResourceHeader
@@ -99,6 +116,12 @@ export default async function AthleteDetailPage({ params }: PageProps) {
             athleteId={athlete.id}
             parentRelations={athlete.parentRelations}
           />
+          {accessStatus ? (
+            <AthleteAccessSection
+              athleteId={athlete.id}
+              status={accessStatus}
+            />
+          ) : null}
           <EnrollmentsSection
             athleteId={athlete.id}
             athleteFirstName={athlete.firstName}

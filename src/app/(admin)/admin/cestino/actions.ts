@@ -105,12 +105,18 @@ async function doRestore(
     let athleteIdForRevalidate: string | null = null
 
     switch (kind) {
-      case "athlete":
-        await prisma.athlete.update({
+      case "athlete": {
+        const athlete = await prisma.athlete.update({
           where: { id: idParsed.data },
           data: { deletedAt: null },
+          select: { userId: true },
         })
+        // Riattiva l'accesso proprio, se ne aveva uno
+        if (athlete.userId) {
+          await reactivateProfileUser(athlete.userId, UserRole.ATHLETE)
+        }
         break
+      }
       case "parent": {
         const parent = await prisma.parent.update({
           where: { id: idParsed.data },
