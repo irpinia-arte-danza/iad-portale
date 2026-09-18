@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
 import { prisma } from "@/lib/prisma"
-import { requireParent } from "@/lib/auth/require-parent"
+import { athleteScopeWhere } from "@/lib/auth/portal-scope"
+import { requirePortalAccess } from "@/lib/auth/require-portal-access"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
 import { enrollAthleteCore } from "@/lib/stages/enroll-athlete"
@@ -14,8 +15,8 @@ const parentEnrollSchema = z.object({
   stageId: uuidSchema,
   athleteIds: z
     .array(uuidSchema)
-    .min(1, "Seleziona almeno una figlia")
-    .max(10, "Massimo 10 figlie per volta"),
+    .min(1, "Seleziona almeno un'allieva")
+    .max(10, "Massimo 10 allieve per volta"),
 })
 
 export type ParentEnrollResult = {
@@ -26,7 +27,7 @@ export type ParentEnrollResult = {
 export async function parentEnrollAthletesInStage(
   input: z.infer<typeof parentEnrollSchema>,
 ): Promise<ActionResult<ParentEnrollResult>> {
-  const { parentId, userId } = await requireParent()
+  const { scope, userId } = await requirePortalAccess()
 
   const parsed = parentEnrollSchema.safeParse(input)
   if (!parsed.success) {
@@ -36,19 +37,26 @@ export async function parentEnrollAthletesInStage(
     }
   }
 
-  // Verifica che tutte le athleteIds appartengano al genitore
-  const ownedAthletes = await prisma.athleteParent.findMany({
+  // Si possono iscrivere solo le allieve del proprio ambito: le figlie
+  // collegate per un genitore, sé stessa per un'allieva maggiorenne
+  const ownedAthletes = await prisma.athlete.findMany({
     where: {
-      parentId,
-      athleteId: { in: parsed.data.athleteIds },
-      athlete: { deletedAt: null },
+      deletedAt: null,
+      id: { in: parsed.data.athleteIds },
+      ...athleteScopeWhere(scope),
     },
-    select: { athleteId: true },
+    select: { id: true },
   })
-  const ownedSet = new Set(ownedAthletes.map((r) => r.athleteId))
+  const ownedSet = new Set(ownedAthletes.map((a) => a.id))
   const unauthorized = parsed.data.athleteIds.filter((id) => !ownedSet.has(id))
   if (unauthorized.length > 0) {
-    return { ok: false, error: "Una o più figlie non sono collegate al tuo profilo" }
+    return {
+      ok: false,
+      error:
+        scope.kind === "athlete"
+          ? "Puoi iscrivere solo te stessa"
+          : "Una o più figlie non sono collegate al tuo profilo",
+    }
   }
 
   let enrolled = 0
@@ -58,7 +66,10 @@ export async function parentEnrollAthletesInStage(
     const result = await enrollAthleteCore({
       stageId: parsed.data.stageId,
       athleteId,
-      notes: "Iscrizione genitore",
+      notes:
+        scope.kind === "athlete"
+          ? "Iscrizione dall'area riservata"
+          : "Iscrizione genitore",
       enrolledByUserId: userId,
       auditUserId: userId,
     })

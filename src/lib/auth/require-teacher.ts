@@ -6,7 +6,7 @@ import { NO_ACCESS_ROUTE } from "./account-state"
 import { getCurrentAccount } from "./current-account"
 import { getDashboardPath } from "./dashboard-path"
 
-// Stessa logica di requireParent (vedi commento lì).
+// Stessa logica di requirePortalAccess (vedi commento lì).
 export async function requireTeacher(): Promise<{
   userId: string
   teacherId: string

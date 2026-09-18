@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { ReceiptStatus, UserRole } from "@prisma/client"
 
 import { NO_ACCESS_ROUTE, resolveAccountState } from "@/lib/auth/account-state"
+import { athleteScopeWhere, portalScopeOf } from "@/lib/auth/portal-scope"
 import { prisma } from "@/lib/prisma"
 import { stampCancelledReceipt } from "@/lib/receipts/cancelled-stamp"
 import {
@@ -27,7 +28,10 @@ type RouteParams = {
 
 function backHrefFor(role: UserRole): string {
   if (role === UserRole.ADMIN) return "/admin/receipts"
-  if (role === UserRole.PARENT) return "/parent/dashboard"
+  // Genitori e allieve con accesso proprio condividono l'area riservata
+  if (role === UserRole.PARENT || role === UserRole.ATHLETE) {
+    return "/parent/dashboard"
+  }
   return "/"
 }
 
@@ -118,29 +122,39 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     })
   }
 
-  // 2) Non autorizzato
-  if (account.role === UserRole.PARENT) {
-    const owned =
-      account.parentId && receipt.payment
-        ? await prisma.athleteParent.count({
-            where: {
-              parentId: account.parentId,
-              athleteId: receipt.payment.athleteId,
-            },
-          })
-        : 0
+  // 2) Non autorizzato. L'area riservata la usano i genitori per le figlie
+  //    collegate e le allieve maggiorenni per sé: stessa domanda, "questa
+  //    ricevuta riguarda una delle allieve che puoi vedere?"
+  const scope = portalScopeOf(account)
+  if (scope) {
+    const owned = receipt.payment
+      ? await prisma.athlete.count({
+          where: {
+            id: receipt.payment.athleteId,
+            ...athleteScopeWhere(scope),
+          },
+        })
+      : 0
     if (owned === 0) {
-      console.warn("[receipt pdf] access denied: receipt not linked to parent", logContext)
+      console.warn(
+        "[receipt pdf] access denied: receipt outside portal scope",
+        logContext,
+      )
       return messagePage({
         status: 403,
         title: "Accesso non consentito",
         message:
-          "Questa ricevuta non riguarda le allieve collegate al tuo account.",
+          scope.kind === "athlete"
+            ? "Questa ricevuta non è intestata a te."
+            : "Questa ricevuta non riguarda le allieve collegate al tuo account.",
         backHref,
       })
     }
     if (receipt.status !== ReceiptStatus.VALID) {
-      console.info("[receipt pdf] cancelled receipt requested by parent", logContext)
+      console.info(
+        "[receipt pdf] cancelled receipt requested from portal",
+        logContext,
+      )
       return messagePage({
         status: 410,
         title: "Ricevuta annullata",
