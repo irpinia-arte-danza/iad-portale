@@ -29,6 +29,10 @@ enum UserRole {
   ADMIN
   PARENT
   TEACHER
+  // Allieva maggiorenne che accede per sé: corso adulti, nessun genitore
+  // collegato. Vive nella stessa area dei genitori (/parent), perché vede le
+  // stesse cose — solo per una persona sola invece che per le figlie.
+  ATHLETE
 }
 
 model User {
@@ -46,6 +50,7 @@ model User {
 
   parentProfile  Parent?
   teacherProfile Teacher?
+  athleteProfile Athlete?
   auditLogs      AuditLog[]
   emailsSent     EmailLog[] @relation("EmailsSent")
 
@@ -175,6 +180,11 @@ model Athlete {
   status            AthleteStatus      @default(TRIAL)
   acquisitionSource AcquisitionSource? @map("acquisition_source")
   enrollmentDate    DateTime?          @map("enrollment_date") @db.Date
+
+  // Accesso proprio, solo per le maggiorenni senza genitori collegati: chi ha
+  // un genitore entra dall'account del genitore, non da uno suo.
+  userId String? @unique @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id])
 
   parentRelations        AthleteParent[]
   enrollments            CourseEnrollment[]

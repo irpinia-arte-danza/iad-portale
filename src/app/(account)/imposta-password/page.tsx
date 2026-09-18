@@ -21,6 +21,9 @@ const AREA_LABELS: Record<UserRole, string> = {
   PARENT: "all'area genitori",
   TEACHER: "all'area insegnanti",
   ADMIN: "al portale",
+  // Allieva che accede per sé: l'area è la stessa dei genitori, ma darle
+  // della genitrice sarebbe sbagliato
+  ATHLETE: "nella tua area riservata",
 }
 
 export default async function SetPasswordPage({ searchParams }: PageProps) {

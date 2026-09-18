@@ -7,6 +7,10 @@ export function getDashboardPath(role: UserRole): string {
     case UserRole.TEACHER:
       return "/teacher/dashboard"
     case UserRole.PARENT:
+    // Un'allieva con accesso proprio vede la stessa area del genitore: le
+    // stesse cose, per una persona sola invece che per le figlie. Tenere
+    // l'indirizzo /parent costa niente e non rompe nessun link.
+    case UserRole.ATHLETE:
       return "/parent/dashboard"
     default: {
       const _exhaustive: never = role
@@ -23,6 +27,7 @@ export function getRoleAreaPrefix(role: UserRole): string {
     case UserRole.TEACHER:
       return "/teacher"
     case UserRole.PARENT:
+    case UserRole.ATHLETE:
       return "/parent"
     default: {
       const _exhaustive: never = role
