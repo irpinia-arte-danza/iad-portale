@@ -138,7 +138,7 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
   const hasEmailByScheduleId = useMemo(() => {
     const map = new Map<string, boolean>()
     for (const s of scadenze) {
-      map.set(s.id, Boolean(s.parent?.email))
+      map.set(s.id, Boolean(s.contact?.email))
     }
     return map
   }, [scadenze])
@@ -211,7 +211,7 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                 />
               </TableHead>
               <TableHead>Allieva</TableHead>
-              <TableHead className="hidden md:table-cell">Genitore</TableHead>
+              <TableHead className="hidden md:table-cell">Contatto</TableHead>
               <TableHead className="hidden lg:table-cell">Telefono</TableHead>
               <TableHead className="hidden sm:table-cell">Corso / causale</TableHead>
               <TableHead className="text-right">Importo</TableHead>
@@ -228,9 +228,7 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
           <TableBody>
             {scadenze.map((s) => {
               const isSelected = selected.has(s.id)
-              const parentName = s.parent
-                ? `${s.parent.lastName} ${s.parent.firstName}`
-                : null
+              const contact = s.contact
               return (
                 <TableRow
                   key={s.id}
@@ -259,12 +257,22 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    {parentName ? (
+                    {contact ? (
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-sm">{parentName}</span>
-                        {s.parent?.email ? (
+                        <span className="text-sm">
+                          {contact.name}
+                          {/* Senza genitori collegati il sollecito va
+                              all'allieva: che si veda */}
+                          {contact.isAthlete ? (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              (allieva)
+                            </span>
+                          ) : null}
+                        </span>
+                        {contact.email ? (
                           <span className="text-xs text-muted-foreground">
-                            {s.parent.email}
+                            {contact.email}
                           </span>
                         ) : (
                           <span className="text-xs text-amber-600 dark:text-amber-500">
@@ -277,12 +285,12 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                     )}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
-                    {s.parent?.phone ? (
+                    {contact?.phone ? (
                       <a
-                        href={`tel:${s.parent.phone}`}
+                        href={`tel:${contact.phone}`}
                         className="font-mono text-xs hover:underline"
                       >
-                        {s.parent.phone}
+                        {contact.phone}
                       </a>
                     ) : (
                       <span className="text-muted-foreground">—</span>
@@ -334,7 +342,7 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {s.parent?.email ? (
+                        {contact?.email ? (
                           <DropdownMenuItem
                             onSelect={(e) => {
                               e.preventDefault()
@@ -355,7 +363,9 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                               </div>
                             </TooltipTrigger>
                             <TooltipContent side="left">
-                              Email genitore mancante
+                              {contact?.isAthlete
+                                ? "Email dell'allieva mancante"
+                                : "Email del genitore mancante"}
                             </TooltipContent>
                           </Tooltip>
                         )}

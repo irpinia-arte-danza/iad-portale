@@ -3,6 +3,7 @@ import { Prisma, ScheduleStatus } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { withActiveCourseOrAssociationScheduleFilter } from "@/lib/queries/active-schedule-filter"
+import { isMinorAt } from "@/lib/utils/age"
 
 export type ScadenzeStatoFilter =
   | "DEFAULT"
@@ -35,12 +36,13 @@ export type ScadenzaWithDetails = {
     firstName: string
     lastName: string
   }
-  parent: {
-    id: string
-    firstName: string
-    lastName: string
+  // Chi riceve i solleciti: il genitore di riferimento, oppure l'allieva
+  // stessa quando non ha genitori collegati (corso adulti)
+  contact: {
+    name: string
     email: string | null
     phone: string | null
+    isAthlete: boolean
   } | null
   // null per la quota associativa, che non è legata a un corso
   course: {
@@ -62,6 +64,11 @@ const SCHEDULE_ATHLETE_SELECT = {
   id: true,
   firstName: true,
   lastName: true,
+  // Contatto quando non ha genitori collegati (corso adulti)
+  email: true,
+  // Serve al limite dei 18 anni per il ripiego sull allieva
+  dateOfBirth: true,
+  phone: true,
   parentRelations: {
     where: { parent: { deletedAt: null } },
     orderBy: [{ isPrimaryPayer: "desc" }, { isPrimaryContact: "desc" }],
@@ -242,15 +249,25 @@ export async function getScadenze(
           firstName: athlete.firstName,
           lastName: athlete.lastName,
         },
-        parent: parentRel
+        contact: parentRel
           ? {
-              id: parentRel.parent.id,
-              firstName: parentRel.parent.firstName,
-              lastName: parentRel.parent.lastName,
+              name: `${parentRel.parent.lastName} ${parentRel.parent.firstName}`,
               email: parentRel.parent.email,
               phone: parentRel.parent.phone,
+              isAthlete: false,
             }
-          : null,
+          : isMinorAt(athlete.dateOfBirth, today)
+            ? // Minorenne senza genitori collegati: non c'è nessuno a cui
+              // scrivere, e mostrarla come contatto sarebbe fuorviante
+              null
+            : {
+                // Maggiorenne: riceve lei. Si mostra anche senza email, così
+                // si vede cosa manca
+                name: `${athlete.lastName} ${athlete.firstName}`,
+                email: athlete.email,
+                phone: athlete.phone,
+                isAthlete: true,
+              },
         course: s.courseEnrollment?.course ?? null,
         academicYear: {
           id: s.academicYear.id,

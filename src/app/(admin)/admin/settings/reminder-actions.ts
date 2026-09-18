@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { AuditAction, Prisma, ScheduleStatus } from "@prisma/client"
 
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { prisma } from "@/lib/prisma"
 import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
 import type { ActionResult } from "@/lib/schemas/common"
@@ -211,6 +212,12 @@ export async function previewCronReminders(): Promise<CronPreview> {
           select: {
             athlete: {
               select: {
+                firstName: true,
+                lastName: true,
+                // Destinataria quando non ha genitori collegati (corso adulti)
+                email: true,
+                // Serve al limite dei 18 anni per il ripiego sull allieva
+                dateOfBirth: true,
                 parentRelations: {
                   where: { parent: { deletedAt: null } },
                   orderBy: [
@@ -221,6 +228,7 @@ export async function previewCronReminders(): Promise<CronPreview> {
                   select: {
                     parent: {
                       select: {
+                        id: true,
                         firstName: true,
                         lastName: true,
                         email: true,
@@ -256,13 +264,13 @@ export async function previewCronReminders(): Promise<CronPreview> {
     const names: string[] = []
     for (const s of toSend) {
       if (!s.courseEnrollment) continue // stage: niente sollecito automatico
-      const parent = s.courseEnrollment.athlete.parentRelations[0]?.parent
-      if (!parent || !parent.email) {
+      const resolved = resolveCommunicationRecipient(s.courseEnrollment.athlete)
+      if (!resolved.ok) {
         missingEmailCount++
         continue
       }
       if (names.length < 5) {
-        names.push(`${parent.firstName} ${parent.lastName}`)
+        names.push(resolved.recipient.name)
       }
     }
 
