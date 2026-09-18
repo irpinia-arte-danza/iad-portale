@@ -49,12 +49,18 @@ export async function getAccessStatuses(
             milestoneKey: { in: [...ACCESS_MILESTONES] },
             status: { not: EmailStatus.FAILED },
             recipientEmail: { in: emails },
-            parentId:
-              kind === "PARENT" ? { in: profiles.map((p) => p.id) } : null,
+            // Genitori e allieve si distinguono per il profilo collegato al
+            // log; per gli insegnanti non c'è collegamento, e basta l'email
+            ...(kind === "PARENT"
+              ? { parentId: { in: profiles.map((p) => p.id) } }
+              : kind === "ATHLETE"
+                ? { athleteId: { in: profiles.map((p) => p.id) } }
+                : { parentId: null, athleteId: null }),
           },
           select: {
             recipientEmail: true,
             parentId: true,
+            athleteId: true,
             status: true,
             sentAt: true,
           },
@@ -66,7 +72,9 @@ export async function getAccessStatuses(
     const key =
       kind === "PARENT"
         ? `${log.parentId}|${log.recipientEmail}`
-        : log.recipientEmail
+        : kind === "ATHLETE"
+          ? `${log.athleteId}|${log.recipientEmail}`
+          : log.recipientEmail
     if (!latestByKey.has(key)) latestByKey.set(key, log)
   }
 
@@ -88,7 +96,7 @@ export async function getAccessStatuses(
     }
 
     const log = latestByKey.get(
-      kind === "PARENT" ? `${profile.id}|${email}` : email,
+      kind === "TEACHER" ? email : `${profile.id}|${email}`,
     )
     result[profile.id] = log
       ? {

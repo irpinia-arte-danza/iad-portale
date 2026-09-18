@@ -54,7 +54,9 @@ export function SendAccessButton({
         <TooltipContent>
           {kind === "PARENT"
             ? "Manca l'email: modifica il genitore e aggiungila"
-            : "Manca l'email: modifica l'insegnante e aggiungila"}
+            : kind === "TEACHER"
+              ? "Manca l'email: modifica l'insegnante e aggiungila"
+              : "Manca l'email: modifica l'allieva e aggiungila"}
         </TooltipContent>
       </Tooltip>
     )

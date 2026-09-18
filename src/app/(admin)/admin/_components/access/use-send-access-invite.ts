@@ -9,6 +9,7 @@ import type {
   AccessProfileKind,
 } from "@/lib/auth/access-status-types"
 
+import { sendAthleteAccessInvite } from "../../athletes/access-actions"
 import { sendAccessInvite } from "../../parents/actions"
 import { sendTeacherAccessInvite } from "../../teachers/actions"
 
@@ -23,7 +24,9 @@ export function useSendAccessInvite(kind: AccessProfileKind) {
       const result: AccessInviteResult =
         kind === "PARENT"
           ? await sendAccessInvite(profileId)
-          : await sendTeacherAccessInvite(profileId)
+          : kind === "TEACHER"
+            ? await sendTeacherAccessInvite(profileId)
+            : await sendAthleteAccessInvite(profileId)
 
       if (result.ok) {
         toast.success(

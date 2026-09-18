@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { Prisma } from "@prisma/client"
+import { Prisma, UserRole } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
@@ -104,17 +104,30 @@ export async function softDeleteAthlete(id: string): Promise<ActionResult> {
   try {
     const athlete = await prisma.athlete.findUnique({
       where: { id: idParsed.data },
-      select: { deletedAt: true },
+      select: { deletedAt: true, userId: true },
     })
 
     if (!athlete || athlete.deletedAt !== null) {
       return { ok: false, error: "Allieva non trovata" }
     }
 
-    await prisma.athlete.update({
-      where: { id: idParsed.data },
-      data: { deletedAt: new Date() },
-    })
+    // Un'allieva maggiorenne può avere un accesso proprio: nel Cestino va
+    // disattivato anche quello, come per genitori e insegnanti. Senza,
+    // l'account resterebbe attivo su un profilo che non c'è più.
+    await prisma.$transaction([
+      prisma.athlete.update({
+        where: { id: idParsed.data },
+        data: { deletedAt: new Date() },
+      }),
+      ...(athlete.userId
+        ? [
+            prisma.user.updateMany({
+              where: { id: athlete.userId, role: UserRole.ATHLETE },
+              data: { isActive: false },
+            }),
+          ]
+        : []),
+    ])
 
     revalidatePath(ATHLETES_PATH)
     return { ok: true }
