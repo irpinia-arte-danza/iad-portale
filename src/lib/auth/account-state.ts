@@ -15,6 +15,9 @@ export type AccountState =
       role: UserRole
       parentId: string | null
       teacherId: string | null
+      // Valorizzato solo per il ruolo ATHLETE: allieva maggiorenne che
+      // accede per sé
+      athleteId: string | null
     }
   | {
       state: "blocked"
@@ -23,7 +26,7 @@ export type AccountState =
     }
 
 // Un account è utilizzabile solo se: utente Prisma esiste, è attivo e (per
-// PARENT/TEACHER) ha un profilo non nel cestino.
+// PARENT/TEACHER/ATHLETE) ha un profilo non nel cestino.
 export async function resolveAccountState(userId: string): Promise<AccountState> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -33,6 +36,7 @@ export async function resolveAccountState(userId: string): Promise<AccountState>
       deletedAt: true,
       parentProfile: { select: { id: true, deletedAt: true } },
       teacherProfile: { select: { id: true, deletedAt: true } },
+      athleteProfile: { select: { id: true, deletedAt: true } },
     },
   })
 
@@ -43,7 +47,14 @@ export async function resolveAccountState(userId: string): Promise<AccountState>
 
   switch (user.role) {
     case UserRole.ADMIN:
-      return { state: "ok", userId, role: user.role, parentId: null, teacherId: null }
+      return {
+        state: "ok",
+        userId,
+        role: user.role,
+        parentId: null,
+        teacherId: null,
+        athleteId: null,
+      }
     case UserRole.PARENT:
       if (user.parentProfile && !user.parentProfile.deletedAt) {
         return {
@@ -52,6 +63,7 @@ export async function resolveAccountState(userId: string): Promise<AccountState>
           role: user.role,
           parentId: user.parentProfile.id,
           teacherId: null,
+          athleteId: null,
         }
       }
       return { state: "blocked", userId, reason: "no-profile" }
@@ -63,6 +75,19 @@ export async function resolveAccountState(userId: string): Promise<AccountState>
           role: user.role,
           parentId: null,
           teacherId: user.teacherProfile.id,
+          athleteId: null,
+        }
+      }
+      return { state: "blocked", userId, reason: "no-profile" }
+    case UserRole.ATHLETE:
+      if (user.athleteProfile && !user.athleteProfile.deletedAt) {
+        return {
+          state: "ok",
+          userId,
+          role: user.role,
+          parentId: null,
+          teacherId: null,
+          athleteId: user.athleteProfile.id,
         }
       }
       return { state: "blocked", userId, reason: "no-profile" }

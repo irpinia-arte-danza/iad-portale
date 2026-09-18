@@ -18,6 +18,11 @@ export async function requireParent(): Promise<{
 
   if (account.state === "anonymous") redirect("/login")
   if (account.state === "blocked") redirect(NO_ACCESS_ROUTE)
+  // Un'allieva con accesso proprio ha come dashboard questa stessa area:
+  // mandarla lì sarebbe un giro infinito. Finché le query del portale
+  // filtrano per genitore non la si può servire, quindi si ferma qui. Cade
+  // quando la guardia imparerà a lavorare per entrambi i ruoli.
+  if (account.role === UserRole.ATHLETE) redirect(NO_ACCESS_ROUTE)
   if (account.role !== UserRole.PARENT || !account.parentId) {
     redirect(getDashboardPath(account.role))
   }
