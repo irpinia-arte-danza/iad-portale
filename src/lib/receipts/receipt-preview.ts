@@ -6,11 +6,9 @@ import { prisma } from "@/lib/prisma"
 
 import { stampReceiptPreview } from "./cancelled-stamp"
 import { buildReceiptSnapshot, loadPaymentForReceipt } from "./issue-receipt"
-import {
-  formatReceiptNumber,
-  nextReceiptSequence,
-  todayInRome,
-} from "./numbering"
+import { todayInRome } from "./numbering"
+import { formatReceiptNumber } from "./numbering-config"
+import { loadNumberingContext, peekNextSequence } from "./numbering-context"
 import { renderReceiptPdfFromData } from "./receipt-document"
 
 export type ReceiptPreviewResult =
@@ -35,26 +33,22 @@ export async function renderReceiptPreviewPdf(
     return { ok: false, reason: "REVERSED" }
   }
 
-  const settings = await prisma.receiptSettings.findUnique({
-    where: { id: 1 },
-    select: { receiptPrefix: true, receiptNumber: true },
-  })
-  if (!settings) return { ok: false, reason: "NO_SETTINGS" }
-
-  const highest = await prisma.receipt.aggregate({
-    where: { receiptNumber: { startsWith: settings.receiptPrefix } },
-    _max: { sequence: true },
-  })
+  // Stesse regole dell'emissione, senza scrivere niente: il numero previsto
+  // è quello che uscirebbe emettendo adesso
+  const issueDate = todayInRome()
+  let numbering
+  try {
+    numbering = await loadNumberingContext(prisma, issueDate)
+  } catch {
+    return { ok: false, reason: "NO_SETTINGS" }
+  }
 
   const snapshot = buildReceiptSnapshot(payment)
   const receiptNumber = formatReceiptNumber({
-    prefix: settings.receiptPrefix,
-    academicYearLabel: payment.academicYear.label,
-    // L'emissione incrementa il contatore prima di usarlo
-    sequence: nextReceiptSequence(
-      settings.receiptNumber + 1,
-      highest._max.sequence ?? 0,
-    ),
+    config: numbering.config,
+    issueDate,
+    academicYearLabel: numbering.academicYearLabel,
+    sequence: await peekNextSequence(numbering),
     category: snapshot.category,
   })
 

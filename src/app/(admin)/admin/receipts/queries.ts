@@ -85,7 +85,11 @@ export async function listReceipts(filters: ReceiptListFilters) {
     prisma.receipt.findMany({
       where,
       ...receiptListItem,
-      orderBy: [{ sequence: "asc" }, { issueDate: "asc" }, { createdAt: "asc" }],
+      // Prima la data di emissione, poi il progressivo: col riavvio annuale
+      // il progressivo non è più crescente lungo tutta la serie, e ordinarci
+      // sopra metterebbe le ricevute di settembre prima di quelle di gennaio.
+      // L'indice [issueDate, sequence] copre esattamente quest'ordine.
+      orderBy: [{ issueDate: "asc" }, { sequence: "asc" }, { createdAt: "asc" }],
     }),
     prisma.receipt.aggregate({
       where: { ...yearWhere, status: ReceiptStatus.VALID },

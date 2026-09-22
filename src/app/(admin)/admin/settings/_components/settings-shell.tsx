@@ -8,6 +8,7 @@ import type {
   ProfileValues,
   RicevuteValues,
 } from "@/lib/schemas/admin-settings"
+import type { NumberingPreviewContext } from "@/lib/receipts/numbering-context"
 import type { ReminderConfigValues } from "@/lib/schemas/reminder-config"
 
 import type { AuditLogRow } from "../queries"
@@ -38,6 +39,7 @@ interface SettingsShellProps {
     }
   }
   initialRicevute: RicevuteValues
+  receiptPreview: NumberingPreviewContext
   initialReminder: ReminderConfigValues
   initialReminderPreview: CronPreview
   initialProfile: ProfileValues
@@ -110,6 +112,7 @@ export function SettingsShell(props: SettingsShellProps) {
           <RicevuteTab
             key="ricevute"
             initial={props.initialRicevute}
+            preview={props.receiptPreview}
             onDirtyChange={onDirtyChange}
           />
         ) : null}

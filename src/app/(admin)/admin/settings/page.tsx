@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { loadNumberingPreviewContext } from "@/lib/receipts/numbering-context"
 import type {
   AssociationValues,
   BrandValues,
@@ -78,8 +79,18 @@ export default async function SettingsPage() {
   const initialRicevute: RicevuteValues = {
     receiptPrefix: receipt.receiptPrefix,
     receiptNumber: receipt.receiptNumber,
+    receiptYearMode: receipt.receiptYearMode,
+    receiptResetMode: receipt.receiptResetMode,
+    receiptDigits: receipt.receiptDigits,
     receiptFooter: receipt.receiptFooter ?? "",
   }
+
+  // Serve all'anteprima dal vivo: il browser ricalcola il prossimo numero a
+  // ogni cambio di opzione senza tornare al server
+  const receiptPreview = await loadNumberingPreviewContext(
+    receipt.receiptPrefix,
+    receipt.receiptPeriod,
+  )
 
   const initialProfile: ProfileValues = {
     firstName: profile.firstName ?? "",
@@ -106,6 +117,7 @@ export default async function SettingsPage() {
           initialAssociation={initialAssociation}
           initialBrand={initialBrand}
           initialRicevute={initialRicevute}
+          receiptPreview={receiptPreview}
           initialReminder={reminder}
           initialReminderPreview={reminderPreview}
           initialProfile={initialProfile}
