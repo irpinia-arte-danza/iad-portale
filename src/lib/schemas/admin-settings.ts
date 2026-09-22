@@ -105,6 +105,15 @@ export const ricevuteSchema = z.object({
     .int()
     .min(0, { message: "Il contatore deve essere ≥ 0" })
     .max(9_999_999, { message: "Contatore troppo grande" }),
+  // Scelte chiuse: un campo libero dove scrivere il formato sarebbe un modo
+  // per rompere la numerazione fiscale per sbaglio
+  receiptYearMode: z.enum(["NONE", "CALENDAR", "ACADEMIC"]),
+  receiptResetMode: z.enum(["NEVER", "CALENDAR", "ACADEMIC"]),
+  receiptDigits: z
+    .number()
+    .int()
+    .min(1, { message: "Almeno 1 cifra" })
+    .max(6, { message: "Massimo 6 cifre" }),
   receiptFooter: z
     .string()
     .trim()

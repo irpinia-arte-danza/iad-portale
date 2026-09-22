@@ -1283,13 +1283,40 @@ model BrandSettings {
 // RECEIPT SETTINGS (numerazione ricevute, singleton stateful)
 // ============================================================================
 
+// Anno dentro il numero di ricevuta: nessuno, solare (2026) o accademico
+// (2026-27). Si legge sempre dalla data di EMISSIONE.
+enum ReceiptYearMode {
+  NONE
+  CALENDAR
+  ACADEMIC
+}
+
+// Quando il progressivo riparte da 1
+enum ReceiptResetMode {
+  NEVER
+  CALENDAR
+  ACADEMIC
+}
+
 model ReceiptSettings {
   id            Int      @id @default(1)
   receiptPrefix String   @default("IAD/") @map("receipt_prefix")
   receiptNumber Int      @default(0) @map("receipt_number")
   receiptFooter String?  @map("receipt_footer")
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  updatedBy     String?  @map("updated_by") @db.Uuid
+
+  // Formato del numero. I default riproducono il formato in uso prima che
+  // queste opzioni esistessero: IAD/2026-27/295, serie unica e continua.
+  receiptYearMode  ReceiptYearMode  @default(ACADEMIC) @map("receipt_year_mode")
+  receiptResetMode ReceiptResetMode @default(NEVER) @map("receipt_reset_mode")
+  receiptDigits    Int              @default(3) @map("receipt_digits")
+
+  // Periodo a cui appartiene il contatore. Serve all'assegnazione atomica:
+  // se il periodo calcolato dalla data di emissione è diverso, il
+  // progressivo riparte. "ALL" quando non riparte mai.
+  receiptPeriod String? @map("receipt_period")
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
 
   @@map("receipt_settings")
 }

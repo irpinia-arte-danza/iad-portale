@@ -22,12 +22,13 @@ import { isMinorAt } from "@/lib/utils/age"
 
 import { MINOR_PAYER_BLOCKER } from "./payer-rules"
 import { composeAddress } from "./person-data"
+import { feeTypeToReceiptCategory, todayInRome } from "./numbering"
+import { formatReceiptNumber } from "./numbering-config"
 import {
-  feeTypeToReceiptCategory,
-  formatReceiptNumber,
-  nextReceiptSequence,
-  todayInRome,
-} from "./numbering"
+  assignSequence,
+  loadNumberingContext,
+  ReceiptNumberingError,
+} from "./numbering-context"
 import { archiveReceiptPdf } from "./receipt-pdf-store"
 import type {
   IssuedReceiptInfo,
@@ -355,40 +356,25 @@ export async function issueReceiptCore(params: {
           }
         }
 
-        const minorBlocker = minorPayerBlocker(payment, todayInRome())
+        // Giorno di emissione: da qui dipendono numero, periodo del
+        // contatore e blocco sul pagante minorenne
+        const issueDate = todayInRome()
+
+        const minorBlocker = minorPayerBlocker(payment, issueDate)
         if (minorBlocker) return { ok: false, error: minorBlocker }
 
-        // Assegnazione atomica del numero. L'UPDATE con incremento prende il
-        // lock sulla riga del contatore fino al commit: un'emissione
-        // concorrente attende e legge il valore già incrementato. Se questa
-        // transazione fallisce, l'incremento viene annullato (niente buchi).
-        const settings = await tx.receiptSettings.update({
-          where: { id: 1 },
-          data: { receiptNumber: { increment: 1 } },
-          select: { receiptPrefix: true, receiptNumber: true },
-        })
-
-        // Anti-downgrade: il contatore non può mai riusare un progressivo già
-        // emesso con lo stesso prefisso (stessa regola di Impostazioni → Ricevute).
-        const highest = await tx.receipt.aggregate({
-          where: { receiptNumber: { startsWith: settings.receiptPrefix } },
-          _max: { sequence: true },
-        })
-        const sequence = nextReceiptSequence(
-          settings.receiptNumber,
-          highest._max.sequence ?? 0,
-        )
-        if (sequence !== settings.receiptNumber) {
-          await tx.receiptSettings.update({
-            where: { id: 1 },
-            data: { receiptNumber: sequence },
-          })
-        }
+        // Il formato e il periodo si leggono dalla data di emissione, mai dal
+        // pagamento: una ricevuta appartiene a quando viene emessa.
+        // assignSequence prende il lock sul contatore fino al commit, quindi
+        // un'emissione concorrente attende e trova il valore già aggiornato.
+        const numbering = await loadNumberingContext(tx, issueDate)
+        const sequence = await assignSequence(tx, numbering)
 
         const snapshot = buildReceiptSnapshot(payment)
         const receiptNumber = formatReceiptNumber({
-          prefix: settings.receiptPrefix,
-          academicYearLabel: payment.academicYear.label,
+          config: numbering.config,
+          issueDate,
+          academicYearLabel: numbering.academicYearLabel,
           sequence,
           category: snapshot.category,
         })
@@ -399,7 +385,7 @@ export async function issueReceiptCore(params: {
             category: snapshot.category,
             receiptNumber,
             sequence,
-            issueDate: todayInRome(),
+            issueDate,
             issuedBy: params.adminUserId,
             status: ReceiptStatus.VALID,
             payerName: snapshot.payerName,
@@ -464,6 +450,9 @@ export async function issueReceiptCore(params: {
         error:
           "Il numero di ricevuta calcolato risulta già usato: controlla il contatore in Impostazioni → Ricevute.",
       }
+    }
+    if (error instanceof ReceiptNumberingError) {
+      return { ok: false, error: error.message }
     }
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
