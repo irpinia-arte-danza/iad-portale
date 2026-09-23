@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils"
 import {
   getBrandIban,
   getGeneralCourseSchedules,
+  getMyAthleteCards,
   getMyAthletes,
   getMyAthleteSchedules,
   getMyAttendanceStats,
@@ -40,6 +41,7 @@ import {
 } from "../_actions/queries"
 import { countOpenStagesForPortal } from "../_actions/stages"
 
+import { AthleteCardBlock } from "./_components/athlete-card-block"
 import { IbanCard } from "./_components/iban-card"
 
 const DAY_OF_WEEK_LABELS = [
@@ -84,6 +86,7 @@ export default async function ParentDashboardPage() {
   const [
     profile,
     athletes,
+    athleteCards,
     openSchedules,
     payments,
     myAthleteSchedules,
@@ -94,6 +97,7 @@ export default async function ParentDashboardPage() {
   ] = await Promise.all([
     getPortalProfile(scope),
     getMyAthletes(scope),
+    getMyAthleteCards(scope),
     getMyOpenSchedules(scope),
     getMyPayments(scope),
     getMyAthleteSchedules(scope),
@@ -356,6 +360,11 @@ export default async function ParentDashboardPage() {
                       )
                     })()}
                   </div>
+
+                  {/* Tessera dell'ente = copertura assicurativa */}
+                  <AthleteCardBlock
+                    card={athleteCards.get(athlete.id) ?? null}
+                  />
                 </CardContent>
               </Card>
             )

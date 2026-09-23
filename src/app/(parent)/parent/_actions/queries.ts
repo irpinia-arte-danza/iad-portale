@@ -1,5 +1,6 @@
 import "server-only"
 
+import { CURRENT_CARD_ORDER } from "@/lib/affiliations/card-status"
 import {
   athleteScopeWhere,
   type PortalScope,
@@ -117,6 +118,41 @@ export async function getMyAthletes(scope: PortalScope) {
 }
 
 export type MyAthlete = Awaited<ReturnType<typeof getMyAthletes>>[number]
+
+// Tessera dell'ente corrente per ogni allieva dell'ambito. È anche la
+// copertura assicurativa: la famiglia ha diritto di vederla e di scaricarla.
+// Il PDF contiene solo i dati dell'allieva, non quelli di chi paga, quindi
+// fra genitori separati non fa passare niente che l'altro non abbia già.
+export async function getMyAthleteCards(scope: PortalScope) {
+  const cards = await prisma.affiliation.findMany({
+    where: {
+      deletedAt: null,
+      athlete: { deletedAt: null, ...athleteScopeWhere(scope) },
+    },
+    orderBy: CURRENT_CARD_ORDER,
+    select: {
+      id: true,
+      athleteId: true,
+      entity: true,
+      cardNumber: true,
+      cardType: true,
+      cardYear: true,
+      expiryDate: true,
+      filePath: true,
+    },
+  })
+
+  // Solo la corrente per allieva: lo storico in area genitori non serve
+  const byAthlete = new Map<string, (typeof cards)[number]>()
+  for (const card of cards) {
+    if (!byAthlete.has(card.athleteId)) byAthlete.set(card.athleteId, card)
+  }
+  return byAthlete
+}
+
+export type MyAthleteCard = NonNullable<
+  ReturnType<Awaited<ReturnType<typeof getMyAthleteCards>>["get"]>
+>
 
 export async function getMyOpenSchedules(scope: PortalScope) {
   // Scadenze DUE/OVERDUE delle figlie del genitore (corsi, contributo di iscrizione,

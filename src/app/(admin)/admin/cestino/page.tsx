@@ -4,6 +4,7 @@ import { ResourceHeader } from "../_components/resource-header"
 import { CestinoClient } from "./_components/cestino-client"
 import {
   getCestinoCounts,
+  getDeletedAffiliationCards,
   getDeletedAthletes,
   getDeletedCostumes,
   getDeletedCourses,
@@ -23,6 +24,7 @@ export default async function CestinoPage() {
     courses,
     expenses,
     certs,
+    cards,
     showcases,
     costumes,
   ] = await Promise.all([
@@ -33,6 +35,7 @@ export default async function CestinoPage() {
     getDeletedCourses(),
     getDeletedExpenses(),
     getDeletedMedicalCertificates(),
+    getDeletedAffiliationCards(),
     getDeletedShowcases(),
     getDeletedCostumes(),
   ])
@@ -53,6 +56,7 @@ export default async function CestinoPage() {
           courses={courses}
           expenses={expenses}
           certs={certs}
+          cards={cards}
           showcases={showcases}
           costumes={costumes}
         />

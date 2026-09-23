@@ -1014,18 +1014,33 @@ model Affiliation {
   entity      AffiliationEntity
   status      AffiliationStatus @default(PENDING)
   cardNumber  String?           @map("card_number")
-  cardYear    Int               @map("card_year") // 2026
+  cardYear    Int               @map("card_year") // anno sociale, es. 2026
   sentAt      DateTime?         @map("sent_at") @db.Timestamptz(6)
   confirmedAt DateTime?         @map("confirmed_at") @db.Timestamptz(6)
   expiryDate  DateTime?         @map("expiry_date") @db.Date
 
-  notes String?
+  // Dati della tessera vera, letti dal PDF dell'ente
+  cardType  String?   @map("card_type") // "Plus", …
+  issueDate DateTime? @map("issue_date") @db.Date
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  // PDF nel bucket privato, stesso schema dei certificati medici
+  filePath String? @map("file_path")
+  fileUrl  String? @map("file_url")
 
-  @@unique([athleteId, entity, cardYear])
+  notes     String?
+  createdBy String? @map("created_by") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  // Una tessera per allieva, per ente, per anno: il vincolo è un indice
+  // unico PARZIALE creato a mano nella migration (… WHERE deleted_at IS
+  // NULL), perché Prisma non sa esprimerlo. Senza la condizione, una tessera
+  // cestinata terrebbe occupato l'anno e impedirebbe di caricare quella
+  // giusta al suo posto.
   @@index([status])
+  @@index([athleteId, expiryDate])
   @@map("affiliations")
 }
 
@@ -1412,6 +1427,14 @@ enum AuditAction {
   // Condivisione del PDF dal foglio di iOS: si sa che è uscita dal
   // gestionale, non a chi è andata (il contatto si sceglie fuori dalla pagina)
   RECEIPT_SHARED
+  // Tessere ENDAS/CSEN: caricamento singolo, caricamento in blocco dai PDF
+  // dell'ente, cestino, ed export dell'elenco da tesserare per il referente
+  CARD_CREATE
+  CARD_IMPORT
+  CARD_DELETE
+  RESTORE_CARD
+  HARD_DELETE_CARD
+  AFFILIATION_EXPORT
 }
 
 model AuditLog {

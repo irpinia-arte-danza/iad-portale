@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { ArrowDown } from "lucide-react"
 
+import { CardStatusBadge } from "@/components/affiliations/card-status-badge"
 import { CertStatusBadge } from "@/components/medical-certificates/cert-status-badge"
 import {
   Table,
@@ -13,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import type { CardStatus } from "@/lib/affiliations/card-status"
 import type { CertStatus } from "@/lib/medical-certificates/certificate-status"
 import { cn } from "@/lib/utils"
 import { computeAge } from "@/lib/utils/date-helpers"
@@ -39,9 +41,11 @@ type AthleteRow = {
   _count: { parentRelations: number }
   // Certificato corrente, stato calcolato lato server
   certificate: { expiryDate: Date | null; status: CertStatus }
+  // Tessera dell'ente corrente, stesso trattamento
+  card: { expiryDate: Date | null; status: CardStatus }
 }
 
-type AthletesSort = "name" | "certificate"
+type AthletesSort = "name" | "certificate" | "card"
 
 interface AthletesTableProps {
   athletes: AthleteRow[]
@@ -124,6 +128,13 @@ export function AthletesTable({ athletes, sort, sortHrefs }: AthletesTableProps)
                 active={sort === "certificate"}
               />
             </TableHead>
+            <TableHead className="hidden lg:table-cell">
+              <SortLink
+                label="Tessera"
+                href={sortHrefs.card}
+                active={sort === "card"}
+              />
+            </TableHead>
             <TableHead className="hidden text-center sm:table-cell">
               Genitori
             </TableHead>
@@ -175,6 +186,19 @@ export function AthletesTable({ athletes, sort, sortHrefs }: AthletesTableProps)
                     <span className="hidden text-xs text-muted-foreground sm:inline">
                       {expired ? "scaduto il" : "scade il"}{" "}
                       {formatDateShort(new Date(certificate.expiryDate))}
+                    </span>
+                  ) : null}
+                </div>
+              </TableCell>
+              <TableCell className="hidden lg:table-cell">
+                <div className="flex flex-col items-start gap-1">
+                  <CardStatusBadge status={athlete.card.status} />
+                  {athlete.card.expiryDate ? (
+                    <span className="text-xs text-muted-foreground">
+                      {athlete.card.status === "expired"
+                        ? "scaduta il"
+                        : "scade il"}{" "}
+                      {formatDateShort(new Date(athlete.card.expiryDate))}
                     </span>
                   ) : null}
                 </div>
