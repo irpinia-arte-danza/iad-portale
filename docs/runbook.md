@@ -276,6 +276,7 @@ Aprire il link nell'email: il passo fallito è in rosso, con il messaggio.
 | *Download di Supabase Storage* — HTTP 401/403 | Chiave `github-backup` revocata | Nuova secret key (passo 4). |
 | *Manifest e controlli* — **"Backup sospetto"** | Dati molto diminuiti rispetto al backup precedente | **Non rilanciare subito.** Capire se la riduzione è voluta: eliminazioni definitive dal cestino, corso eliminato, pulizia di fine anno. Se **non** è voluta, l'ultimo backup buono è il precedente: vedi *Recuperare dati cancellati*. Se è voluta, Run workflow con **allow_shrink** spuntato. Finché non si fa, ogni notte il backup si ferma allo stesso controllo. |
 | *Manifest*, *Pubblicazione* o *Retention* — `Resource not accessible by integration` o `403` | Il `GITHUB_TOKEN` non può scrivere le release | Settings → Actions → General → *Workflow permissions* del repo di backup; se l'impostazione è bloccata, la sblocca un owner dell'organizzazione. |
+| *Controllo esposizione della Data API* | Il database è diventato leggibile dall'esterno senza login | **Il backup è stato fatto lo stesso**: non è un problema di backup. Vedi *Quando il controllo Data API fallisce*, qui sotto. |
 | *Email di avviso* fallita | Chiave Resend revocata | Nuova chiave (passo 5) in `BACKUP_RESEND_API_KEY`; nel frattempo resta l'email di GitHub. |
 | Job annullato o in timeout | GitHub o Supabase lenti | Rilanciare a mano. |
 
@@ -291,6 +292,36 @@ avvisare:
 Per coprirli: dopo ogni modifica, lanciare il workflow a mano; una volta al
 mese aprire le Releases del repo di backup e controllare che l'ultimo backup
 sia di stanotte.
+
+### Quando il controllo Data API fallisce
+
+**Cosa significa.** Il portale legge e scrive il database solo con Prisma, in SQL
+diretto: la Data API di Supabase (PostgREST, `https://<ref>.supabase.co/rest/v1/…`)
+non serve a niente e oggi non è raggiungibile, perché sullo schema `public` i ruoli
+`anon` e `authenticated` non hanno né `USAGE` né grant su alcuna tabella. Se il
+controllo fallisce vuol dire che quelle grant sono ricomparse: le tabelle elencate
+nell'email sono leggibili — o scrivibili — **da chiunque abbia la chiave anon, che è
+pubblica per definizione** (sta nel JavaScript del sito). Sono dati di minori.
+
+**Cosa fare.** Il backup della notte è a posto: il controllo gira dopo, non lo tocca.
+
+1. Verificare davvero, da terminale (la chiave anon sta in `.env.local`, riga
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`):
+   `curl -s -H "apikey: $CHIAVE" "https://<ref>.supabase.co/rest/v1/athletes?select=id&limit=0" -H "Prefer: count=exact" -D- -o /dev/null`
+   Chiuso risponde `401 permission denied for schema public`; aperto risponde `200`
+   con l'header `Content-Range` che dice quante righe.
+2. Richiudere subito, in Supabase → SQL Editor:
+   `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;`
+   `REVOKE USAGE ON SCHEMA public FROM anon, authenticated;`
+   Non rompe niente: Prisma si collega come `postgres` e non passa da quei ruoli.
+3. Capire com'è successo, altrimenti torna: una `GRANT` finita in una migration
+   (cercare `GRANT` in `prisma/migrations/`), oppure l'interruttore della Data API
+   nelle impostazioni del progetto Supabase.
+4. Rilanciare il workflow a mano e controllare che il passo torni verde.
+
+Se invece il messaggio è `RUOLO ASSENTE`, il ruolo `anon` o `authenticated` non
+esiste più: non è un'apertura, ma qualcosa è cambiato nel progetto Supabase e va
+capito prima di ignorarlo.
 
 ### Prova di decifratura (dopo il setup, poi ogni 6 mesi)
 
