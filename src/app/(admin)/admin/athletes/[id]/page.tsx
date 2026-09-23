@@ -20,6 +20,7 @@ import { SchedulesSection } from "../_components/schedules-section"
 import { getAthleteById, getAthleteForPDF } from "../queries"
 import { AthleteAccessSection } from "./_components/athlete-access-section"
 import { AthletePDFButton } from "./_components/athlete-pdf-button"
+import { EndasCardSection } from "./_components/endas-card-section"
 import { MedicalCertSection } from "./_components/medical-cert-section"
 
 interface PageProps {
@@ -111,6 +112,11 @@ export default async function AthleteDetailPage({ params }: PageProps) {
           <MedicalCertSection
             athleteId={athlete.id}
             certificates={athlete.medicalCertificates}
+          />
+          <EndasCardSection
+            athleteId={athlete.id}
+            entity="ENDAS"
+            cards={athlete.affiliations.filter((c) => c.entity === "ENDAS")}
           />
           <GuardianListSection
             athleteId={athlete.id}

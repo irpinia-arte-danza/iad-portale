@@ -19,6 +19,8 @@ const ATHLETES_PATH = "/admin/athletes"
 const PAGE_SIZE = 100
 // ?sort=certificato: prima chi non ha il certificato, poi per scadenza
 const CERTIFICATE_SORT_PARAM = "certificato"
+// ?sort=tessera: stessa regola per la tessera dell'ente
+const CARD_SORT_PARAM = "tessera"
 
 interface PageProps {
   searchParams: Promise<{ search?: string; page?: string; sort?: string }>
@@ -31,6 +33,7 @@ function listParams(
   const params: Record<string, string> = {}
   if (search) params.search = search
   if (sort === "certificate") params.sort = CERTIFICATE_SORT_PARAM
+  if (sort === "card") params.sort = CARD_SORT_PARAM
   return params
 }
 
@@ -40,7 +43,9 @@ export default async function AthletesPage({ searchParams }: PageProps) {
   const sort: AthleteListSort =
     resolvedSearchParams.sort === CERTIFICATE_SORT_PARAM
       ? "certificate"
-      : "name"
+      : resolvedSearchParams.sort === CARD_SORT_PARAM
+        ? "card"
+        : "name"
   const page = parsePageParam(resolvedSearchParams.page)
   const params = listParams(search, sort)
 
@@ -78,6 +83,7 @@ export default async function AthletesPage({ searchParams }: PageProps) {
                 listParams(search, "certificate"),
                 1,
               ),
+              card: pageHref(ATHLETES_PATH, listParams(search, "card"), 1),
             }}
           />
           <ListPagination

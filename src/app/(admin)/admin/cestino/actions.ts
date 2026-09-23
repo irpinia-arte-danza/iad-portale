@@ -9,6 +9,10 @@ import { requireAdmin } from "@/lib/auth/require-admin"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
 import {
+  deleteAffiliationCardFile,
+  deleteAllAffiliationCardFilesForAthlete,
+} from "@/lib/supabase/storage-affiliation-card"
+import {
   deleteAllMedicalCertFilesForAthlete,
   deleteMedicalCertFile,
 } from "@/lib/supabase/storage-medical-cert"
@@ -22,6 +26,11 @@ function normalizeName(s: string): string {
 function mapPrismaError(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2025") return "Elemento non trovato"
+    // Capita ripristinando una tessera il cui anno, nel frattempo, è stato
+    // preso da un'altra: l'indice unico parziale la rifiuta, ed è giusto così
+    if (error.code === "P2002") {
+      return "Impossibile ripristinare: esiste già un elemento che occupa quel posto"
+    }
   }
   console.error("[cestino action] error", error)
   return "Errore interno, riprova"
@@ -34,6 +43,7 @@ type EntityKind =
   | "course"
   | "expense"
   | "cert"
+  | "card"
   | "showcase"
   | "costume"
 
@@ -44,6 +54,7 @@ const REVALIDATE_PATHS: Record<EntityKind, string[]> = {
   course: ["/admin/courses"],
   expense: ["/admin/expenses"],
   cert: [],
+  card: ["/admin/tessere"],
   showcase: ["/admin/showcase"],
   costume: ["/admin/showcase"],
 }
@@ -56,6 +67,7 @@ const AUDIT_ACTIONS: Record<
   | "RESTORE_COURSE"
   | "RESTORE_EXPENSE"
   | "RESTORE_CERT"
+  | "RESTORE_CARD"
   | "RESTORE_SHOWCASE"
   | "RESTORE_COSTUME"
 > = {
@@ -65,6 +77,7 @@ const AUDIT_ACTIONS: Record<
   course: "RESTORE_COURSE",
   expense: "RESTORE_EXPENSE",
   cert: "RESTORE_CERT",
+  card: "RESTORE_CARD",
   showcase: "RESTORE_SHOWCASE",
   costume: "RESTORE_COSTUME",
 }
@@ -76,6 +89,7 @@ const ENTITY_TYPE: Record<EntityKind, string> = {
   course: "Course",
   expense: "Expense",
   cert: "MedicalCertificate",
+  card: "Affiliation",
   showcase: "Showcase",
   costume: "Costume",
 }
@@ -160,6 +174,18 @@ async function doRestore(
         athleteIdForRevalidate = cert.athleteId
         break
       }
+      case "card": {
+        // Una tessera ripristinata torna a occupare il suo anno: se nel
+        // frattempo ne è stata caricata un'altra per quell'anno, l'indice
+        // unico parziale rifiuta il ripristino ed è giusto così
+        const card = await prisma.affiliation.update({
+          where: { id: idParsed.data },
+          data: { deletedAt: null },
+          select: { athleteId: true },
+        })
+        athleteIdForRevalidate = card.athleteId
+        break
+      }
       case "showcase":
         await prisma.showcase.update({
           where: { id: idParsed.data },
@@ -221,6 +247,12 @@ export async function restoreMedicalCertificate(
   id: string,
 ): Promise<ActionResult> {
   return doRestore("cert", id)
+}
+
+export async function restoreAffiliationCard(
+  id: string,
+): Promise<ActionResult> {
+  return doRestore("card", id)
 }
 
 export async function restoreShowcase(id: string): Promise<ActionResult> {
@@ -318,6 +350,9 @@ export async function hardDeleteAthlete(
 
     // Storage cleanup post-transaction (file orfani recuperabili da Dashboard)
     const storage = await deleteAllMedicalCertFilesForAthlete(athlete.id)
+    const cardStorage = await deleteAllAffiliationCardFilesForAthlete(
+      athlete.id,
+    )
 
     await prisma.auditLog.create({
       data: {
@@ -330,6 +365,8 @@ export async function hardDeleteAthlete(
           certFilesRemoved: storage.removed,
           certFilesError: storage.error,
           dbCertCount: certs.length,
+          cardFilesRemoved: cardStorage.removed,
+          cardFilesError: cardStorage.error,
         },
       },
     })
@@ -719,6 +756,75 @@ export async function hardDeleteMedicalCertificate(
 
     revalidatePath(CESTINO_PATH)
     revalidatePath(`/admin/athletes/${cert.athleteId}`)
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, error: mapPrismaError(error) }
+  }
+}
+export async function hardDeleteAffiliationCard(
+  cardId: string,
+  confirmAthleteName: string,
+): Promise<ActionResult> {
+  const { userId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(cardId)
+  if (!idParsed.success) {
+    return { ok: false, error: "Identificativo tessera non valido" }
+  }
+
+  try {
+    const card = await prisma.affiliation.findUnique({
+      where: { id: idParsed.data },
+      select: {
+        id: true,
+        athleteId: true,
+        entity: true,
+        cardNumber: true,
+        cardYear: true,
+        filePath: true,
+        deletedAt: true,
+        athlete: { select: { firstName: true, lastName: true } },
+      },
+    })
+    if (!card) return { ok: false, error: "Tessera non trovata" }
+    if (!card.deletedAt) {
+      return {
+        ok: false,
+        error: "Sposta prima nel cestino, poi elimina definitivamente",
+      }
+    }
+
+    const expected = `${card.athlete.firstName} ${card.athlete.lastName}`
+    if (normalizeName(confirmAthleteName) !== normalizeName(expected)) {
+      return { ok: false, error: "Nome allieva di conferma non corrisponde" }
+    }
+
+    if (card.filePath) {
+      await deleteAffiliationCardFile(card.filePath)
+    }
+
+    await prisma.affiliation.delete({ where: { id: card.id } })
+
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: AuditAction.HARD_DELETE_CARD,
+        entityType: "Affiliation",
+        entityId: card.id,
+        changes: {
+          athleteId: card.athleteId,
+          athleteName: expected,
+          entity: card.entity,
+          cardNumber: card.cardNumber,
+          cardYear: card.cardYear,
+          fileRemoved: !!card.filePath,
+        },
+      },
+    })
+
+    revalidatePath(CESTINO_PATH)
+    revalidatePath("/admin/tessere")
+    revalidatePath(`/admin/athletes/${card.athleteId}`)
     return { ok: true }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }

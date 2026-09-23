@@ -3,13 +3,18 @@ import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import {
+  classifyCard,
+  compareByCardExpiry,
+  CURRENT_CARD_ORDER,
+} from "@/lib/affiliations/card-status"
+import {
   classifyCert,
   compareByCertificateExpiry,
   CURRENT_CERTIFICATE_ORDER,
 } from "@/lib/medical-certificates/certificate-status"
 import { todayDateOnly } from "@/lib/utils/date-only"
 
-export type AthleteListSort = "name" | "certificate"
+export type AthleteListSort = "name" | "certificate" | "card"
 
 type ListFilters = {
   search?: string
@@ -35,6 +40,13 @@ const athleteListInclude = Prisma.validator<Prisma.AthleteInclude>()({
     take: 1,
     select: { expiryDate: true },
   },
+  // Solo la tessera corrente, per la colonna "Tessera"
+  affiliations: {
+    where: { deletedAt: null },
+    orderBy: CURRENT_CARD_ORDER,
+    take: 1,
+    select: { expiryDate: true },
+  },
 })
 
 type AthleteListRecord = Prisma.AthleteGetPayload<{
@@ -42,13 +54,15 @@ type AthleteListRecord = Prisma.AthleteGetPayload<{
 }>
 
 function toListRow(
-  { medicalCertificates, ...athlete }: AthleteListRecord,
+  { medicalCertificates, affiliations, ...athlete }: AthleteListRecord,
   today: Date,
 ) {
   const expiryDate = medicalCertificates[0]?.expiryDate ?? null
+  const cardExpiry = affiliations[0]?.expiryDate ?? null
   return {
     ...athlete,
     certificate: { expiryDate, status: classifyCert(expiryDate, today) },
+    card: { expiryDate: cardExpiry, status: classifyCard(cardExpiry, today) },
   }
 }
 
@@ -75,8 +89,8 @@ export async function listAthletes(filters: ListFilters = {}) {
     { firstName: "asc" },
   ]
 
-  if (sort === "certificate") {
-    // Il certificato corrente è una relazione: si ordina in memoria l'elenco
+  if (sort === "certificate" || sort === "card") {
+    // Certificato e tessera sono relazioni: si ordina in memoria l'elenco
     // completo (poche centinaia di allieve) e poi si pagina. A parità di
     // scadenza resta l'ordine per nome (sort stabile).
     const athletes = await prisma.athlete.findMany({
@@ -87,10 +101,12 @@ export async function listAthletes(filters: ListFilters = {}) {
     const rows = athletes
       .map((athlete) => toListRow(athlete, today))
       .sort((a, b) =>
-        compareByCertificateExpiry(
-          a.certificate.expiryDate,
-          b.certificate.expiryDate,
-        ),
+        sort === "card"
+          ? compareByCardExpiry(a.card.expiryDate, b.card.expiryDate)
+          : compareByCertificateExpiry(
+              a.certificate.expiryDate,
+              b.certificate.expiryDate,
+            ),
       )
     return { items: rows.slice(offset, offset + limit), totalCount: rows.length }
   }
@@ -166,6 +182,23 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
         notes: true,
         fileUrl: true,
         filePath: true,
+        createdAt: true,
+      },
+    },
+    // Tessere dell'ente (corrente + storico), gemelle dei certificati
+    affiliations: {
+      where: { deletedAt: null },
+      orderBy: CURRENT_CARD_ORDER,
+      select: {
+        id: true,
+        entity: true,
+        cardNumber: true,
+        cardType: true,
+        cardYear: true,
+        issueDate: true,
+        expiryDate: true,
+        filePath: true,
+        fileUrl: true,
         createdAt: true,
       },
     },
