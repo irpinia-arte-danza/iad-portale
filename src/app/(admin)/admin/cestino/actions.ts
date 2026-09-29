@@ -44,6 +44,7 @@ type EntityKind =
   | "expense"
   | "cert"
   | "card"
+  | "enrollment"
   | "showcase"
   | "costume"
 
@@ -55,6 +56,7 @@ const REVALIDATE_PATHS: Record<EntityKind, string[]> = {
   expense: ["/admin/expenses"],
   cert: [],
   card: ["/admin/tessere"],
+  enrollment: ["/admin/scadenze"],
   showcase: ["/admin/showcase"],
   costume: ["/admin/showcase"],
 }
@@ -68,6 +70,7 @@ const AUDIT_ACTIONS: Record<
   | "RESTORE_EXPENSE"
   | "RESTORE_CERT"
   | "RESTORE_CARD"
+  | "RESTORE_ENROLLMENT"
   | "RESTORE_SHOWCASE"
   | "RESTORE_COSTUME"
 > = {
@@ -78,6 +81,7 @@ const AUDIT_ACTIONS: Record<
   expense: "RESTORE_EXPENSE",
   cert: "RESTORE_CERT",
   card: "RESTORE_CARD",
+  enrollment: "RESTORE_ENROLLMENT",
   showcase: "RESTORE_SHOWCASE",
   costume: "RESTORE_COSTUME",
 }
@@ -90,6 +94,7 @@ const ENTITY_TYPE: Record<EntityKind, string> = {
   expense: "Expense",
   cert: "MedicalCertificate",
   card: "Affiliation",
+  enrollment: "CourseEnrollment",
   showcase: "Showcase",
   costume: "Costume",
 }
@@ -186,6 +191,40 @@ async function doRestore(
         athleteIdForRevalidate = card.athleteId
         break
       }
+      case "enrollment": {
+        const current = await prisma.courseEnrollment.findUnique({
+          where: { id: idParsed.data },
+          select: { athleteId: true, deletedAt: true },
+        })
+        if (!current?.deletedAt) {
+          return { ok: false, error: "Iscrizione non trovata nel cestino" }
+        }
+        // Tornano indietro solo le rate annullate NELLO STESSO istante
+        // dell'iscrizione: quelle cancellate prima da un ritiro erano già state
+        // chiuse per un altro motivo e restano dove sono.
+        const stamp = current.deletedAt
+        await prisma.$transaction([
+          prisma.courseEnrollment.update({
+            where: { id: idParsed.data },
+            data: { deletedAt: null },
+          }),
+          prisma.paymentSchedule.updateMany({
+            where: { courseEnrollmentId: idParsed.data, deletedAt: stamp },
+            data: { deletedAt: null },
+          }),
+          // Il contributo di iscrizione annuale, se era stato annullato con lei
+          prisma.paymentSchedule.updateMany({
+            where: {
+              athleteId: current.athleteId,
+              feeType: "ASSOCIATION",
+              deletedAt: stamp,
+            },
+            data: { deletedAt: null },
+          }),
+        ])
+        athleteIdForRevalidate = current.athleteId
+        break
+      }
       case "showcase":
         await prisma.showcase.update({
           where: { id: idParsed.data },
@@ -253,6 +292,10 @@ export async function restoreAffiliationCard(
   id: string,
 ): Promise<ActionResult> {
   return doRestore("card", id)
+}
+
+export async function restoreEnrollment(id: string): Promise<ActionResult> {
+  return doRestore("enrollment", id)
 }
 
 export async function restoreShowcase(id: string): Promise<ActionResult> {
@@ -340,6 +383,15 @@ export async function hardDeleteAthlete(
       }),
       prisma.showcaseParticipation.deleteMany({
         where: { athleteId: athlete.id },
+      }),
+      // Prima le rate, poi le iscrizioni. La FK course_enrollment_id è
+      // ON DELETE SET NULL e il CHECK payment_schedules_one_event_chk pretende
+      // esattamente un collegamento valorizzato: cancellare l'iscrizione senza
+      // le sue rate azzera la colonna e viola il CHECK, facendo saltare tutta
+      // la transazione. Nessun filtro su deletedAt: qui va via tutto, anche le
+      // rate annullate. (Il ramo del corso, sotto, fa già così.)
+      prisma.paymentSchedule.deleteMany({
+        where: { courseEnrollment: { athleteId: athlete.id } },
       }),
       prisma.courseEnrollment.deleteMany({
         where: { athleteId: athlete.id },
@@ -581,6 +633,9 @@ export async function hardDeleteCourse(
       }
     }
 
+    // Nota: `enrollmentIds` sopra NON filtra deletedAt, ed è voluto. Qui
+    // servono tutte le iscrizioni del corso, annullate comprese: altrimenti la
+    // cancellazione definitiva lascerebbe righe orfane e fallirebbe sulla FK.
     const scheduleIds = await prisma.courseSchedule.findMany({
       where: { courseId: course.id },
       select: { id: true },
@@ -825,6 +880,87 @@ export async function hardDeleteAffiliationCard(
     revalidatePath(CESTINO_PATH)
     revalidatePath("/admin/tessere")
     revalidatePath(`/admin/athletes/${card.athleteId}`)
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, error: mapPrismaError(error) }
+  }
+}
+export async function hardDeleteEnrollment(
+  enrollmentId: string,
+  confirmAthleteName: string,
+): Promise<ActionResult> {
+  const { userId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(enrollmentId)
+  if (!idParsed.success) {
+    return { ok: false, error: "Identificativo iscrizione non valido" }
+  }
+
+  try {
+    const enrollment = await prisma.courseEnrollment.findUnique({
+      where: { id: idParsed.data },
+      select: {
+        id: true,
+        athleteId: true,
+        deletedAt: true,
+        course: { select: { name: true } },
+        academicYear: { select: { label: true } },
+        athlete: { select: { firstName: true, lastName: true } },
+      },
+    })
+    if (!enrollment) return { ok: false, error: "Iscrizione non trovata" }
+    if (!enrollment.deletedAt) {
+      return {
+        ok: false,
+        error: "Annulla prima l'iscrizione, poi eliminala definitivamente",
+      }
+    }
+
+    const expected = `${enrollment.athlete.firstName} ${enrollment.athlete.lastName}`
+    if (normalizeName(confirmAthleteName) !== normalizeName(expected)) {
+      return { ok: false, error: "Nome allieva di conferma non corrisponde" }
+    }
+
+    // Stesso blocco fiscale del resto del Cestino: se c'è un incasso collegato
+    // i dati restano, per legge
+    const [paymentCount, paidScheduleCount] = await Promise.all([
+      prisma.payment.count({ where: { courseEnrollmentId: enrollment.id } }),
+      prisma.paymentSchedule.count({
+        where: { courseEnrollmentId: enrollment.id, paymentId: { not: null } },
+      }),
+    ])
+    if (paymentCount > 0 || paidScheduleCount > 0) {
+      return { ok: false, error: COMPLIANCE_BLOCK_PAYMENT }
+    }
+
+    // Prima le rate, poi l'iscrizione: la FK è ON DELETE SET NULL e il CHECK
+    // payment_schedules_one_event_chk non ammette una rata senza collegamento
+    const [removedSchedules] = await prisma.$transaction([
+      prisma.paymentSchedule.deleteMany({
+        where: { courseEnrollmentId: enrollment.id },
+      }),
+      prisma.courseEnrollment.delete({ where: { id: enrollment.id } }),
+    ])
+
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: AuditAction.HARD_DELETE_ENROLLMENT,
+        entityType: "CourseEnrollment",
+        entityId: enrollment.id,
+        changes: {
+          athleteId: enrollment.athleteId,
+          athleteName: expected,
+          course: enrollment.course.name,
+          academicYear: enrollment.academicYear.label,
+          removedSchedules: removedSchedules.count,
+        },
+      },
+    })
+
+    revalidatePath(CESTINO_PATH)
+    revalidatePath(`/admin/athletes/${enrollment.athleteId}`)
+    revalidatePath("/admin/scadenze")
     return { ok: true }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }

@@ -105,6 +105,25 @@ export async function getDeletedMedicalCertificates() {
   })
 }
 
+export async function getDeletedEnrollments() {
+  await requireAdmin()
+  return prisma.courseEnrollment.findMany({
+    where: { deletedAt: { not: null } },
+    select: {
+      id: true,
+      enrollmentDate: true,
+      withdrawalDate: true,
+      deletedAt: true,
+      course: { select: { name: true } },
+      academicYear: { select: { label: true } },
+      athlete: { select: { id: true, firstName: true, lastName: true } },
+      _count: { select: { paymentSchedules: true } },
+    },
+    orderBy: { deletedAt: "desc" },
+    take: TAKE,
+  })
+}
+
 export async function getDeletedAffiliationCards() {
   await requireAdmin()
   return prisma.affiliation.findMany({
@@ -169,6 +188,7 @@ export async function getCestinoCounts() {
     expenses,
     certs,
     cards,
+    enrollments,
     showcases,
     costumes,
   ] = await Promise.all([
@@ -181,6 +201,7 @@ export async function getCestinoCounts() {
       where: { deletedAt: { not: null } },
     }),
     prisma.affiliation.count({ where: { deletedAt: { not: null } } }),
+    prisma.courseEnrollment.count({ where: { deletedAt: { not: null } } }),
     prisma.showcase.count({ where: { deletedAt: { not: null } } }),
     prisma.costume.count({ where: { deletedAt: { not: null } } }),
   ])
@@ -192,6 +213,7 @@ export async function getCestinoCounts() {
     expenses,
     certs,
     cards,
+    enrollments,
     showcases,
     costumes,
   }

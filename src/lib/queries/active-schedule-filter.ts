@@ -7,10 +7,20 @@ import type { Prisma } from "@prisma/client"
 //   • athleteId → quota associativa annuale (una per allieva per anno)
 // activeScheduleFilter (default) tiene solo scadenze di tipo corso con
 // allieva/corso attivi: lo usano i solleciti, che riguardano le mensili.
+//
+// La regola sta sulla RATA, non sull'iscrizione. Prima era
+// `courseEnrollment: { withdrawalDate: null }`, cioè di un'iscrizione ritirata
+// sparivano tutte le rate — anche i mesi già frequentati e non pagati, che
+// diventavano impossibili da vedere e da sollecitare. Ora il ritiro annulla da
+// solo le rate dei mesi successivi (deletedAt) e qui basta chiedere che la
+// rata non sia nel Cestino: i mesi frequentati restano dovuti e visibili.
+
+const scheduleNotDeleted = { deletedAt: null } as const
 
 export const activeScheduleFilter = {
+  deletedAt: null,
   courseEnrollment: {
-    withdrawalDate: null,
+    deletedAt: null,
     athlete: { deletedAt: null },
     course: { deletedAt: null },
   },
@@ -25,6 +35,7 @@ export function withActiveScheduleFilter(
 
   return {
     ...where,
+    deletedAt: null,
     courseEnrollment: existingEnrollmentFilter
       ? {
           AND: [activeScheduleFilter.courseEnrollment, existingEnrollmentFilter],
@@ -49,6 +60,7 @@ export function withActiveCourseOrAssociationScheduleFilter(
   return {
     AND: [
       where,
+      scheduleNotDeleted,
       {
         OR: [
           { courseEnrollment: activeScheduleFilter.courseEnrollment },
@@ -74,15 +86,12 @@ export function withActiveCourseOrStageScheduleFilter(
   return {
     AND: [
       where,
+      scheduleNotDeleted,
       {
         OR: [
-          {
-            courseEnrollment: {
-              withdrawalDate: null,
-              athlete: { deletedAt: null },
-              course: { deletedAt: null },
-            },
-          },
+          // Derivata, non ricopiata: due definizioni della stessa condizione
+          // divergono senza che nessuno se ne accorga
+          { courseEnrollment: activeScheduleFilter.courseEnrollment },
           activeAssociationFeeFilter,
           {
             stageEnrollment: {

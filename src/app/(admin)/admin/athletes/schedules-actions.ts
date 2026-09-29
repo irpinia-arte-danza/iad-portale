@@ -59,8 +59,10 @@ export async function waiveSchedule(
     }
   }
 
-  const existing = await prisma.paymentSchedule.findUnique({
-    where: { id: idParsed.data },
+  // deletedAt: null — una rata annullata (iscrizione sbagliata o mese dopo il
+  // ritiro) non esiste più per la famiglia: non si condona e non si riapre
+  const existing = await prisma.paymentSchedule.findFirst({
+    where: { id: idParsed.data, deletedAt: null },
     select: SCHEDULE_FOR_WAIVER_SELECT,
   })
   if (!existing) {
@@ -123,8 +125,10 @@ export async function unwaiveSchedule(
     return { ok: false, error: "Identificativo scadenza non valido" }
   }
 
-  const existing = await prisma.paymentSchedule.findUnique({
-    where: { id: idParsed.data },
+  // deletedAt: null — una rata annullata (iscrizione sbagliata o mese dopo il
+  // ritiro) non esiste più per la famiglia: non si condona e non si riapre
+  const existing = await prisma.paymentSchedule.findFirst({
+    where: { id: idParsed.data, deletedAt: null },
     select: SCHEDULE_FOR_WAIVER_SELECT,
   })
   if (!existing) {

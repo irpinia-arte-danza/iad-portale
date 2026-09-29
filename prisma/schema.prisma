@@ -420,7 +420,12 @@ model CourseEnrollment {
   academicYearId String @map("academic_year_id") @db.Uuid
 
   enrollmentDate DateTime  @default(now()) @map("enrollment_date") @db.Date
+  // Ritiro: l'allieva ha frequentato e poi ha smesso. L'iscrizione resta,
+  // con le rate dei mesi frequentati.
   withdrawalDate DateTime? @map("withdrawal_date") @db.Date
+  // Annullamento: l'iscrizione non doveva esistere (errore di inserimento).
+  // Va nel Cestino con le sue rate non pagate, ripristinabile.
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   notes String?
 
@@ -431,8 +436,12 @@ model CourseEnrollment {
   payments         Payment[]
   paymentSchedules PaymentSchedule[]
 
-  @@unique([athleteId, courseId, academicYearId])
+  // Una sola iscrizione attiva per allieva, corso e anno: il vincolo è un
+  // indice unico PARZIALE creato a mano nella migration (… WHERE deleted_at
+  // IS NULL), che Prisma non sa esprimere. Senza la condizione un'iscrizione
+  // annullata terrebbe occupato il posto e impedirebbe di reiscriversi.
   @@index([courseId, academicYearId])
+  @@index([athleteId, deletedAt])
   @@map("course_enrollments")
 }
 
@@ -782,8 +791,11 @@ model PaymentSchedule {
   academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id])
   payment               Payment?               @relation(fields: [paymentId], references: [id])
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  // Rata annullata: iscrizione sbagliata, oppure mese successivo alla data di
+  // ritiro. Mai una rata pagata — quelle si stornano, non si annullano.
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@index([courseEnrollmentId, dueDate])
   @@index([stageEnrollmentId, dueDate])
@@ -791,8 +803,10 @@ model PaymentSchedule {
   @@index([status, dueDate])
   @@index([academicYearId, status])
   @@index([paymentId])
-  // Una sola quota associativa per allieva e anno
-  @@unique([athleteId, academicYearId])
+  @@index([deletedAt, status, dueDate])
+  // Un solo contributo di iscrizione attivo per allieva e anno: anche questo è
+  // un indice unico PARZIALE nella migration (… WHERE deleted_at IS NULL), così
+  // dopo un annullamento il contributo può tornare.
   @@map("payment_schedules")
 }
 
@@ -1429,6 +1443,11 @@ enum AuditAction {
   RECEIPT_SHARED
   // Tessere ENDAS/CSEN: caricamento singolo, caricamento in blocco dai PDF
   // dell'ente, cestino, ed export dell'elenco da tesserare per il referente
+  // Iscrizione a un corso: annullata (era un errore) o ritirata (ha smesso)
+  ENROLLMENT_CANCEL
+  ENROLLMENT_WITHDRAW
+  RESTORE_ENROLLMENT
+  HARD_DELETE_ENROLLMENT
   CARD_CREATE
   CARD_IMPORT
   CARD_DELETE

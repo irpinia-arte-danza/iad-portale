@@ -59,7 +59,8 @@ export async function listCourses(filters: ListFilters = {}) {
           },
         },
         _count: {
-          select: { enrollments: true },
+          // Un'iscrizione annullata non è mai avvenuta: non va contata
+          select: { enrollments: { where: { deletedAt: null } } },
         },
       },
       orderBy: [{ name: "asc" }],
@@ -88,6 +89,7 @@ const courseWithRelations = Prisma.validator<Prisma.CourseDefaultArgs>()({
       },
     },
     enrollments: {
+      where: { deletedAt: null },
       include: {
         athlete: {
           select: {

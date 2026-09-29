@@ -58,6 +58,7 @@ const showcaseDetailArgs = Prisma.validator<Prisma.ShowcaseDefaultArgs>()({
             enrollments: {
               where: {
                 withdrawalDate: null,
+                deletedAt: null,
                 course: { deletedAt: null },
                 academicYear: { isCurrent: true },
               },
@@ -198,6 +199,7 @@ export async function listShowcaseEnrollableAthletes(showcaseId: string) {
         where: {
           academicYearId: showcase.academicYearId,
           withdrawalDate: null,
+          deletedAt: null,
           course: { deletedAt: null },
         },
         select: { course: { select: { id: true, name: true } } },
