@@ -17,6 +17,8 @@ interface AthleteAnagraficaDisplayProps {
     dateOfBirth: Date | null
     gender: "F" | "M" | "OTHER"
     status: "TRIAL" | "ACTIVE" | "SUSPENDED" | "WITHDRAWN"
+    email: string | null
+    phone: string | null
     fiscalCode: string | null
     placeOfBirth: string | null
     provinceOfBirth: string | null
@@ -117,6 +119,23 @@ export function AthleteAnagraficaDisplay({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {athlete.email || athlete.phone ? (
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            {athlete.email && (
+              <div>
+                <dt className="text-xs text-muted-foreground">Email</dt>
+                <dd className="break-all">{athlete.email}</dd>
+              </div>
+            )}
+            {athlete.phone && (
+              <div>
+                <dt className="text-xs text-muted-foreground">Telefono</dt>
+                <dd>{athlete.phone}</dd>
+              </div>
+            )}
+          </dl>
+        ) : null}
+
         {hasAnagraficaCompleta ? (
           <dl className="grid gap-3 sm:grid-cols-2 text-sm">
             {athlete.fiscalCode && (

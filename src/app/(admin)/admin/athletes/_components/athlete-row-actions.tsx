@@ -40,6 +40,9 @@ interface AthleteRowActionsProps {
     lastName: string
     dateOfBirth: Date
     gender: "F" | "M" | "OTHER"
+    email: string | null
+    phone: string | null
+    linkedParents: number
     fiscalCode: string | null
     placeOfBirth: string | null
     provinceOfBirth: string | null
@@ -109,11 +112,14 @@ export function AthleteRowActions({ athlete }: AthleteRowActionsProps) {
           <AthleteForm
             mode="edit"
             athleteId={athlete.id}
+            linkedParents={athlete.linkedParents}
             defaultValues={{
               firstName: athlete.firstName,
               lastName: athlete.lastName,
               dateOfBirth: athlete.dateOfBirth,
               gender: athlete.gender,
+              email: athlete.email ?? "",
+              phone: athlete.phone ?? "",
               fiscalCode: athlete.fiscalCode ?? "",
               placeOfBirth: athlete.placeOfBirth ?? "",
               provinceOfBirth: athlete.provinceOfBirth ?? "",

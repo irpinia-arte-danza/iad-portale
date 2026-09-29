@@ -29,6 +29,8 @@ type AthleteRow = {
   dateOfBirth: Date
   gender: "F" | "M" | "OTHER"
   status: "TRIAL" | "ACTIVE" | "SUSPENDED" | "WITHDRAWN"
+  email: string | null
+  phone: string | null
   fiscalCode: string | null
   placeOfBirth: string | null
   provinceOfBirth: string | null
@@ -214,6 +216,9 @@ export function AthletesTable({ athletes, sort, sortHrefs }: AthletesTableProps)
                     lastName: athlete.lastName,
                     dateOfBirth: athlete.dateOfBirth,
                     gender: athlete.gender,
+                    email: athlete.email,
+                    phone: athlete.phone,
+                    linkedParents: athlete._count.parentRelations,
                     fiscalCode: athlete.fiscalCode,
                     placeOfBirth: athlete.placeOfBirth,
                     provinceOfBirth: athlete.provinceOfBirth,

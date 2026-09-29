@@ -102,7 +102,10 @@ export default async function AthleteDetailPage({ params }: PageProps) {
                 brand={athleteForPDF.brand}
               />
             ) : null}
-            <AthleteDetailHeader athlete={athlete} />
+            <AthleteDetailHeader
+              athlete={athlete}
+              linkedParents={athlete.parentRelations.length}
+            />
           </div>
         }
       />
