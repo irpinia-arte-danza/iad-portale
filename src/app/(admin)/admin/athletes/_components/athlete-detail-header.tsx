@@ -28,12 +28,15 @@ import { softDeleteAthlete } from "../actions"
 import { AthleteForm } from "./athlete-form"
 
 interface AthleteDetailHeaderProps {
+  linkedParents: number
   athlete: {
     id: string
     firstName: string
     lastName: string
     dateOfBirth: Date
     gender: "F" | "M" | "OTHER"
+    email: string | null
+    phone: string | null
     fiscalCode: string | null
     placeOfBirth: string | null
     provinceOfBirth: string | null
@@ -46,7 +49,10 @@ interface AthleteDetailHeaderProps {
   }
 }
 
-export function AthleteDetailHeader({ athlete }: AthleteDetailHeaderProps) {
+export function AthleteDetailHeader({
+  athlete,
+  linkedParents,
+}: AthleteDetailHeaderProps) {
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -96,11 +102,14 @@ export function AthleteDetailHeader({ athlete }: AthleteDetailHeaderProps) {
           <AthleteForm
             mode="edit"
             athleteId={athlete.id}
+            linkedParents={linkedParents}
             defaultValues={{
               firstName: athlete.firstName,
               lastName: athlete.lastName,
               dateOfBirth: athlete.dateOfBirth,
               gender: athlete.gender,
+              email: athlete.email ?? "",
+              phone: athlete.phone ?? "",
               fiscalCode: athlete.fiscalCode ?? "",
               placeOfBirth: athlete.placeOfBirth ?? "",
               provinceOfBirth: athlete.provinceOfBirth ?? "",

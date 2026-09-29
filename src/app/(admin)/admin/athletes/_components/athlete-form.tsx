@@ -43,12 +43,17 @@ import {
 
 import { createMedicalCertificate } from "../[id]/medical-cert-actions"
 import { createAthlete, updateAthlete } from "../actions"
+import { AthleteContactFields } from "./athlete-contact-fields"
 import { NewAthleteCertificateFields } from "./new-athlete-certificate-fields"
 
 interface AthleteFormProps {
   mode: "create" | "edit"
   defaultValues?: Partial<AthleteCreateValues>
   athleteId?: string
+  // Genitori collegati: decide se i contatti dell'allieva sono un dettaglio
+  // o l'unico recapito. In creazione è sempre 0 — i genitori si collegano
+  // dopo, dalla scheda dell'allieva.
+  linkedParents?: number
   onSuccess?: () => void
 }
 
@@ -56,6 +61,7 @@ export function AthleteForm({
   mode,
   defaultValues,
   athleteId,
+  linkedParents = 0,
   onSuccess,
 }: AthleteFormProps) {
   const [isPending, startTransition] = useTransition()
@@ -73,6 +79,8 @@ export function AthleteForm({
       lastName: "",
       dateOfBirth: undefined as unknown as Date,
       gender: Gender.F,
+      email: "",
+      phone: "",
       fiscalCode: "",
       placeOfBirth: "",
       provinceOfBirth: "",
@@ -230,6 +238,10 @@ export function AthleteForm({
             )}
           />
         </div>
+
+        <Separator />
+
+        <AthleteContactFields linkedParents={linkedParents} />
 
         <Separator />
 

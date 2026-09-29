@@ -1,7 +1,13 @@
 import { z } from "zod"
 import { Gender } from "@prisma/client"
 
-import { endOfToday, fiscalCodeSchema, nonEmptyStringSchema } from "./common"
+import {
+  emailOptionalSchema,
+  endOfToday,
+  fiscalCodeSchema,
+  nonEmptyStringSchema,
+  phoneSchema,
+} from "./common"
 
 export const genderOptions = [
   { value: Gender.F, label: "Femmina" },
@@ -18,6 +24,17 @@ export const athleteCreateSchema = z.object({
       message: "La data di nascita non può essere nel futuro",
     }),
   gender: z.enum(Gender),
+
+  // Contatti dell'allieva. Facoltativi: per le minorenni le comunicazioni
+  // vanno ai genitori e questi campi restano vuoti. Diventano l'unico
+  // recapito per le maggiorenni senza genitori collegati (il corso adulti):
+  // senza email non ricevono ricevute, solleciti, inviti agli stage, e non
+  // possono avere l'accesso all'area riservata.
+  //
+  // Stessa validazione dei genitori — è lo stesso controllo di formato di
+  // emailRequiredSchema e phoneRequiredSchema, solo senza l'obbligo.
+  email: emailOptionalSchema,
+  phone: phoneSchema,
 
   fiscalCode: fiscalCodeSchema,
   placeOfBirth: z.string().trim().max(100).optional(),
