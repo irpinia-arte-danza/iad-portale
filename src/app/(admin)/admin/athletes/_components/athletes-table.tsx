@@ -53,6 +53,9 @@ interface AthletesTableProps {
   athletes: AthleteRow[]
   sort: AthletesSort
   sortHrefs: Record<AthletesSort, string>
+  // Con un filtro attivo "nessun risultato" vuol dire un'altra cosa, e
+  // "aggiungi la prima allieva" sarebbe un consiglio sbagliato
+  empty?: { title: string; hint: string }
 }
 
 const STATUS_LABELS: Record<AthleteRow["status"], string> = {
@@ -97,13 +100,21 @@ function SortLink({
   )
 }
 
-export function AthletesTable({ athletes, sort, sortHrefs }: AthletesTableProps) {
+export function AthletesTable({
+  athletes,
+  sort,
+  sortHrefs,
+  empty,
+}: AthletesTableProps) {
   if (athletes.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center">
-        <h3 className="text-sm font-medium">Nessuna allieva trovata</h3>
+        <h3 className="text-sm font-medium">
+          {empty?.title ?? "Nessuna allieva trovata"}
+        </h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Prova a modificare la ricerca o aggiungi la prima allieva.
+          {empty?.hint ??
+            "Prova a modificare la ricerca o aggiungi la prima allieva."}
         </p>
       </div>
     )

@@ -8,8 +8,16 @@ import {
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
 
-import { listAthletes, type AthleteListSort } from "./queries"
+import { GUARDIAN_GAP_FILTER } from "@/lib/athletes/guardian-gap"
+
+import {
+  countAthletesWithoutGuardian,
+  listAthletes,
+  type AthleteListFilter,
+  type AthleteListSort,
+} from "./queries"
 import { AthleteCreateDialog } from "./_components/athlete-create-dialog"
+import { AthletesFilterChip } from "./_components/athletes-filter-chip"
 import { AthletesSearch } from "./_components/athletes-search"
 import { AthletesTable } from "./_components/athletes-table"
 
@@ -23,17 +31,24 @@ const CERTIFICATE_SORT_PARAM = "certificato"
 const CARD_SORT_PARAM = "tessera"
 
 interface PageProps {
-  searchParams: Promise<{ search?: string; page?: string; sort?: string }>
+  searchParams: Promise<{
+    search?: string
+    page?: string
+    sort?: string
+    filtro?: string
+  }>
 }
 
 function listParams(
   search: string,
   sort: AthleteListSort,
+  filter: AthleteListFilter | null,
 ): Record<string, string> {
   const params: Record<string, string> = {}
   if (search) params.search = search
   if (sort === "certificate") params.sort = CERTIFICATE_SORT_PARAM
   if (sort === "card") params.sort = CARD_SORT_PARAM
+  if (filter) params.filtro = filter
   return params
 }
 
@@ -46,15 +61,23 @@ export default async function AthletesPage({ searchParams }: PageProps) {
       : resolvedSearchParams.sort === CARD_SORT_PARAM
         ? "card"
         : "name"
+  const filter: AthleteListFilter | null =
+    resolvedSearchParams.filtro === GUARDIAN_GAP_FILTER
+      ? GUARDIAN_GAP_FILTER
+      : null
   const page = parsePageParam(resolvedSearchParams.page)
-  const params = listParams(search, sort)
+  const params = listParams(search, sort, filter)
 
-  const { items, totalCount } = await listAthletes({
-    search,
-    sort,
-    limit: PAGE_SIZE,
-    offset: (page - 1) * PAGE_SIZE,
-  })
+  const [{ items, totalCount }, withoutGuardianCount] = await Promise.all([
+    listAthletes({
+      search,
+      sort,
+      filter: filter ?? undefined,
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+    }),
+    countAthletesWithoutGuardian(),
+  ])
 
   // Pagina oltre la fine (link vecchio, allieve eliminate): all'ultima
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
@@ -72,18 +95,50 @@ export default async function AthletesPage({ searchParams }: PageProps) {
       />
       <ResourceContent>
         <div className="flex flex-col gap-4">
-          <AthletesSearch defaultValue={search} />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <AthletesSearch defaultValue={search} />
+            <AthletesFilterChip
+              active={filter === GUARDIAN_GAP_FILTER}
+              count={withoutGuardianCount}
+              onHref={pageHref(
+                ATHLETES_PATH,
+                listParams(search, sort, GUARDIAN_GAP_FILTER),
+                1,
+              )}
+              offHref={pageHref(
+                ATHLETES_PATH,
+                listParams(search, sort, null),
+                1,
+              )}
+            />
+          </div>
           <AthletesTable
             athletes={items}
+            empty={
+              filter === GUARDIAN_GAP_FILTER
+                ? {
+                    title: "Nessuna minorenne senza genitore collegato",
+                    hint: "Tutte le allieve minorenni hanno almeno un genitore o tutore collegato.",
+                  }
+                : undefined
+            }
             sort={sort}
             sortHrefs={{
-              name: pageHref(ATHLETES_PATH, listParams(search, "name"), 1),
-              certificate: pageHref(
+              name: pageHref(
                 ATHLETES_PATH,
-                listParams(search, "certificate"),
+                listParams(search, "name", filter),
                 1,
               ),
-              card: pageHref(ATHLETES_PATH, listParams(search, "card"), 1),
+              certificate: pageHref(
+                ATHLETES_PATH,
+                listParams(search, "certificate", filter),
+                1,
+              ),
+              card: pageHref(
+                ATHLETES_PATH,
+                listParams(search, "card", filter),
+                1,
+              ),
             }}
           />
           <ListPagination
