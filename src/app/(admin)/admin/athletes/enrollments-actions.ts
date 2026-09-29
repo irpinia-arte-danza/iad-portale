@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { AthleteStatus, Prisma } from "@prisma/client"
+import { AthleteStatus, AuditAction, Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
@@ -16,6 +16,12 @@ import {
   type EnrollmentUpdateValues,
   type WithdrawEnrollmentValues,
 } from "@/lib/schemas/enrollment"
+import {
+  checkCancelEnrollment,
+  splitSchedulesOnWithdrawal,
+  sumCents,
+  type RuleSchedule,
+} from "@/lib/enrollments/enrollment-rules"
 import {
   AssociationFeeNotSetError,
   ensureAssociationFeeSchedule,
@@ -166,8 +172,9 @@ export async function updateEnrollment(
     }
   }
 
-  const existing = await prisma.courseEnrollment.findUnique({
-    where: { id: idParsed.data },
+  // deletedAt: null — un'iscrizione annullata non si modifica
+  const existing = await prisma.courseEnrollment.findFirst({
+    where: { id: idParsed.data, deletedAt: null },
     select: { athleteId: true },
   })
   if (!existing) {
@@ -191,11 +198,38 @@ export async function updateEnrollment(
   }
 }
 
+// Rate dell'iscrizione nella forma che vogliono le regole pure
+const RULE_SCHEDULE_SELECT = {
+  id: true,
+  dueDate: true,
+  status: true,
+  amountCents: true,
+} as const
+
+async function loadEnrollmentForChange(enrollmentId: string) {
+  return prisma.courseEnrollment.findFirst({
+    where: { id: enrollmentId, deletedAt: null },
+    select: {
+      id: true,
+      athleteId: true,
+      courseId: true,
+      academicYearId: true,
+      withdrawalDate: true,
+      course: { select: { name: true } },
+      academicYear: { select: { label: true } },
+      paymentSchedules: {
+        where: { deletedAt: null },
+        select: RULE_SCHEDULE_SELECT,
+      },
+    },
+  })
+}
+
 export async function withdrawEnrollment(
   enrollmentId: string,
   values: WithdrawEnrollmentValues,
-): Promise<ActionResult> {
-  await requireAdmin()
+): Promise<ActionResult<{ removedCount: number }>> {
+  const { userId: adminUserId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(enrollmentId)
   if (!idParsed.success) {
@@ -210,21 +244,257 @@ export async function withdrawEnrollment(
     }
   }
 
-  const existing = await prisma.courseEnrollment.findUnique({
-    where: { id: idParsed.data },
-    select: { athleteId: true },
-  })
+  const existing = await loadEnrollmentForChange(idParsed.data)
   if (!existing) {
     return { ok: false, error: "Iscrizione non trovata" }
   }
 
+  const withdrawalDate = toDateOnly(parsed.data.withdrawalDate)
+  // Restano dovuti i mesi frequentati, va via il resto. Prima il ritiro
+  // scriveva solo la data e lasciava dovute tutte le rate, giugno compreso.
+  const { remove } = splitSchedulesOnWithdrawal(
+    existing.paymentSchedules as RuleSchedule[],
+    withdrawalDate,
+  )
+
   try {
-    await prisma.courseEnrollment.update({
-      where: { id: idParsed.data },
-      data: { withdrawalDate: toDateOnly(parsed.data.withdrawalDate) },
+    const now = new Date()
+    await prisma.$transaction(async (tx) => {
+      await tx.courseEnrollment.update({
+        where: { id: existing.id },
+        data: { withdrawalDate },
+      })
+
+      if (remove.length > 0) {
+        await tx.paymentSchedule.updateMany({
+          where: { id: { in: remove.map((r) => r.id) }, deletedAt: null },
+          data: { deletedAt: now },
+        })
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          action: AuditAction.ENROLLMENT_WITHDRAW,
+          entityType: "CourseEnrollment",
+          entityId: existing.id,
+          changes: {
+            athleteId: existing.athleteId,
+            course: existing.course.name,
+            withdrawalDate: withdrawalDate.toISOString().slice(0, 10),
+            removedSchedules: remove.length,
+            removedCents: sumCents(remove),
+          },
+        },
+      })
     })
+
     revalidatePath(athletePath(existing.athleteId))
-    return { ok: true }
+    revalidatePath("/admin/scadenze")
+    return { ok: true, data: { removedCount: remove.length } }
+  } catch (error) {
+    return { ok: false, error: mapPrismaError(error) }
+  }
+}
+
+// Il contributo di iscrizione annuale è appeso all'allieva, non al corso: se
+// resta un altro corso attivo nell'anno non si tocca. Si porta via solo
+// quando l'iscrizione annullata era l'ultima dell'anno, il contributo non è
+// pagato e non c'è nient'altro che richieda di essere socia.
+async function associationFeeToCancel(
+  tx: Prisma.TransactionClient,
+  params: { athleteId: string; academicYearId: string; enrollmentId: string },
+): Promise<{ id: string; amountCents: number } | null> {
+  const otherActive = await tx.courseEnrollment.count({
+    where: {
+      athleteId: params.athleteId,
+      academicYearId: params.academicYearId,
+      deletedAt: null,
+      id: { not: params.enrollmentId },
+    },
+  })
+  if (otherActive > 0) return null
+
+  const [stages, showcases] = await Promise.all([
+    tx.stageEnrollment.count({
+      where: {
+        athleteId: params.athleteId,
+        stage: { deletedAt: null, academicYearId: params.academicYearId },
+      },
+    }),
+    tx.showcaseParticipation.count({
+      where: {
+        athleteId: params.athleteId,
+        showcase: { deletedAt: null, academicYearId: params.academicYearId },
+      },
+    }),
+  ])
+  // Stage o saggio nell'anno: è socia per quelli, il contributo resta dovuto
+  if (stages > 0 || showcases > 0) return null
+
+  const fee = await tx.paymentSchedule.findFirst({
+    where: {
+      athleteId: params.athleteId,
+      academicYearId: params.academicYearId,
+      feeType: "ASSOCIATION",
+      deletedAt: null,
+    },
+    select: { id: true, status: true, amountCents: true },
+  })
+  // Pagato: non si tocca, come qualsiasi altra rata pagata
+  if (!fee || fee.status === "PAID") return null
+
+  return { id: fee.id, amountCents: fee.amountCents }
+}
+
+export type CancelEnrollmentPreview = {
+  courseName: string
+  academicYearLabel: string
+  wasWithdrawn: boolean
+  // Rate che verrebbero eliminate, e quanto valgono
+  removableCount: number
+  removableCents: number
+  // Contributo di iscrizione annuale che verrebbe eliminato con lei
+  associationFee: { label: string; amountCents: number } | null
+  // Se valorizzato l'annullamento è vietato: c'è una rata pagata
+  blocker: string | null
+}
+
+// Cosa succederebbe annullando: lo calcola il server con le stesse funzioni
+// che poi eseguono l'operazione, così il dialog non può promettere una cosa
+// e l'azione farne un'altra.
+export async function getCancelEnrollmentPreview(
+  enrollmentId: string,
+): Promise<ActionResult<CancelEnrollmentPreview>> {
+  await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(enrollmentId)
+  if (!idParsed.success) {
+    return { ok: false, error: "Identificativo iscrizione non valido" }
+  }
+
+  const existing = await loadEnrollmentForChange(idParsed.data)
+  if (!existing) return { ok: false, error: "Iscrizione non trovata" }
+
+  const check = checkCancelEnrollment(
+    existing.paymentSchedules as RuleSchedule[],
+  )
+  const fee = check.ok
+    ? await associationFeeToCancel(prisma, {
+        athleteId: existing.athleteId,
+        academicYearId: existing.academicYearId,
+        enrollmentId: existing.id,
+      })
+    : null
+
+  return {
+    ok: true,
+    data: {
+      courseName: existing.course.name,
+      academicYearLabel: existing.academicYear.label,
+      wasWithdrawn: existing.withdrawalDate !== null,
+      removableCount: check.ok ? check.removable.length : 0,
+      removableCents: check.ok ? sumCents(check.removable) : 0,
+      associationFee: fee
+        ? {
+            label: existing.academicYear.label,
+            amountCents: fee.amountCents,
+          }
+        : null,
+      blocker: check.ok ? null : check.message,
+    },
+  }
+}
+
+// Annulla un'iscrizione inserita per errore: sparisce con le sue rate non
+// pagate, e l'allieva può reiscriversi allo stesso corso (l'indice unico è
+// parziale su deleted_at). Funziona anche su un'iscrizione già ritirata: è il
+// modo per correggere un errore che era stato "chiuso" con Ritira.
+export async function cancelEnrollment(
+  enrollmentId: string,
+): Promise<ActionResult<{ removedSchedules: number; feeRemoved: boolean }>> {
+  const { userId: adminUserId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(enrollmentId)
+  if (!idParsed.success) {
+    return { ok: false, error: "Identificativo iscrizione non valido" }
+  }
+
+  const existing = await loadEnrollmentForChange(idParsed.data)
+  if (!existing) {
+    return { ok: false, error: "Iscrizione non trovata" }
+  }
+
+  // Il controllo si rifà qui: quello che ha visto il browser non fa fede
+  const check = checkCancelEnrollment(
+    existing.paymentSchedules as RuleSchedule[],
+  )
+  if (!check.ok) {
+    return { ok: false, error: check.message }
+  }
+
+  try {
+    const now = new Date()
+    const feeRemoved = await prisma.$transaction(async (tx) => {
+      // Stesso istante su iscrizione e rate: è così che il ripristino dal
+      // Cestino sa quali rate tornano con lei e quali erano già state
+      // annullate prima, da un ritiro
+      await tx.courseEnrollment.update({
+        where: { id: existing.id },
+        data: { deletedAt: now },
+      })
+
+      if (check.removable.length > 0) {
+        await tx.paymentSchedule.updateMany({
+          where: {
+            id: { in: check.removable.map((r) => r.id) },
+            deletedAt: null,
+            status: { not: "PAID" },
+          },
+          data: { deletedAt: now },
+        })
+      }
+
+      const fee = await associationFeeToCancel(tx, {
+        athleteId: existing.athleteId,
+        academicYearId: existing.academicYearId,
+        enrollmentId: existing.id,
+      })
+      if (fee) {
+        await tx.paymentSchedule.update({
+          where: { id: fee.id },
+          data: { deletedAt: now },
+        })
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminUserId,
+          action: AuditAction.ENROLLMENT_CANCEL,
+          entityType: "CourseEnrollment",
+          entityId: existing.id,
+          changes: {
+            athleteId: existing.athleteId,
+            course: existing.course.name,
+            academicYear: existing.academicYear.label,
+            wasWithdrawn: existing.withdrawalDate !== null,
+            removedSchedules: check.removable.length,
+            removedCents: sumCents(check.removable),
+            associationFeeRemoved: fee ? fee.amountCents : null,
+          },
+        },
+      })
+
+      return fee !== null
+    })
+
+    revalidatePath(athletePath(existing.athleteId))
+    revalidatePath("/admin/scadenze")
+    revalidatePath("/admin/cestino")
+    return {
+      ok: true,
+      data: { removedSchedules: check.removable.length, feeRemoved },
+    }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }
   }

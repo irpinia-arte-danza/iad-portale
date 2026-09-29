@@ -42,6 +42,7 @@ import {
   hardDeleteCourse,
   hardDeleteExpense,
   hardDeleteAffiliationCard,
+  hardDeleteEnrollment,
   hardDeleteMedicalCertificate,
   hardDeleteParent,
   hardDeleteTeacher,
@@ -50,6 +51,7 @@ import {
   restoreCourse,
   restoreExpense,
   restoreAffiliationCard,
+  restoreEnrollment,
   restoreMedicalCertificate,
   restoreParent,
   restoreShowcase,
@@ -64,6 +66,7 @@ type EntityKind =
   | "expense"
   | "cert"
   | "card"
+  | "enrollment"
   | "showcase"
   | "costume"
 
@@ -88,6 +91,7 @@ const HARD_DELETE_FN: Partial<Record<EntityKind, HardDeleteFn>> = {
   expense: hardDeleteExpense,
   cert: hardDeleteMedicalCertificate,
   card: hardDeleteAffiliationCard,
+  enrollment: hardDeleteEnrollment,
 }
 
 type Counts = {
@@ -98,6 +102,7 @@ type Counts = {
   expenses: number
   certs: number
   cards: number
+  enrollments: number
   showcases: number
   costumes: number
 }
@@ -171,6 +176,17 @@ type CardRow = {
   athlete: { id: string; firstName: string; lastName: string }
 }
 
+type EnrollmentRow = {
+  id: string
+  enrollmentDate: Date
+  withdrawalDate: Date | null
+  deletedAt: Date | null
+  course: { name: string }
+  academicYear: { label: string }
+  athlete: { id: string; firstName: string; lastName: string }
+  _count: { paymentSchedules: number }
+}
+
 type Props = {
   counts: Counts
   athletes: Athlete[]
@@ -180,6 +196,7 @@ type Props = {
   expenses: ExpenseRow[]
   certs: CertRow[]
   cards: CardRow[]
+  enrollments: EnrollmentRow[]
   showcases: ShowcaseRow[]
   costumes: CostumeRow[]
 }
@@ -212,6 +229,7 @@ const RESTORE_FN = {
   expense: restoreExpense,
   cert: restoreMedicalCertificate,
   card: restoreAffiliationCard,
+  enrollment: restoreEnrollment,
   showcase: restoreShowcase,
   costume: restoreCostume,
 } as const
@@ -225,6 +243,7 @@ export function CestinoClient({
   expenses,
   certs,
   cards,
+  enrollments,
   showcases,
   costumes,
 }: Props) {
@@ -272,6 +291,9 @@ export function CestinoClient({
           </TabsTrigger>
           <TabsTrigger value="cards">
             Tessere {counts.cards > 0 ? `(${counts.cards})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="enrollments">
+            Iscrizioni {counts.enrollments > 0 ? `(${counts.enrollments})` : ""}
           </TabsTrigger>
           <TabsTrigger value="showcases">
             Saggi {counts.showcases > 0 ? `(${counts.showcases})` : ""}
@@ -437,6 +459,29 @@ export function CestinoClient({
               label: `${c.athlete.firstName} ${c.athlete.lastName} · tessera ${c.entity} n. ${c.cardNumber ?? "—"}`,
               kind: "card" as const,
               confirmExpected: `${c.athlete.firstName} ${c.athlete.lastName}`,
+              confirmKind: "name" as const,
+            }))}
+            onRestore={setConfirm}
+            onHardDelete={setHardTarget}
+          />
+        </TabsContent>
+
+        <TabsContent value="enrollments">
+          <CestinoTable
+            empty="Nessuna iscrizione annullata."
+            columns={["Allieva", "Corso", "Anno", "Rate", "Annullata"]}
+            rows={enrollments.map((e) => ({
+              id: e.id,
+              cells: [
+                `${e.athlete.lastName} ${e.athlete.firstName}`,
+                e.course.name,
+                e.academicYear.label,
+                String(e._count.paymentSchedules),
+                daysAgo(e.deletedAt),
+              ],
+              label: `${e.athlete.firstName} ${e.athlete.lastName} · ${e.course.name}`,
+              kind: "enrollment" as const,
+              confirmExpected: `${e.athlete.firstName} ${e.athlete.lastName}`,
               confirmKind: "name" as const,
             }))}
             onRestore={setConfirm}

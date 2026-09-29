@@ -50,11 +50,14 @@ export async function ensureAssociationFeeSchedule(
 ): Promise<"created" | "existing"> {
   const { athleteId, academicYear } = params
 
+  // deletedAt: null — un contributo annullato (ultima iscrizione dell'anno
+  // annullata) non deve impedire che ne nasca uno nuovo alla reiscrizione
   const existing = await tx.paymentSchedule.findFirst({
     where: {
       athleteId,
       academicYearId: academicYear.id,
       feeType: FeeType.ASSOCIATION,
+      deletedAt: null,
     },
     select: { id: true },
   })
@@ -72,7 +75,7 @@ export async function ensureAssociationFeeSchedule(
       feeType: FeeType.ASSOCIATION,
       status: PaymentStatus.PAID,
       deletedAt: null,
-      paymentSchedules: { none: {} },
+      paymentSchedules: { none: { deletedAt: null } },
     },
     orderBy: { paymentDate: "asc" },
     select: { id: true, amountCents: true },

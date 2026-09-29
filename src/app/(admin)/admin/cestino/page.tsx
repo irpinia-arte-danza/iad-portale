@@ -6,6 +6,7 @@ import {
   getCestinoCounts,
   getDeletedAffiliationCards,
   getDeletedAthletes,
+  getDeletedEnrollments,
   getDeletedCostumes,
   getDeletedCourses,
   getDeletedExpenses,
@@ -25,6 +26,7 @@ export default async function CestinoPage() {
     expenses,
     certs,
     cards,
+    enrollments,
     showcases,
     costumes,
   ] = await Promise.all([
@@ -36,6 +38,7 @@ export default async function CestinoPage() {
     getDeletedExpenses(),
     getDeletedMedicalCertificates(),
     getDeletedAffiliationCards(),
+    getDeletedEnrollments(),
     getDeletedShowcases(),
     getDeletedCostumes(),
   ])
@@ -57,6 +60,7 @@ export default async function CestinoPage() {
           expenses={expenses}
           certs={certs}
           cards={cards}
+          enrollments={enrollments}
           showcases={showcases}
           costumes={costumes}
         />

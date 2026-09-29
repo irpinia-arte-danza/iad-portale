@@ -71,6 +71,7 @@ export default async function SessionPage({ params }: PageProps) {
     where: {
       courseId: lesson.schedule.course.id,
       withdrawalDate: null,
+      deletedAt: null,
       academicYear: { isCurrent: true },
       athlete: { deletedAt: null },
     },

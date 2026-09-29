@@ -62,6 +62,7 @@ export async function getMyAthletes(scope: PortalScope) {
       enrollments: {
         where: {
           withdrawalDate: null,
+          deletedAt: null,
           academicYear: { isCurrent: true },
         },
         select: {
@@ -382,6 +383,7 @@ export async function getMyAthleteSchedules(scope: PortalScope) {
         enrollments: {
           some: {
             withdrawalDate: null,
+            deletedAt: null,
             academicYear: { isCurrent: true },
             athlete: {
               deletedAt: null,
@@ -429,6 +431,7 @@ export async function getGeneralCourseSchedules() {
         enrollments: {
           some: {
             withdrawalDate: null,
+            deletedAt: null,
             academicYear: { isCurrent: true },
           },
         },

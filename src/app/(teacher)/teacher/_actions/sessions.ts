@@ -174,6 +174,7 @@ export async function saveAttendance(
       courseId: lesson.schedule.courseId,
       athleteId: { in: athleteIds },
       withdrawalDate: null,
+      deletedAt: null,
       academicYear: { isCurrent: true },
       athlete: { deletedAt: null },
     },

@@ -138,7 +138,10 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
         { isPrimaryPayer: "desc" },
       ],
     },
+    // Le iscrizioni annullate (errore di inserimento) stanno nel Cestino e non
+    // compaiono qui, con le loro rate
     enrollments: {
+      where: { deletedAt: null },
       include: {
         course: {
           select: {
@@ -157,6 +160,7 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
           },
         },
         paymentSchedules: {
+          where: { deletedAt: null },
           orderBy: { dueDate: "asc" },
         },
       },
@@ -164,7 +168,7 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
     },
     // Contributo di iscrizione annuale: collegato all'allieva, non a un corso
     paymentSchedules: {
-      where: { feeType: "ASSOCIATION" },
+      where: { feeType: "ASSOCIATION", deletedAt: null },
       orderBy: { dueDate: "desc" },
       // Serve alla dicitura del contributo ("… 2026/2027")
       include: { academicYear: { select: { label: true } } },
@@ -243,6 +247,7 @@ const athleteForPDF = Prisma.validator<Prisma.AthleteDefaultArgs>()({
       ],
     },
     enrollments: {
+      where: { deletedAt: null },
       include: {
         course: {
           select: {
@@ -265,6 +270,7 @@ const athleteForPDF = Prisma.validator<Prisma.AthleteDefaultArgs>()({
         paymentSchedules: {
           where: {
             status: "DUE",
+            deletedAt: null,
           },
           orderBy: { dueDate: "asc" },
         },

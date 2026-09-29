@@ -48,6 +48,7 @@ export async function getEnrollmentsTrend(
 
   const enrollments = await prisma.courseEnrollment.findMany({
     where: {
+      deletedAt: null,
       enrollmentDate: { gte: from, lt: to },
     },
     select: { enrollmentDate: true },
@@ -127,6 +128,7 @@ export async function getPopularCourses(
     where: {
       academicYearId: currentAY.id,
       withdrawalDate: null,
+      deletedAt: null,
     },
     select: {
       courseId: true,
@@ -177,12 +179,14 @@ export async function getRetentionRate(): Promise<RetentionData> {
   }
 
   const [previousEnrollments, currentEnrollments] = await Promise.all([
+    // Le iscrizioni annullate non sono mai avvenute: falserebbero il tasso
+    // in entrambe le direzioni
     prisma.courseEnrollment.findMany({
-      where: { academicYearId: previous.id },
+      where: { academicYearId: previous.id, deletedAt: null },
       select: { athleteId: true },
     }),
     prisma.courseEnrollment.findMany({
-      where: { academicYearId: current.id },
+      where: { academicYearId: current.id, deletedAt: null },
       select: { athleteId: true },
     }),
   ])

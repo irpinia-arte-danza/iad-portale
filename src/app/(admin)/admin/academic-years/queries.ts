@@ -10,7 +10,7 @@ export async function listAcademicYears() {
     include: {
       _count: {
         select: {
-          enrollments: true,
+          enrollments: { where: { deletedAt: null } },
           payments: true,
           lessons: true,
         },
@@ -33,7 +33,7 @@ export async function getAcademicYearStats(id: string) {
       isCurrent: true,
       _count: {
         select: {
-          enrollments: true,
+          enrollments: { where: { deletedAt: null } },
           payments: true,
           lessons: true,
         },

@@ -52,6 +52,7 @@ export async function getMyCourses(teacherId: string) {
               enrollments: {
                 where: {
                   withdrawalDate: null,
+                  deletedAt: null,
                   academicYear: { isCurrent: true },
                   athlete: { deletedAt: null },
                 },

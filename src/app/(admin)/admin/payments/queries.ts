@@ -319,6 +319,7 @@ export async function listActiveEnrollmentsForAthlete(athleteId: string) {
     where: {
       athleteId,
       withdrawalDate: null,
+      deletedAt: null,
       academicYear: { isCurrent: true },
     },
     select: {

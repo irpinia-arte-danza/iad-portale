@@ -72,6 +72,7 @@ export default async function TeacherCourseDetailPage({ params }: PageProps) {
     where: {
       courseId: course.id,
       withdrawalDate: null,
+      deletedAt: null,
       academicYear: { isCurrent: true },
       athlete: { deletedAt: null },
     },

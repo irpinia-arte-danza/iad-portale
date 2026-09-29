@@ -70,7 +70,13 @@ export function WithdrawEnrollmentDialog({
     startTransition(async () => {
       const result = await withdrawEnrollment(enrollment.id, values)
       if (result.ok) {
-        toast.success("Iscrizione ritirata")
+        const rate = result.data?.removedCount ?? 0
+        toast.success("Iscrizione ritirata", {
+          description:
+            rate > 0
+              ? `${rate} ${rate === 1 ? "rata successiva al ritiro eliminata" : "rate successive al ritiro eliminate"}. I mesi frequentati restano dovuti.`
+              : "Nessuna rata successiva da eliminare.",
+        })
         onOpenChange(false)
         onSuccess?.()
       } else {
@@ -84,11 +90,23 @@ export function WithdrawEnrollmentDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Ritirare dal corso?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Stai per ritirare {enrollment.athleteFirstName} da{" "}
-            {enrollment.courseName}. L&apos;iscrizione verrà marcata come
-            ritirata, lo storico sarà preservato. Questa azione non è
-            reversibile dall&apos;interfaccia.
+          <AlertDialogDescription asChild>
+            <div className="space-y-2">
+              <p>
+                Usalo quando {enrollment.athleteFirstName} ha frequentato{" "}
+                {enrollment.courseName} e ora smette. Lo storico resta.
+              </p>
+              <p>
+                Le rate <strong>fino al mese del ritiro</strong> restano dovute:
+                sono mesi frequentati, e si incassano normalmente. Quelle dei
+                mesi successivi vengono eliminate.
+              </p>
+              <p className="text-xs">
+                Se invece l&apos;iscrizione era stata inserita per errore, non
+                usare Ritira: chiudi e scegli{" "}
+                <strong>Annulla iscrizione</strong>.
+              </p>
+            </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <Form {...form}>

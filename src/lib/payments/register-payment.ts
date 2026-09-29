@@ -123,6 +123,8 @@ export async function registerPaymentCore(
         athleteId: athlete.id,
         academicYearId: currentAY.id,
         feeType: FeeType.ASSOCIATION,
+        // Un contributo annullato non si chiude: per quell'anno non esiste
+        deletedAt: null,
       },
       select: { id: true, status: true },
     })
@@ -142,7 +144,10 @@ export async function registerPaymentCore(
   const selected =
     scheduleIds.length > 0
       ? await prisma.paymentSchedule.findMany({
-          where: { id: { in: scheduleIds } },
+          // deletedAt: null — una rata annullata mentre il form era aperto non
+          // si può pagare: il conteggio sotto se ne accorge e chiede di
+          // ricaricare la pagina
+          where: { id: { in: scheduleIds }, deletedAt: null },
           select: SCHEDULE_LINE_SELECT,
         })
       : []
@@ -281,6 +286,7 @@ export async function registerPaymentCore(
             id: { in: open.map((s) => s.id) },
             status: { in: OPEN_STATUSES },
             paymentId: null,
+            deletedAt: null,
           },
           data: { paymentId: created.id, status: ScheduleStatus.PAID },
         })
