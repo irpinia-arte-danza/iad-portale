@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   isAmountOffReference,
   monthBadge,
+  raisedRows,
   reducedRows,
 } from "./reduced-collection"
 
@@ -104,5 +105,40 @@ describe("isAmountOffReference", () => {
         isPaid: false,
       }),
     ).toBe(false)
+  })
+})
+
+describe("raisedRows", () => {
+  it("prende le righe incassate per più di quanto la scadenza chiedeva", () => {
+    const r = raisedRows([
+      riga("ass", 3000, 3000),
+      riga("ott", 2000, 4000, "ottobre"),
+    ])
+    expect(r.map((x) => x.id)).toEqual(["ott"])
+    expect(r[0]).toMatchObject({ fromCents: 2000, toCents: 4000 })
+  })
+
+  it("prende anche un rialzo parziale", () => {
+    const r = raisedRows([riga("ott", 2000, 3000)])
+    expect(r[0]).toMatchObject({ fromCents: 2000, toCents: 3000 })
+  })
+
+  it("ignora le righe esatte e quelle ridotte", () => {
+    expect(
+      raisedRows([riga("a", 4000, 4000), riga("b", 4000, 2000)]),
+    ).toEqual([])
+  })
+
+  it("ridotte e rialzate non si sovrappongono mai", () => {
+    const righe = [
+      riga("giu", 4000, 2000),
+      riga("ott", 2000, 4000),
+      riga("ass", 3000, 3000),
+    ]
+    const ridotte = reducedRows(righe).map((r) => r.id)
+    const rialzate = raisedRows(righe).map((r) => r.id)
+    expect(ridotte).toEqual(["giu"])
+    expect(rialzate).toEqual(["ott"])
+    expect(ridotte.filter((id) => rialzate.includes(id))).toEqual([])
   })
 })

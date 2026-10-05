@@ -41,6 +41,20 @@ export function reducedRows(rows: CollectionRow[]): ReducedRow[] {
     }))
 }
 
+// Le righe su cui l'importo della scadenza verrebbe ALZATO: incassato più di
+// quanto la scadenza chiedeva, ma non oltre la quota del corso. Non è un
+// incasso ridotto, è una correzione — e si vede nella stessa operazione.
+export function raisedRows(rows: CollectionRow[]): ReducedRow[] {
+  return rows
+    .filter((r) => r.collectedCents > r.amountCents)
+    .map((r) => ({
+      id: r.id,
+      description: r.description,
+      fromCents: r.amountCents,
+      toCents: r.collectedCents,
+    }))
+}
+
 const MESI_BREVI = [
   "GEN",
   "FEB",

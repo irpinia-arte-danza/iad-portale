@@ -13,6 +13,7 @@ import {
   athleteIdOfSchedule,
   compareScheduleLines,
   describeScheduleAdmin,
+  scheduleReferenceCents,
 } from "@/lib/payments/schedule-lines"
 import { withActiveCourseOrStageScheduleFilter } from "@/lib/queries/active-schedule-filter"
 import { feeTypeToReceiptCategory } from "@/lib/receipts/numbering"
@@ -228,6 +229,9 @@ export type OpenScheduleOption = {
   // Numerazione ricevute (quote / saggio / costumi): in un pagamento solo
   // scadenze della stessa
   category: string
+  // Quota del corso: tetto dell'incasso e valore a cui la scadenza torna.
+  // null dove un valore giusto non esiste (contributo, stage, saggio, costume).
+  referenceAmountCents: number | null
 }
 
 // Scadenze da incassare per allieva: mensili dei corsi attivi, quota
@@ -277,6 +281,7 @@ export async function listOpenSchedulesByAthlete(
       // Elenco per l'admin: col corso, per distinguere due rate dello stesso mese
       description: describeScheduleAdmin(s),
       category: feeTypeToReceiptCategory(s.feeType),
+      referenceAmountCents: scheduleReferenceCents(s),
     })
     byAthlete[owner] = list
   }
