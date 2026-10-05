@@ -1,36 +1,42 @@
-"use client"
-
-import Link from "next/link"
-import { Plus } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 
-export function QuickActions() {
+import { AthleteCreateDialog } from "../../athletes/_components/athlete-create-dialog"
+import { PaymentCreateDialog } from "../../payments/_components/payment-create-dialog"
+import type {
+  AthleteWithFormRelations,
+  OpenScheduleOption,
+} from "../../payments/queries"
+
+// Le due cose che si fanno davvero più spesso, e che prima erano due link a
+// una lista: qui si aprono subito, senza passare dalla pagina.
+export function QuickActions({
+  athletes,
+  openSchedulesByAthlete,
+}: {
+  athletes: AthleteWithFormRelations[]
+  openSchedulesByAthlete: Record<string, OpenScheduleOption[]>
+}) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Azioni rapide</CardTitle>
+        <CardDescription>
+          Si aprono qui: non serve andare in Pagamenti o in Allieve.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button asChild variant="outline">
-            <Link href="/admin/athletes">
-              <Plus className="h-4 w-4" />
-              Aggiungi nuova allieva
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/admin/parents">
-              <Plus className="h-4 w-4" />
-              Aggiungi nuovo genitore
-            </Link>
-          </Button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <PaymentCreateDialog
+            athletes={athletes}
+            openSchedulesByAthlete={openSchedulesByAthlete}
+          />
+          <AthleteCreateDialog />
         </div>
       </CardContent>
     </Card>

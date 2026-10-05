@@ -22,9 +22,6 @@ interface KpiCardsProps {
     athletesTrial: number
     athletesSuspended: number
     parentsTotal: number
-    schedulesOverdue: number
-    schedulesDueThisMonth: number
-    schedulesPaidThisMonth: number
   }
 }
 

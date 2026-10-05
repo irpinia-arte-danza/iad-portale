@@ -39,7 +39,10 @@ export async function getCertificatesOverview(): Promise<AthleteCertRow[]> {
 
   const today = todayDateOnly()
   const athletes = await prisma.athlete.findMany({
-    where: { deletedAt: null },
+    // Le ritirate restano fuori: non devono fare lezione, quindi un
+    // certificato non serve. È la stessa popolazione della scheda allieva e
+    // dei riquadri in dashboard, così i tre numeri coincidono.
+    where: { deletedAt: null, status: { not: "WITHDRAWN" } },
     select: {
       id: true,
       firstName: true,
@@ -108,7 +111,7 @@ export async function getCertificateStatusCounts(): Promise<
 
   const today = todayDateOnly()
   const athletes = await prisma.athlete.findMany({
-    where: { deletedAt: null },
+    where: { deletedAt: null, status: { not: "WITHDRAWN" } },
     select: {
       medicalCertificates: {
         where: { deletedAt: null },

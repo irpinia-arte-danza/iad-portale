@@ -8,10 +8,11 @@ import {
   CURRENT_CARD_ORDER,
 } from "@/lib/affiliations/card-status"
 import {
-  countGuardianGaps,
-  GUARDIAN_GAP_FILTER,
-  hasGuardianGap,
-} from "@/lib/athletes/guardian-gap"
+  ATHLETE_LIST_FILTERS,
+  type AthleteListFilter,
+  type AthleteListFilterStep,
+} from "@/lib/athletes/list-filters"
+import { athleteSetupChecklist } from "@/lib/athletes/setup-checklist"
 import {
   classifyCert,
   compareByCertificateExpiry,
@@ -21,9 +22,8 @@ import { todayDateOnly } from "@/lib/utils/date-only"
 
 export type AthleteListSort = "name" | "certificate" | "card"
 
-// Per ora un filtro solo: le minorenni senza genitori collegati, che senza
-// un elenco dedicato non si trovano.
-export type AthleteListFilter = typeof GUARDIAN_GAP_FILTER
+export type { AthleteListFilter } from "@/lib/athletes/list-filters"
+export { parseAthleteListFilter } from "@/lib/athletes/list-filters"
 
 type ListFilters = {
   search?: string
@@ -35,6 +35,9 @@ type ListFilters = {
 
 const DEFAULT_LIMIT = 50
 
+// Tutto quello che serve ad athleteSetupChecklist, più il certificato e la
+// tessera correnti per le colonne dell'elenco. Lo usano l'elenco allieve e il
+// conteggio della dashboard: una sola forma, un solo predicato.
 const athleteListInclude = Prisma.validator<Prisma.AthleteInclude>()({
   _count: {
     select: {
@@ -43,19 +46,28 @@ const athleteListInclude = Prisma.validator<Prisma.AthleteInclude>()({
       },
     },
   },
-  // Solo il certificato corrente, per la colonna "Certificato"
+  enrollments: {
+    where: { deletedAt: null },
+    select: {
+      academicYearId: true,
+      withdrawalDate: true,
+      deletedAt: true,
+    },
+  },
   medicalCertificates: {
     where: { deletedAt: null },
     orderBy: CURRENT_CERTIFICATE_ORDER,
-    take: 1,
-    select: { expiryDate: true },
+    select: { expiryDate: true, createdAt: true },
   },
-  // Solo la tessera corrente, per la colonna "Tessera"
   affiliations: {
     where: { deletedAt: null },
     orderBy: CURRENT_CARD_ORDER,
-    take: 1,
-    select: { expiryDate: true },
+    select: {
+      entity: true,
+      cardYear: true,
+      expiryDate: true,
+      createdAt: true,
+    },
   },
 })
 
@@ -63,17 +75,45 @@ type AthleteListRecord = Prisma.AthleteGetPayload<{
   include: typeof athleteListInclude
 }>
 
+type ChecklistYear = {
+  id: string
+  label: string
+  startDate: Date
+} | null
+
 function toListRow(
-  { medicalCertificates, affiliations, ...athlete }: AthleteListRecord,
+  record: AthleteListRecord,
   today: Date,
+  currentAcademicYear: ChecklistYear,
 ) {
+  const { medicalCertificates, affiliations, enrollments, ...athlete } = record
   const expiryDate = medicalCertificates[0]?.expiryDate ?? null
   const cardExpiry = affiliations[0]?.expiryDate ?? null
   return {
     ...athlete,
     certificate: { expiryDate, status: classifyCert(expiryDate, today) },
     card: { expiryDate: cardExpiry, status: classifyCard(cardExpiry, today) },
+    // Gli stessi passi che la scheda mostra in "Da completare"
+    setupSteps: athleteSetupChecklist(
+      {
+        status: record.status,
+        dateOfBirth: record.dateOfBirth,
+        email: record.email,
+        linkedParents: record._count.parentRelations,
+        enrollments,
+        certificates: medicalCertificates,
+        cards: affiliations,
+      },
+      { currentAcademicYear, at: today },
+    ).map((step) => step.id),
   }
+}
+
+async function currentAcademicYearForChecklist(): Promise<ChecklistYear> {
+  return prisma.academicYear.findFirst({
+    where: { isCurrent: true },
+    select: { id: true, label: true, startDate: true },
+  })
 }
 
 export async function listAthletes(filters: ListFilters = {}) {
@@ -98,18 +138,12 @@ export async function listAthletes(filters: ListFilters = {}) {
           ],
         }
       : {}),
-    // "Senza genitore collegato": la parte esatta la fa il database (nessuna
-    // relazione con un genitore non cestinato); la minore età si applica dopo
-    // in memoria con isMinorAt, che è l'unica definizione di minorenne del
-    // progetto. Tradurla in confronto fra date in SQL vorrebbe dire scriverne
-    // una seconda, che il 29 febbraio non coinciderebbe con la prima.
-    // Le ritirate restano fuori: non c'è niente da sistemare.
-    ...(filter === GUARDIAN_GAP_FILTER
-      ? {
-          status: { not: "WITHDRAWN" as const },
-          parentRelations: { none: { parent: { deletedAt: null } } },
-        }
-      : {}),
+    // Con un filtro attivo le ritirate restano fuori, come nella scheda: a
+    // chi ha smesso non si chiede di completare niente. Il resto del
+    // predicato NON si riscrive in SQL — lo decide athleteSetupChecklist in
+    // memoria, così elenco, scheda e dashboard usano la stessa regola. Sono
+    // poche decine di allieve.
+    ...(filter ? { status: { not: "WITHDRAWN" as const } } : {}),
   }
 
   const orderBy: Prisma.AthleteOrderByWithRelationInput[] = [
@@ -118,30 +152,28 @@ export async function listAthletes(filters: ListFilters = {}) {
   ]
 
   const inMemory =
-    sort === "certificate" || sort === "card" || filter === GUARDIAN_GAP_FILTER
+    sort === "certificate" || sort === "card" || filter !== undefined
 
   if (inMemory) {
-    // Certificato, tessera e filtro "senza genitore" dipendono da relazioni o
-    // dalla minore età: si lavora in memoria sull'elenco completo (poche
-    // centinaia di allieve) e poi si pagina. A parità di scadenza resta
-    // l'ordine per nome (sort stabile).
-    const athletes = await prisma.athlete.findMany({
-      where,
-      include: athleteListInclude,
-      orderBy,
-    })
-    let rows = athletes.map((athlete) => toListRow(athlete, today))
+    // Ordinamenti per certificato o tessera e filtri sui passi mancanti
+    // dipendono da relazioni, dalla minore età e dall'anno accademico: si
+    // lavora in memoria sull'elenco completo (poche decine di allieve) e poi
+    // si pagina. A parità di scadenza resta l'ordine per nome (sort stabile).
+    const [athletes, currentAcademicYear] = await Promise.all([
+      prisma.athlete.findMany({
+        where,
+        include: athleteListInclude,
+        orderBy,
+      }),
+      currentAcademicYearForChecklist(),
+    ])
+    let rows = athletes.map((athlete) =>
+      toListRow(athlete, today, currentAcademicYear),
+    )
 
-    if (filter === GUARDIAN_GAP_FILTER) {
-      rows = rows.filter((row) =>
-        hasGuardianGap(
-          {
-            dateOfBirth: row.dateOfBirth,
-            linkedParents: row._count.parentRelations,
-          },
-          today,
-        ),
-      )
+    if (filter) {
+      const step = ATHLETE_LIST_FILTERS[filter]
+      rows = rows.filter((row) => row.setupSteps.includes(step))
     }
 
     if (sort === "card" || sort === "certificate") {
@@ -158,7 +190,7 @@ export async function listAthletes(filters: ListFilters = {}) {
     return { items: rows.slice(offset, offset + limit), totalCount: rows.length }
   }
 
-  const [athletes, totalCount] = await Promise.all([
+  const [athletes, totalCount, currentAcademicYear] = await Promise.all([
     prisma.athlete.findMany({
       where,
       include: athleteListInclude,
@@ -167,34 +199,60 @@ export async function listAthletes(filters: ListFilters = {}) {
       skip: offset,
     }),
     prisma.athlete.count({ where }),
+    currentAcademicYearForChecklist(),
   ])
 
   return {
-    items: athletes.map((athlete) => toListRow(athlete, today)),
+    items: athletes.map((athlete) =>
+      toListRow(athlete, today, currentAcademicYear),
+    ),
     totalCount,
   }
 }
 
-// Quante minorenni sono senza genitore collegato. La usano la dashboard (per
-// decidere se mostrare la riga) e la lista allieve (per il numero sul filtro):
-// un conteggio solo, così non possono discordare.
-export async function countAthletesWithoutGuardian(): Promise<number> {
+// ─────────────────────────────────────────────────────────────────────────
+// Conteggi per i riquadri della dashboard.
+//
+// Stessa popolazione dell'elenco e della scheda (non cestinate, non
+// ritirate) e stesso predicato: i passi li decide athleteSetupChecklist. Il
+// numero sul riquadro è per costruzione uguale alle righe dell'elenco che
+// apre, non perché due query scritte a parte capita che coincidano.
+// ─────────────────────────────────────────────────────────────────────────
+/**
+ * I passi che la lista allieve sa filtrare, contati sulla stessa funzione che
+ * decide i passi nella scheda (`athleteSetupChecklist`): il riquadro in
+ * dashboard e l'elenco che apre non possono dire numeri diversi.
+ *
+ * Certificati e tessere non stanno qui: i loro riquadri contano gli elenchi
+ * delle rispettive pagine (`getCertificateStatusCounts`,
+ * `countTesseramentoQueue`), che è dove portano.
+ */
+export type AthleteStepCounts = Record<AthleteListFilterStep, number>
+
+export async function countAthleteSteps(): Promise<AthleteStepCounts> {
   await requireAdmin()
 
   const today = todayDateOnly()
-  const athletes = await prisma.athlete.findMany({
-    where: {
-      deletedAt: null,
-      status: { not: "WITHDRAWN" },
-      parentRelations: { none: { parent: { deletedAt: null } } },
-    },
-    select: { dateOfBirth: true },
-  })
+  const [athletes, currentAcademicYear] = await Promise.all([
+    prisma.athlete.findMany({
+      // Stessa popolazione della lista: le ritirate non hanno niente da
+      // completare
+      where: { deletedAt: null, status: { not: "WITHDRAWN" } },
+      include: athleteListInclude,
+    }),
+    currentAcademicYearForChecklist(),
+  ])
 
-  return countGuardianGaps(
-    athletes.map((a) => ({ dateOfBirth: a.dateOfBirth, linkedParents: 0 })),
-    today,
-  )
+  const counts: AthleteStepCounts = { guardian: 0, email: 0, course: 0 }
+
+  for (const athlete of athletes) {
+    const row = toListRow(athlete, today, currentAcademicYear)
+    for (const step of row.setupSteps) {
+      if (step in counts) counts[step as AthleteListFilterStep] += 1
+    }
+  }
+
+  return counts
 }
 
 const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
