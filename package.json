@@ -24,6 +24,7 @@
     "@supabase/supabase-js": "^2.103.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "geist": "^1.7.0",
     "ibantools": "^4.5.4",
     "jszip": "^3.10.1",

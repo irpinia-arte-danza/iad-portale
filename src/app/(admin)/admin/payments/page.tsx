@@ -3,6 +3,9 @@ import { redirect } from "next/navigation"
 import { ReceiptText, X } from "lucide-react"
 import { FeeType, PaymentStatus } from "@prisma/client"
 
+import { prisma } from "@/lib/prisma"
+import { uuidSchema } from "@/lib/schemas/common"
+
 import {
   ListPagination,
   pageHref,
@@ -31,6 +34,8 @@ interface PageProps {
     status?: string
     // ?ricevuta=mancante — ci arriva il riquadro "Pagamenti senza ricevuta"
     ricevuta?: string
+    // ?incassa=<id allieva> — ci arriva il tasto "Incassa" della ricerca
+    incassa?: string
     page?: string
   }>
 }
@@ -63,6 +68,7 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
   const feeType = parseFeeType(resolved.feeType)
   const status = parseStatus(resolved.status)
   const missingReceipt = resolved.ricevuta === "mancante"
+  const incassaAthleteId = uuidSchema.safeParse(resolved.incassa)
   const page = parsePageParam(resolved.page)
 
   // Parametri da conservare nei link di pagina
@@ -86,6 +92,22 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
       listOpenSchedulesByAthlete(),
     ])
 
+  // Ultimo metodo della famiglia: chi paga in contanti paga in contanti
+  // anche il mese dopo, e una casella già giusta è una in meno da toccare
+  const lastMethod = incassaAthleteId.success
+    ? (
+        await prisma.payment.findFirst({
+          where: {
+            athleteId: incassaAthleteId.data,
+            deletedAt: null,
+            status: PaymentStatus.PAID,
+          },
+          orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
+          select: { method: true },
+        })
+      )?.method ?? null
+    : null
+
   // Pagina oltre la fine (link vecchio, pagamenti eliminati): all'ultima
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
   if (page > totalPages) {
@@ -102,6 +124,11 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
           <PaymentCreateDialog
             athletes={athletes}
             openSchedulesByAthlete={openSchedulesByAthlete}
+            preselect={
+              incassaAthleteId.success
+                ? { athleteId: incassaAthleteId.data, method: lastMethod }
+                : null
+            }
           />
         }
       />

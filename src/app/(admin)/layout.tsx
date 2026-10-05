@@ -14,6 +14,7 @@ import { getNavCounters } from "./admin/dashboard/queries"
 
 import { AcademicYearChip } from "./_components/academic-year-chip"
 import { AdminMenuButton } from "./_components/admin-menu-button"
+import { AdminSearch } from "./_components/admin-search"
 import { AdminSidebar } from "./_components/admin-sidebar"
 
 export default async function AdminLayout({
@@ -75,9 +76,9 @@ export default async function AdminLayout({
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 lg:h-14">
           <AdminMenuButton />
           <SidebarTrigger className="hidden lg:flex" />
-          <span className="truncate text-sm font-medium">
-            IAD Portale — Admin
-          </span>
+          {/* Al posto del titolo: su una barra da 500 px "IAD Portale —
+              Admin" diceva a Giuseppina una cosa che sapeva già */}
+          <AdminSearch />
           <div className="ml-auto">
             <AcademicYearChip label={currentYear?.label ?? null} />
           </div>
