@@ -7,13 +7,6 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -25,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 import { softDeleteAthlete } from "../actions"
-import { AthleteForm } from "./athlete-form"
+import { AthleteEditDialog } from "./athlete-edit-dialog"
 
 interface AthleteDetailHeaderProps {
   linkedParents: number
@@ -91,42 +84,12 @@ export function AthleteDetailHeader({
         </Button>
       </div>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Modifica allieva</DialogTitle>
-            <DialogDescription>
-              Aggiorna i dati di {athlete.firstName} {athlete.lastName}.
-            </DialogDescription>
-          </DialogHeader>
-          <AthleteForm
-            mode="edit"
-            athleteId={athlete.id}
-            linkedParents={linkedParents}
-            defaultValues={{
-              firstName: athlete.firstName,
-              lastName: athlete.lastName,
-              dateOfBirth: athlete.dateOfBirth,
-              gender: athlete.gender,
-              email: athlete.email ?? "",
-              phone: athlete.phone ?? "",
-              fiscalCode: athlete.fiscalCode ?? "",
-              placeOfBirth: athlete.placeOfBirth ?? "",
-              provinceOfBirth: athlete.provinceOfBirth ?? "",
-              residenceStreet: athlete.residenceStreet ?? "",
-              residenceNumber: athlete.residenceNumber ?? "",
-              residenceCity: athlete.residenceCity ?? "",
-              residenceProvince: athlete.residenceProvince ?? "",
-              residenceCap: athlete.residenceCap ?? "",
-              instructorNotes: athlete.instructorNotes ?? "",
-            }}
-            onSuccess={() => {
-              setEditOpen(false)
-              router.refresh()
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+      <AthleteEditDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        athlete={athlete}
+        linkedParents={linkedParents}
+      />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>

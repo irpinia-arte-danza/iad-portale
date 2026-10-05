@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 
-import { hasGuardianGap } from "@/lib/athletes/guardian-gap"
+import { athleteSetupChecklist } from "@/lib/athletes/setup-checklist"
 import { getAccessStatus } from "@/lib/auth/access-status"
 import { athleteAccessEligibility } from "@/lib/auth/athlete-access"
 import { prisma } from "@/lib/prisma"
@@ -23,7 +23,10 @@ import { AthleteAccessSection } from "./_components/athlete-access-section"
 import { AthletePDFButton } from "./_components/athlete-pdf-button"
 import { EndasCardSection } from "./_components/endas-card-section"
 import { MedicalCertSection } from "./_components/medical-cert-section"
-import { MissingGuardianAlert } from "./_components/missing-guardian-alert"
+import {
+  CARD_SECTION_ID,
+  SetupChecklistCard,
+} from "./_components/setup-checklist-card"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -80,12 +83,34 @@ export default async function AthleteDetailPage({ params }: PageProps) {
     dateOfBirth: athlete.dateOfBirth,
     linkedParents: athlete.parentRelations.length,
   }).ok
-  // Minorenne e senza nessuno che la rappresenti: va detto in cima, non
-  // lasciato dedurre dalla sezione "Genitori e tutori" vuota più in basso
-  const guardianGap = hasGuardianGap({
-    dateOfBirth: athlete.dateOfBirth,
-    linkedParents: athlete.parentRelations.length,
-  })
+  // Cosa manca perché la scheda sia a posto: genitore, email, corso,
+  // certificato, tessera. Il passo del genitore assorbe l'avviso che prima
+  // stava qui da solo.
+  const setupSteps = athleteSetupChecklist(
+    {
+      status: athlete.status,
+      dateOfBirth: athlete.dateOfBirth,
+      email: athlete.email,
+      linkedParents: athlete.parentRelations.length,
+      enrollments: athlete.enrollments.map((e) => ({
+        academicYearId: e.academicYearId,
+        withdrawalDate: e.withdrawalDate,
+        deletedAt: e.deletedAt,
+      })),
+      certificates: athlete.medicalCertificates.map((c) => ({
+        expiryDate: c.expiryDate,
+        createdAt: c.createdAt,
+      })),
+      cards: athlete.affiliations.map((c) => ({
+        entity: c.entity,
+        cardYear: c.cardYear,
+        expiryDate: c.expiryDate,
+        createdAt: c.createdAt,
+      })),
+    },
+    { currentAcademicYear },
+  )
+
   const accessStatus = canHaveOwnAccess
     ? await getAccessStatus("ATHLETE", {
         id: athlete.id,
@@ -119,22 +144,33 @@ export default async function AthleteDetailPage({ params }: PageProps) {
       />
       <ResourceContent>
         <div className="flex flex-col gap-6">
-          {guardianGap ? (
-            <MissingGuardianAlert
-              athleteId={athlete.id}
-              athleteFirstName={athlete.firstName}
-            />
-          ) : null}
+          <SetupChecklistCard
+            steps={setupSteps}
+            athlete={athlete}
+            linkedParents={athlete.parentRelations.length}
+            course={{
+              activeCourses,
+              currentAcademicYear,
+              hasAssociationFee: athlete.paymentSchedules.some(
+                (s) => s.academicYearId === currentAcademicYear?.id,
+              ),
+              enrolledCourseIds: athlete.enrollments
+                .filter((e) => e.academicYearId === currentAcademicYear?.id)
+                .map((e) => e.courseId),
+            }}
+          />
           <AthleteAnagraficaDisplay athlete={athlete} />
           <MedicalCertSection
             athleteId={athlete.id}
             certificates={athlete.medicalCertificates}
           />
-          <EndasCardSection
-            athleteId={athlete.id}
-            entity="ENDAS"
-            cards={athlete.affiliations.filter((c) => c.entity === "ENDAS")}
-          />
+          <div id={CARD_SECTION_ID} className="scroll-mt-20">
+            <EndasCardSection
+              athleteId={athlete.id}
+              entity="ENDAS"
+              cards={athlete.affiliations.filter((c) => c.entity === "ENDAS")}
+            />
+          </div>
           <GuardianListSection
             athleteId={athlete.id}
             parentRelations={athlete.parentRelations}

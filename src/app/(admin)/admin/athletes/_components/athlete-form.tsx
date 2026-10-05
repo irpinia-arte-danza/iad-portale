@@ -54,7 +54,9 @@ interface AthleteFormProps {
   // o l'unico recapito. In creazione è sempre 0 — i genitori si collegano
   // dopo, dalla scheda dell'allieva.
   linkedParents?: number
-  onSuccess?: () => void
+  // In creazione riceve l'id della nuova allieva, così chi apre il form può
+  // portare subito alla sua scheda
+  onSuccess?: (athleteId?: string) => void
 }
 
 export function AthleteForm({
@@ -145,7 +147,9 @@ export function AthleteForm({
       }
       form.reset()
       setCertificate(EMPTY_NEW_ATHLETE_CERTIFICATE)
-      onSuccess?.()
+      // Anche quando il certificato non è stato salvato: l'allieva c'è, e la
+      // sua scheda è il posto da cui completarla
+      onSuccess?.(newAthleteId)
     })
   }
 
