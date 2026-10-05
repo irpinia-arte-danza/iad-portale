@@ -23,6 +23,8 @@ import type {
   AthleteWithFormRelations,
   OpenScheduleOption,
 } from "../../payments/queries"
+import { AmountOffReference } from "@/components/payments/amount-off-reference"
+
 import { ScheduleRowActions } from "./schedule-row-actions"
 import { ScheduleSettleProvider } from "./schedule-settle-provider"
 
@@ -30,6 +32,10 @@ type FlattenedSchedule = AthletePaymentSchedule & {
   courseName: string
   // null per la quota associativa, che non è legata a un corso
   enrollmentId: string | null
+  // Importo "di listino" con cui confrontare quello della scadenza: la quota
+  // mensile del corso. null per la quota associativa, il cui importo dell'anno
+  // non arriva fino qui.
+  referenceAmountCents: number | null
 }
 
 interface SchedulesSectionProps {
@@ -65,12 +71,15 @@ function flatten(
     ...s,
     courseName: associationFeeDescription(s.academicYear.label),
     enrollmentId: null,
+    referenceAmountCents: null,
   }))
   const monthly = enrollments.flatMap((e) =>
     e.paymentSchedules.map((s) => ({
       ...s,
       courseName: e.course.name,
       enrollmentId: e.id,
+      referenceAmountCents:
+        s.feeType === "MONTHLY" ? e.course.monthlyFeeCents : null,
     })),
   )
   return [...association, ...monthly]
@@ -194,6 +203,11 @@ function ScheduleRow({ schedule }: { schedule: FlattenedSchedule }) {
         <span className="font-mono text-sm">
           {formatEur(schedule.amountCents)}
         </span>
+        <AmountOffReference
+          amountCents={schedule.amountCents}
+          referenceAmountCents={schedule.referenceAmountCents}
+          isPaid={schedule.status === "PAID"}
+        />
         <StatusBadge status={displayStatus} />
       </div>
       <ScheduleRowActions
@@ -208,6 +222,7 @@ function ScheduleRow({ schedule }: { schedule: FlattenedSchedule }) {
           amountCents: schedule.amountCents,
           waiverReason: schedule.waiverReason,
           paymentId: schedule.paymentId,
+          referenceAmountCents: schedule.referenceAmountCents,
         }}
       />
     </li>

@@ -6,6 +6,7 @@ import { AuditAction, Prisma, ScheduleStatus } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { eurToCents } from "@/lib/payments/collection-plan"
 import {
   SCHEDULE_LINE_SELECT,
   athleteIdOfSchedule,
@@ -14,7 +15,9 @@ import {
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
 import {
+  scheduleAmountSchema,
   waiveScheduleSchema,
+  type ScheduleAmountValues,
   type WaiveScheduleValues,
 } from "@/lib/schemas/payment-schedule"
 
@@ -167,6 +170,104 @@ export async function unwaiveSchedule(
     if (athleteId) revalidatePath(athletePath(athleteId))
     revalidatePath("/admin/scadenze")
     return { ok: true }
+  } catch (error) {
+    return { ok: false, error: mapPrismaError(error) }
+  }
+}
+
+// Modifica dell'importo di una scadenza non pagata, nei due versi.
+//
+// Il blocco all'incasso sopra l'importo della scadenza resta dov'è: protegge
+// dagli errori di battitura. Chi deve incassare più del dovuto passa da qui
+// prima, e quella correzione lascia una riga di audit col prima, il dopo e il
+// motivo — l'incasso no.
+export async function updateScheduleAmount(
+  scheduleId: string,
+  values: ScheduleAmountValues,
+): Promise<ActionResult<{ amountCents: number }>> {
+  const { userId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(scheduleId)
+  if (!idParsed.success) {
+    return { ok: false, error: "Identificativo scadenza non valido" }
+  }
+
+  const parsed = scheduleAmountSchema.safeParse(values)
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Dati non validi",
+    }
+  }
+
+  const existing = await prisma.paymentSchedule.findFirst({
+    where: { id: idParsed.data, deletedAt: null },
+    select: {
+      id: true,
+      amountCents: true,
+      status: true,
+      feeType: true,
+      dueDate: true,
+      paymentId: true,
+      courseEnrollment: { select: { athleteId: true } },
+      athleteId: true,
+    },
+  })
+  if (!existing) {
+    return { ok: false, error: "Scadenza non trovata" }
+  }
+
+  // Una scadenza pagata non si ritocca: l'importo è quello che è stato
+  // incassato, e cambiarlo scollerebbe la contabilità dal pagamento. Si
+  // storna il pagamento e si ricomincia.
+  if (existing.status === ScheduleStatus.PAID || existing.paymentId !== null) {
+    return {
+      ok: false,
+      error:
+        "Questa scadenza è già pagata: per cambiarne l'importo storna prima il pagamento.",
+    }
+  }
+
+  const amountCents = eurToCents(parsed.data.amountEur)
+  if (amountCents <= 0) {
+    return { ok: false, error: "L'importo deve essere maggiore di zero" }
+  }
+  if (amountCents === existing.amountCents) {
+    return {
+      ok: false,
+      error: "L'importo è già questo: non c'è niente da cambiare.",
+    }
+  }
+
+  const athleteId = existing.courseEnrollment?.athleteId ?? existing.athleteId
+
+  try {
+    await prisma.$transaction([
+      prisma.paymentSchedule.update({
+        where: { id: existing.id },
+        data: { amountCents },
+      }),
+      prisma.auditLog.create({
+        data: {
+          userId,
+          action: AuditAction.SCHEDULE_AMOUNT_UPDATE,
+          entityType: "PaymentSchedule",
+          entityId: existing.id,
+          changes: {
+            athleteId,
+            feeType: existing.feeType,
+            dueDate: existing.dueDate.toISOString().slice(0, 10),
+            amountCentsBefore: existing.amountCents,
+            amountCentsAfter: amountCents,
+            reason: parsed.data.reason,
+          },
+        },
+      }),
+    ])
+
+    if (athleteId) revalidatePath(athletePath(athleteId))
+    revalidatePath("/admin/scadenze")
+    return { ok: true, data: { amountCents } }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }
   }

@@ -48,6 +48,7 @@ export type ScadenzaWithDetails = {
   course: {
     id: string
     name: string
+    monthlyFeeCents: number
   } | null
   academicYear: {
     id: string
@@ -186,7 +187,10 @@ export async function getScadenze(
       courseEnrollment: {
         select: {
           id: true,
-          course: { select: { id: true, name: true } },
+          // monthlyFeeCents alimenta il tasto "Riporta a …" del dialog importo
+          course: {
+            select: { id: true, name: true, monthlyFeeCents: true },
+          },
           athlete: { select: SCHEDULE_ATHLETE_SELECT },
         },
       },

@@ -6,6 +6,7 @@ import {
   Download,
   Mail,
   MoreHorizontal,
+  PencilLine,
   Receipt,
   UserCircle,
   X,
@@ -40,6 +41,9 @@ import { formatDateShort, formatEur } from "@/lib/utils/format"
 import { generateCSV } from "@/lib/utils/csv"
 
 import { getScadenzeCSVData } from "../actions"
+import { AmountOffReference } from "@/components/payments/amount-off-reference"
+import { ScheduleAmountDialog } from "@/app/(admin)/admin/athletes/_components/schedule-amount-dialog"
+
 import type { ScadenzaWithDetails } from "../queries"
 import { SendReminderDialog } from "./send-reminder-dialog"
 
@@ -81,6 +85,11 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
   const [isExporting, startExportTransition] = useTransition()
   const [reminderOpen, setReminderOpen] = useState(false)
   const [reminderScheduleIds, setReminderScheduleIds] = useState<string[]>([])
+  // Scadenza di cui si sta correggendo l'importo: il dialog è uno solo per
+  // tutta la tabella, non uno per riga
+  const [amountTarget, setAmountTarget] = useState<ScadenzaWithDetails | null>(
+    null,
+  )
 
   const selectableIds = useMemo(
     () => scadenze.map((s) => s.id),
@@ -308,7 +317,19 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                     )}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatEur(s.amountCents)}
+                    <div className="flex flex-col items-end gap-0.5">
+                      {formatEur(s.amountCents)}
+                      <AmountOffReference
+                        amountCents={s.amountCents}
+                        referenceAmountCents={
+                          s.feeType === "MONTHLY" && s.course
+                            ? s.course.monthlyFeeCents
+                            : null
+                        }
+                        isPaid={s.status === "PAID"}
+                        className="font-sans"
+                      />
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
@@ -370,6 +391,17 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                           </Tooltip>
                         )}
                         <DropdownMenuSeparator />
+                        {s.status !== "PAID" ? (
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault()
+                              setAmountTarget(s)
+                            }}
+                          >
+                            <PencilLine className="h-4 w-4" />
+                            Modifica importo
+                          </DropdownMenuItem>
+                        ) : null}
                         <DropdownMenuItem asChild>
                           <Link href={`/admin/athletes/${s.athlete.id}`}>
                             <UserCircle className="h-4 w-4" />
@@ -464,6 +496,33 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
         scheduleIds={reminderScheduleIds}
         onSent={handleReminderSent}
       />
+
+      {amountTarget ? (
+        <ScheduleAmountDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setAmountTarget(null)
+          }}
+          schedule={{
+            id: amountTarget.id,
+            courseName:
+              amountTarget.course?.name ??
+              amountTarget.notes ??
+              "Contributo di iscrizione",
+            dueDate: amountTarget.dueDate,
+            amountCents: amountTarget.amountCents,
+          }}
+          reference={
+            amountTarget.course && amountTarget.feeType === "MONTHLY"
+              ? {
+                  amountCents: amountTarget.course.monthlyFeeCents,
+                  label: "quota del corso",
+                }
+              : null
+          }
+          onSuccess={() => setAmountTarget(null)}
+        />
+      ) : null}
     </>
   )
 }
