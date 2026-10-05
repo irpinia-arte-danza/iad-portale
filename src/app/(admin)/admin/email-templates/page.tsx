@@ -38,8 +38,8 @@ export default async function EmailTemplatesPage() {
   return (
     <>
       <ResourceHeader
-        breadcrumbs={[{ label: "Email templates" }]}
-        title="Email templates"
+        breadcrumbs={[{ label: "Modelli email" }]}
+        title="Modelli email"
         description="Gestisci oggetto e corpo delle email automatiche inviate alle famiglie."
       />
       <ResourceContent>

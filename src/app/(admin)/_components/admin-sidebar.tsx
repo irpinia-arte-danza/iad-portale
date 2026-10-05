@@ -3,28 +3,6 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  BookOpen,
-  Calendar,
-  CalendarClock,
-  FileSpreadsheet,
-  FileText,
-  FileWarning,
-  FolderArchive,
-  GraduationCap,
-  Home,
-  IdCard,
-  MailPlus,
-  Receipt,
-  Settings,
-  Sparkles,
-  Star,
-  Trash2,
-  TrendingUp,
-  UserCog,
-  Users,
-  Wallet,
-} from "lucide-react"
 
 import {
   Sidebar,
@@ -32,13 +10,18 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { LogoutButton } from "@/components/auth/logout-button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { cn } from "@/lib/utils"
+
+import { ADMIN_NAV, isNavItemActive } from "./admin-nav"
 
 type AdminSidebarProps = {
   firstName: string | null
@@ -51,48 +34,6 @@ type AdminSidebarProps = {
   }
 }
 
-const NAV_ITEMS = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: Home, exact: true },
-  { href: "/admin/athletes", label: "Allieve", icon: GraduationCap },
-  { href: "/admin/parents", label: "Genitori", icon: Users },
-  { href: "/admin/teachers", label: "Insegnanti", icon: UserCog },
-  { href: "/admin/courses", label: "Corsi", icon: BookOpen },
-  { href: "/admin/stages", label: "Stage", icon: Sparkles },
-  { href: "/admin/showcase", label: "Saggio", icon: Star },
-  { href: "/admin/academic-years", label: "Anni accademici", icon: Calendar },
-  {
-    href: "/admin/medical-certificates",
-    label: "Certificati medici",
-    icon: FileWarning,
-  },
-  { href: "/admin/tessere", label: "Tessere ENDAS", icon: IdCard },
-  { href: "/admin/payments", label: "Pagamenti", icon: Receipt },
-  { href: "/admin/receipts", label: "Ricevute", icon: FileText },
-  { href: "/admin/scadenze", label: "Scadenze", icon: CalendarClock },
-  { href: "/admin/expenses", label: "Spese", icon: Wallet },
-  {
-    href: "/admin/reports/corrispettivi",
-    label: "Corrispettivi",
-    icon: FileSpreadsheet,
-  },
-  {
-    href: "/admin/reports/bilancio",
-    label: "Bilancio",
-    icon: TrendingUp,
-  },
-  {
-    href: "/admin/reports/annuale",
-    label: "Export annuale",
-    icon: FolderArchive,
-  },
-  {
-    href: "/admin/email-templates",
-    label: "Email templates",
-    icon: MailPlus,
-  },
-  { href: "/admin/settings", label: "Impostazioni", icon: Settings },
-  { href: "/admin/cestino", label: "Cestino", icon: Trash2 },
-] as const
 
 export function AdminSidebar({
   firstName,
@@ -101,6 +42,9 @@ export function AdminSidebar({
   brand,
 }: AdminSidebarProps) {
   const pathname = usePathname()
+  // Sotto il breakpoint la sidebar è un Sheet sopra la pagina: toccata una
+  // voce va chiuso, altrimenti copre quello che si è appena aperto
+  const { isMobile, setOpenMobile } = useSidebar()
   const displayName =
     [firstName, lastName].filter(Boolean).join(" ") || "Admin"
   const brandName = brand.asdName || "IAD Portale"
@@ -138,33 +82,50 @@ export function AdminSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV_ITEMS.map((item) => {
-                const isActive =
-                  "exact" in item && item.exact
-                    ? pathname === item.href
-                    : pathname.startsWith(item.href)
-                const Icon = item.icon
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={item.label}
-                    >
-                      <Link href={item.href}>
-                        <Icon />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {ADMIN_NAV.map((group, index) => (
+          <SidebarGroup
+            key={group.label ?? `gruppo-${index}`}
+            className={cn(
+              // Il gruppo di servizio va in fondo, sopra il footer
+              group.atBottom && "mt-auto",
+              // In modalità icona le etichette scompaiono (ci pensa
+              // SidebarGroupLabel) e senza di loro i gruppi si confondono:
+              // una riga sottile li tiene distinti sulla barra stretta
+              index > 0 &&
+                "group-data-[collapsible=icon]:mt-1 group-data-[collapsible=icon]:border-t group-data-[collapsible=icon]:pt-3",
+            )}
+          >
+            {group.label ? (
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            ) : null}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isNavItemActive(item, pathname)}
+                        tooltip={item.label}
+                      >
+                        <Link
+                          href={item.href}
+                          onClick={() => {
+                            if (isMobile) setOpenMobile(false)
+                          }}
+                        >
+                          <Icon />
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter>
         <div className="flex flex-col gap-0.5 px-2 py-1 text-xs">
