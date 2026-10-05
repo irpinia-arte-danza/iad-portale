@@ -3,10 +3,11 @@
 import { useMemo, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Loader2 } from "lucide-react"
+import { AlertTriangle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { eurToCents, planCollection } from "@/lib/payments/collection-plan"
+import { monthBadge, reducedRows } from "@/lib/payments/reduced-collection"
 import {
   FEE_TYPE_LABELS,
   PAYMENT_METHOD_LABELS,
@@ -158,15 +159,28 @@ export function PaymentForm({
   const multiError = multiPlan && !multiPlan.ok ? multiPlan.error : null
 
   const singleCollectedCents = eurToCents(watchedAmount)
-  const singleReduced =
-    single !== null &&
-    singleCollectedCents > 0 &&
-    singleCollectedCents < single.amountCents
   const singleAbove =
     single !== null && singleCollectedCents > single.amountCents
-  const hasReducedRow =
-    singleReduced ||
-    (isMulti && selectedOptions.some((o) => rowCents(o) < o.amountCents))
+  // Le scadenze che verrebbero abbassate, con nome e importi: è la frase che
+  // va letta prima di confermare. Vale per una sola scadenza come per più.
+  const righeRidotte = reducedRows(
+    single !== null
+      ? [
+          {
+            id: single.id,
+            description: single.description,
+            amountCents: single.amountCents,
+            collectedCents: singleCollectedCents,
+          },
+        ]
+      : selectedOptions.map((o) => ({
+          id: o.id,
+          description: o.description,
+          amountCents: o.amountCents,
+          collectedCents: rowCents(o),
+        })),
+  )
+  const hasReducedRow = righeRidotte.length > 0
 
   const selectedTotalCents = isMulti
     ? selectedOptions.reduce((sum, o) => sum + rowCents(o), 0)
@@ -287,7 +301,7 @@ export function PaymentForm({
                 pagamento libero scegliendo la causale.
               </p>
             ) : (
-              <ul className="divide-y rounded-md border">
+              <ul className="space-y-2">
                 {options.map((option) => {
                   const checked = selectedIds.includes(option.id)
                   const blocked =
@@ -301,7 +315,10 @@ export function PaymentForm({
                   return (
                     <li
                       key={option.id}
-                      className="flex min-h-11 items-center gap-3 px-3 py-2"
+                      className={cn(
+                        "flex min-h-11 items-center gap-3 rounded-md border px-3 py-2",
+                        checked && "border-primary/50 bg-primary/5",
+                      )}
                     >
                       <label
                         className={cn(
@@ -319,6 +336,11 @@ export function PaymentForm({
                           }
                           aria-label={option.description}
                         />
+                        {option.feeType === "MONTHLY" ? (
+                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums">
+                            {monthBadge(new Date(option.dueDate))}
+                          </span>
+                        ) : null}
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm">
                             {option.description}
@@ -496,21 +518,8 @@ export function PaymentForm({
                 </FormControl>
                 {isMulti ? (
                   <p className="text-xs text-muted-foreground">
-                    Somma delle righe. Se un contributo è ridotto cambia il suo
-                    importo nell&apos;elenco: la scadenza si allinea e risulta
-                    pagata.
-                  </p>
-                ) : singleReduced && single ? (
-                  <p className="text-xs text-muted-foreground">
-                    La scadenza passa da{" "}
-                    <span className="font-mono tabular-nums">
-                      {formatEur(single.amountCents)}
-                    </span>{" "}
-                    a{" "}
-                    <span className="font-mono tabular-nums">
-                      {formatEur(singleCollectedCents)}
-                    </span>{" "}
-                    e risulta pagata: nessun residuo.
+                    Somma delle righe. Per incassare meno su un contributo
+                    cambia il suo importo nell&apos;elenco.
                   </p>
                 ) : singleAbove && single ? (
                   <p className="text-xs text-destructive">
@@ -614,6 +623,36 @@ export function PaymentForm({
             </FormItem>
           )}
         />
+
+        {righeRidotte.length > 0 ? (
+          <div className="space-y-2 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950/40">
+            <p className="flex items-start gap-2 font-medium text-amber-900 dark:text-amber-100">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {righeRidotte.length === 1
+                ? "Stai incassando meno del dovuto su questa scadenza:"
+                : "Stai incassando meno del dovuto su queste scadenze:"}
+            </p>
+            <ul className="space-y-1 pl-6 text-amber-900 dark:text-amber-100">
+              {righeRidotte.map((r) => (
+                <li key={r.id}>
+                  <strong>{r.description}</strong>: passa da{" "}
+                  <span className="font-mono tabular-nums">
+                    {formatEur(r.fromCents)}
+                  </span>{" "}
+                  a{" "}
+                  <span className="font-mono tabular-nums">
+                    {formatEur(r.toCents)}
+                  </span>{" "}
+                  e risulta <strong>pagata</strong>, senza residuo.
+                </li>
+              ))}
+            </ul>
+            <p className="pl-6 text-xs text-amber-800 dark:text-amber-200">
+              Controlla che sia il mese giusto. Per rimetterla a posto dopo
+              serve &laquo;Modifica importo&raquo; sulla scadenza.
+            </p>
+          </div>
+        ) : null}
 
         <div className="flex sm:justify-end">
           <Button

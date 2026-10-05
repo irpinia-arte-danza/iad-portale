@@ -23,6 +23,8 @@ import type {
   AthleteWithFormRelations,
   OpenScheduleOption,
 } from "../../payments/queries"
+import { AmountOffReference } from "@/components/payments/amount-off-reference"
+
 import { ScheduleRowActions } from "./schedule-row-actions"
 import { ScheduleSettleProvider } from "./schedule-settle-provider"
 
@@ -201,6 +203,11 @@ function ScheduleRow({ schedule }: { schedule: FlattenedSchedule }) {
         <span className="font-mono text-sm">
           {formatEur(schedule.amountCents)}
         </span>
+        <AmountOffReference
+          amountCents={schedule.amountCents}
+          referenceAmountCents={schedule.referenceAmountCents}
+          isPaid={schedule.status === "PAID"}
+        />
         <StatusBadge status={displayStatus} />
       </div>
       <ScheduleRowActions

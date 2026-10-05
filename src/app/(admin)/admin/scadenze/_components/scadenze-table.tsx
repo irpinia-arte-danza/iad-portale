@@ -41,6 +41,7 @@ import { formatDateShort, formatEur } from "@/lib/utils/format"
 import { generateCSV } from "@/lib/utils/csv"
 
 import { getScadenzeCSVData } from "../actions"
+import { AmountOffReference } from "@/components/payments/amount-off-reference"
 import { ScheduleAmountDialog } from "@/app/(admin)/admin/athletes/_components/schedule-amount-dialog"
 
 import type { ScadenzaWithDetails } from "../queries"
@@ -316,7 +317,19 @@ export function ScadenzeTable({ scadenze }: ScadenzeTableProps) {
                     )}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatEur(s.amountCents)}
+                    <div className="flex flex-col items-end gap-0.5">
+                      {formatEur(s.amountCents)}
+                      <AmountOffReference
+                        amountCents={s.amountCents}
+                        referenceAmountCents={
+                          s.feeType === "MONTHLY" && s.course
+                            ? s.course.monthlyFeeCents
+                            : null
+                        }
+                        isPaid={s.status === "PAID"}
+                        className="font-sans"
+                      />
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
