@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2, Upload } from "lucide-react"
 import { toast } from "sonner"
@@ -18,6 +18,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -38,6 +39,12 @@ import {
   medicalCertSchema,
   type MedicalCertValues,
 } from "@/lib/schemas/medical-certificate"
+import {
+  DEFAULT_EXPIRY_HINT,
+  defaultExpiryFromIssue,
+  isDefaultExpiry,
+  shouldRefillExpiry,
+} from "@/lib/medical-certificates/default-expiry"
 import { toDateInputValue } from "@/lib/utils/format"
 
 import {
@@ -61,16 +68,13 @@ type Props = {
   hasExistingFile?: boolean
 }
 
-function isLeapYear(year: number): boolean {
-  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
-}
-
-function addOneYearSafe(date: Date): Date {
-  const targetYear = date.getFullYear() + 1
-  if (date.getMonth() === 1 && date.getDate() === 29 && !isLeapYear(targetYear)) {
-    return new Date(targetYear, 1, 28)
-  }
-  return new Date(targetYear, date.getMonth(), date.getDate())
+// Scadenza proposta a partire da una data: il calcolo sta in
+// @/lib/medical-certificates/default-expiry, condiviso col form della nuova
+// allieva. Qui si fa solo il passaggio fra Date (quello che tiene il form) e
+// la stringa di calendario su cui lavora la funzione.
+function proposedExpiry(from: Date): Date | undefined {
+  const iso = defaultExpiryFromIssue(toDateInputValue(from))
+  return iso ? new Date(iso) : undefined
 }
 
 export function MedicalCertFormDialog({
@@ -91,22 +95,22 @@ export function MedicalCertFormDialog({
     defaultValues: {
       type: defaults?.type ?? "NON_AGONISTICO",
       issueDate: defaults?.issueDate ?? new Date(),
-      expiryDate:
-        defaults?.expiryDate ??
-        addOneYearSafe(new Date()),
+      expiryDate: defaults?.expiryDate ?? proposedExpiry(new Date()),
       doctorName: defaults?.doctorName ?? "",
       notes: defaults?.notes ?? "",
     },
   })
+
+  // useWatch e non form.watch: quest'ultimo il lint di react-hooks lo segnala
+  // come non memoizzabile
+  const issueDate = useWatch({ control: form.control, name: "issueDate" })
 
   React.useEffect(() => {
     if (open) {
       form.reset({
         type: defaults?.type ?? "NON_AGONISTICO",
         issueDate: defaults?.issueDate ?? new Date(),
-        expiryDate:
-          defaults?.expiryDate ??
-          addOneYearSafe(new Date()),
+        expiryDate: defaults?.expiryDate ?? proposedExpiry(new Date()),
         doctorName: defaults?.doctorName ?? "",
         notes: defaults?.notes ?? "",
       })
@@ -225,22 +229,29 @@ export function MedicalCertFormDialog({
                           field.value ? toDateInputValue(field.value) : ""
                         }
                         onChange={(e) => {
-                          const newIssue = e.target.value
-                            ? new Date(e.target.value)
-                            : undefined
-                          field.onChange(newIssue)
-                          // Auto-suggest expiry = issue + 1 anno se non già impostato manualmente
-                          if (newIssue) {
-                            const currentExpiry = form.getValues("expiryDate")
-                            if (
-                              !currentExpiry ||
-                              currentExpiry <= newIssue
-                            ) {
-                              form.setValue(
-                                "expiryDate",
-                                addOneYearSafe(newIssue),
-                              )
-                            }
+                          const iso = e.target.value
+                          const previousIso = field.value
+                            ? toDateInputValue(field.value)
+                            : ""
+                          field.onChange(iso ? new Date(iso) : undefined)
+
+                          // Solo in creazione: su un certificato esistente non
+                          // si ricalcola niente. E solo se la scadenza è vuota
+                          // o è ancora quella proposta dal rilascio
+                          // precedente: una data scritta a mano resta.
+                          if (mode !== "create" || !iso) return
+                          const currentExpiry = form.getValues("expiryDate")
+                          const currentIso = currentExpiry
+                            ? toDateInputValue(currentExpiry)
+                            : ""
+                          if (!shouldRefillExpiry(previousIso, currentIso)) {
+                            return
+                          }
+                          const proposed = defaultExpiryFromIssue(iso)
+                          if (proposed) {
+                            form.setValue("expiryDate", new Date(proposed), {
+                              shouldValidate: true,
+                            })
                           }
                         }}
                       />
@@ -252,27 +263,42 @@ export function MedicalCertFormDialog({
               <FormField
                 control={form.control}
                 name="expiryDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Scade il</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        value={
-                          field.value ? toDateInputValue(field.value) : ""
-                        }
-                        onChange={(e) =>
-                          field.onChange(
-                            e.target.value
-                              ? new Date(e.target.value)
-                              : undefined,
-                          )
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const iso = field.value
+                    ? toDateInputValue(field.value)
+                    : ""
+                  // La riga compare solo quando la scadenza è ancora quella
+                  // proposta dal rilascio: appena Giuseppina la cambia,
+                  // sparisce
+                  const calcolata =
+                    mode === "create" &&
+                    isDefaultExpiry(
+                      issueDate ? toDateInputValue(issueDate) : "",
+                      iso,
+                    )
+                  return (
+                    <FormItem>
+                      <FormLabel>Scade il</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          value={iso}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value
+                                ? new Date(e.target.value)
+                                : undefined,
+                            )
+                          }
+                        />
+                      </FormControl>
+                      {calcolata ? (
+                        <FormDescription>{DEFAULT_EXPIRY_HINT}</FormDescription>
+                      ) : null}
+                      <FormMessage />
+                    </FormItem>
+                  )
+                }}
               />
             </div>
 

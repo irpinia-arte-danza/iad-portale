@@ -2,8 +2,6 @@ import {
   medicalCertSchema,
   type MedicalCertType,
 } from "@/lib/schemas/medical-certificate"
-import { dateOnly } from "@/lib/utils/date-only"
-
 import { medicalCertFileError } from "./file-rules"
 
 // Certificato inserito insieme alla nuova allieva. La sezione è facoltativa:
@@ -63,14 +61,8 @@ export function newAthleteCertificateFormData(
   return formData
 }
 
-// Scadenza proposta per un certificato annuale: un anno dopo l'emissione
-// (il 29/02 diventa 28/02). Stringhe AAAA-MM-GG, calcolo in UTC.
-export function suggestedExpiryDate(issueDate: string): string {
-  const issue = new Date(issueDate)
-  const year = issue.getUTCFullYear() + 1
-  const month = issue.getUTCMonth()
-  const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
-  return dateOnly(year, month, Math.min(issue.getUTCDate(), lastDayOfMonth))
-    .toISOString()
-    .slice(0, 10)
-}
+// Scadenza proposta: un anno dal rilascio. Il calcolo vive in
+// ./default-expiry, condiviso con il dialog della scheda allieva — prima
+// c'erano due implementazioni, e quella del dialog costruiva le date in ora
+// locale. Il nome resta per chi la chiamava già così.
+export { defaultExpiryFromIssue as suggestedExpiryDate } from "./default-expiry"
