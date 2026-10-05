@@ -6,8 +6,16 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { AlertTriangle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
-import { eurToCents, planCollection } from "@/lib/payments/collection-plan"
-import { monthBadge, reducedRows } from "@/lib/payments/reduced-collection"
+import {
+  collectionCapCents,
+  eurToCents,
+  planCollection,
+} from "@/lib/payments/collection-plan"
+import {
+  monthBadge,
+  raisedRows,
+  reducedRows,
+} from "@/lib/payments/reduced-collection"
 import {
   FEE_TYPE_LABELS,
   PAYMENT_METHOD_LABELS,
@@ -151,6 +159,7 @@ export function PaymentForm({
           id: o.id,
           amountCents: o.amountCents,
           description: o.description,
+          referenceAmountCents: o.referenceAmountCents,
         })),
         totalCents: selectedOptions.reduce((sum, o) => sum + rowCents(o), 0),
         rowCents: Object.fromEntries(selectedOptions.map((o) => [o.id, rowCents(o)])),
@@ -159,11 +168,11 @@ export function PaymentForm({
   const multiError = multiPlan && !multiPlan.ok ? multiPlan.error : null
 
   const singleCollectedCents = eurToCents(watchedAmount)
-  const singleAbove =
-    single !== null && singleCollectedCents > single.amountCents
+  const singleCap = single !== null ? collectionCapCents(single) : 0
+  const singleAbove = single !== null && singleCollectedCents > singleCap
   // Le scadenze che verrebbero abbassate, con nome e importi: è la frase che
   // va letta prima di confermare. Vale per una sola scadenza come per più.
-  const righeRidotte = reducedRows(
+  const righeIncasso =
     single !== null
       ? [
           {
@@ -178,8 +187,10 @@ export function PaymentForm({
           description: o.description,
           amountCents: o.amountCents,
           collectedCents: rowCents(o),
-        })),
-  )
+        }))
+  const righeRidotte = reducedRows(righeIncasso)
+  // Righe che tornano su: l'importo della scadenza era rimasto sotto la quota
+  const righeRialzate = raisedRows(righeIncasso)
   const hasReducedRow = righeRidotte.length > 0
 
   const selectedTotalCents = isMulti
@@ -358,7 +369,7 @@ export function PaymentForm({
                             inputMode="decimal"
                             step="0.01"
                             min="0.01"
-                            max={option.amountCents / 100}
+                            max={collectionCapCents(option) / 100}
                             aria-label={`Importo incassato per ${option.description}`}
                             className="h-9 w-24 text-right font-mono tabular-nums"
                             value={
@@ -378,6 +389,17 @@ export function PaymentForm({
                               <span className="font-mono tabular-nums">
                                 {formatEur(option.amountCents)}
                               </span>
+                            </span>
+                          ) : null}
+                          {option.referenceAmountCents !== null &&
+                          option.amountCents < option.referenceAmountCents ? (
+                            <span className="max-w-[16rem] text-right text-xs text-amber-700 dark:text-amber-400">
+                              La quota del corso è{" "}
+                              <span className="font-mono tabular-nums">
+                                {formatEur(option.referenceAmountCents)}
+                              </span>
+                              : puoi incassarla per intero e la scadenza torna
+                              a quella cifra.
                             </span>
                           ) : null}
                         </span>
@@ -518,8 +540,8 @@ export function PaymentForm({
                 </FormControl>
                 {isMulti ? (
                   <p className="text-xs text-muted-foreground">
-                    Somma delle righe. Per incassare meno su un contributo
-                    cambia il suo importo nell&apos;elenco.
+                    Somma delle righe. Per incassare un importo diverso su un
+                    contributo cambialo nell&apos;elenco.
                   </p>
                 ) : singleAbove && single ? (
                   <p className="text-xs text-destructive">
@@ -623,6 +645,36 @@ export function PaymentForm({
             </FormItem>
           )}
         />
+
+        {righeRialzate.length > 0 ? (
+          <div className="space-y-2 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950/40">
+            <p className="flex items-start gap-2 font-medium text-amber-900 dark:text-amber-100">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {righeRialzate.length === 1
+                ? "Questa scadenza era rimasta sotto la quota del corso:"
+                : "Queste scadenze erano rimaste sotto la quota del corso:"}
+            </p>
+            <ul className="space-y-1 pl-6 text-amber-900 dark:text-amber-100">
+              {righeRialzate.map((r) => (
+                <li key={r.id}>
+                  <strong>{r.description}</strong>: era a{" "}
+                  <span className="font-mono tabular-nums">
+                    {formatEur(r.fromCents)}
+                  </span>
+                  . Registrando torna a{" "}
+                  <span className="font-mono tabular-nums">
+                    {formatEur(r.toCents)}
+                  </span>{" "}
+                  e risulta <strong>pagata</strong>.
+                </li>
+              ))}
+            </ul>
+            <p className="pl-6 text-xs text-amber-800 dark:text-amber-200">
+              La correzione dell&apos;importo resta nel registro delle
+              modifiche, insieme al pagamento.
+            </p>
+          </div>
+        ) : null}
 
         {righeRidotte.length > 0 ? (
           <div className="space-y-2 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950/40">

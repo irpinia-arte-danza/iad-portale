@@ -17,12 +17,18 @@ import type { PaymentCreateValues } from "@/lib/schemas/payment"
 import { toDateOnly } from "@/lib/utils/date-only"
 import { formatEur } from "@/lib/utils/format"
 
-import { amountDifferences, eurToCents, planCollection } from "./collection-plan"
+import {
+  amountDifferences,
+  eurToCents,
+  planCollection,
+  rowDirection,
+} from "./collection-plan"
 import {
   SCHEDULE_LINE_SELECT,
   athleteIdOfSchedule,
   compareScheduleLines,
   describeScheduleAdmin,
+  scheduleReferenceCents,
   type ScheduleLine,
 } from "./schedule-lines"
 
@@ -213,6 +219,9 @@ export async function registerPaymentCore(
       id: s.id,
       amountCents: s.amountCents,
       description: describeScheduleAdmin(s),
+      // Il tetto dell'incasso: la quota del corso dove esiste, così una
+      // mensile rimasta bassa si riporta a posto incassandola
+      referenceAmountCents: scheduleReferenceCents(s),
     })),
     totalCents: inputCents,
     rowCents: rowAmountsCents(values.scheduleAmountsEur),
@@ -230,9 +239,12 @@ export async function registerPaymentCore(
       `Importo registrato ${formatEur(amountCents)} invece di ${formatEur(inputCents)}`,
     )
   }
-  // Quote incassate per meno: la scadenza vale quanto incassato
+  // La scadenza vale quanto incassato, nei due versi
   const alignments = openRows.filter((r) => r.alignedCents !== r.dueCents)
   const differences = amountDifferences(openRows)
+  // Righe riportate su: non sono un incasso ridotto ma una correzione, e
+  // finiscono nell'audit come quelle fatte a mano da "Modifica importo"
+  const raised = openRows.filter((r) => rowDirection(r) === "raised")
 
   const feeType = open[0]?.feeType ?? values.feeType
   const enrollmentIds = [
@@ -316,8 +328,29 @@ export async function registerPaymentCore(
                 dueCents: r.dueCents,
                 collectedCents: r.collectedCents,
                 scheduleAmountAfterCents: r.alignedCents,
+                direction: rowDirection(r),
               })),
               notes: emptyToNull(values.notes),
+            },
+          },
+        })
+      }
+
+      // Una riga per ogni scadenza riportata alla quota: si trova dove si
+      // trovano le correzioni fatte a mano, cercando per id della scadenza
+      for (const row of raised) {
+        await tx.auditLog.create({
+          data: {
+            userId: actor.userId,
+            action: AuditAction.SCHEDULE_AMOUNT_UPDATE,
+            entityType: "PaymentSchedule",
+            entityId: row.scheduleId,
+            changes: {
+              athleteId: athlete.id,
+              paymentId: created.id,
+              amountCentsBefore: row.dueCents,
+              amountCentsAfter: row.alignedCents,
+              reason: "Riportata alla quota del corso all'incasso",
             },
           },
         })

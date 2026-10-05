@@ -8,6 +8,7 @@ import {
   describeScheduleAdmin,
   paymentFeeTypeLabel,
   scheduleCourseName,
+  scheduleReferenceCents,
   type ScheduleLine,
 } from "./schedule-lines"
 
@@ -38,8 +39,13 @@ function schedule(overrides: Partial<ScheduleLine> = {}): ScheduleLine {
   } as ScheduleLine
 }
 
-function withCourse(name: string): Pick<ScheduleLine, "courseEnrollment"> {
-  return { courseEnrollment: { athleteId: "a1", course: { name } } }
+function withCourse(
+  name: string,
+  monthlyFeeCents = 4000,
+): Pick<ScheduleLine, "courseEnrollment"> {
+  return {
+    courseEnrollment: { athleteId: "a1", course: { name, monthlyFeeCents } },
+  }
 }
 
 describe("describeSchedule — dicitura per la famiglia", () => {
@@ -191,5 +197,39 @@ describe("confine famiglia / gestionale", () => {
       }
     }
     expect(offenders).toEqual([])
+  })
+})
+
+describe("scheduleReferenceCents — la quota a cui una scadenza può tornare", () => {
+  it("per una mensile è la quota del corso", () => {
+    expect(
+      scheduleReferenceCents(
+        schedule({ feeType: "MONTHLY", ...withCourse("Moderno 2h", 4000) }),
+      ),
+    ).toBe(4000)
+  })
+
+  it("per il contributo di iscrizione non esiste", () => {
+    expect(scheduleReferenceCents(schedule({ feeType: "ASSOCIATION" }))).toBeNull()
+  })
+
+  it("per il trimestre non esiste: la quota del corso è mensile", () => {
+    expect(
+      scheduleReferenceCents(
+        schedule({ feeType: "TRIMESTER", ...withCourse("Moderno 2h", 4000) }),
+      ),
+    ).toBeNull()
+  })
+
+  it("per stage, saggio e costume non esiste", () => {
+    for (const feeType of ["STAGE", "SHOWCASE_1", "SHOWCASE_2", "COSTUME"] as const) {
+      expect(scheduleReferenceCents(schedule({ feeType }))).toBeNull()
+    }
+  })
+
+  it("mensile senza corso collegato: nessun riferimento invece di un errore", () => {
+    expect(
+      scheduleReferenceCents(schedule({ feeType: "MONTHLY", courseEnrollment: null })),
+    ).toBeNull()
   })
 })

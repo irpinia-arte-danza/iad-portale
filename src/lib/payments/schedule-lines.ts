@@ -26,7 +26,12 @@ export const SCHEDULE_LINE_SELECT = {
   // Serve alla dicitura del contributo di iscrizione ("… 2026/2027")
   academicYear: { select: { label: true } },
   courseEnrollment: {
-    select: { athleteId: true, course: { select: { name: true } } },
+    select: {
+      athleteId: true,
+      // monthlyFeeCents è la quota di riferimento della scadenza mensile: il
+      // tetto dell'incasso e il valore a cui "Riporta a …" la rimette
+      course: { select: { name: true, monthlyFeeCents: true } },
+    },
   },
   stageEnrollment: {
     select: {
@@ -197,4 +202,19 @@ export function paymentFeeTypeLabel(payment: PaymentForAccounting): string {
   const types = [...new Set(accountingLines(payment).map((l) => l.feeType))]
   types.sort((a, b) => FEE_TYPE_ORDER.indexOf(a) - FEE_TYPE_ORDER.indexOf(b))
   return types.map((t) => FEE_TYPE_LABELS[t]).join(" + ")
+}
+
+// Quota "di listino" di una scadenza: il valore giusto a cui può tornare.
+//
+// Solo per le mensili: la quota del corso. Per il contributo di iscrizione,
+// gli stage, il saggio e i costumi un valore giusto non esiste — il prezzo è
+// dell'evento o dell'anno, e l'importo della scadenza è l'unico riferimento.
+// Il trimestre resta fuori di proposito: la quota del corso è mensile, e
+// confrontarla con una rata trimestrale darebbe un tetto sbagliato.
+export function scheduleReferenceCents(line: {
+  feeType: FeeType
+  courseEnrollment?: { course: { monthlyFeeCents: number } } | null
+}): number | null {
+  if (line.feeType !== "MONTHLY") return null
+  return line.courseEnrollment?.course.monthlyFeeCents ?? null
 }
