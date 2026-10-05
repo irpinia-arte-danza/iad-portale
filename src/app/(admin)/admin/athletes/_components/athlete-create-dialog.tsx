@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Plus } from "lucide-react"
 
@@ -16,6 +17,7 @@ import {
 import { AthleteForm } from "./athlete-form"
 
 export function AthleteCreateDialog() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
 
   return (
@@ -30,11 +32,19 @@ export function AthleteCreateDialog() {
         <DialogHeader>
           <DialogTitle>Aggiungi allieva</DialogTitle>
           <DialogDescription>
-            Inserisci i dati anagrafici base. Collegherai i genitori
-            successivamente dalla pagina dell&apos;allieva.
+            Inserisci i dati anagrafici base. Appena salvi si apre la sua
+            scheda, con l&apos;elenco di quello che resta da completare:
+            genitore, corso, certificato e tessera.
           </DialogDescription>
         </DialogHeader>
-        <AthleteForm mode="create" onSuccess={() => setOpen(false)} />
+        <AthleteForm
+          mode="create"
+          onSuccess={(athleteId) => {
+            setOpen(false)
+            // Dalla lista alla scheda appena creata: è lì che si completa
+            if (athleteId) router.push(`/admin/athletes/${athleteId}`)
+          }}
+        />
       </DialogContent>
     </Dialog>
   )

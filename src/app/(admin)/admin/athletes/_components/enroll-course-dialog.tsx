@@ -45,7 +45,7 @@ import { formatDateShort, formatEur, formatMeseIt } from "@/lib/utils/format"
 
 import { createEnrollment } from "../enrollments-actions"
 
-type ActiveCourse = {
+export type ActiveCourse = {
   id: string
   name: string
   type: keyof typeof COURSE_TYPE_LABELS
@@ -67,6 +67,9 @@ interface EnrollCourseDialogProps {
   // L'allieva ha già la quota associativa dell'anno corrente
   hasAssociationFee: boolean
   enrolledCourseIds: string[]
+  // Bottone di apertura alternativo: il blocco "Da completare" apre questo
+  // stesso dialog invece di averne uno suo
+  trigger?: React.ReactNode
 }
 
 function toDateInputValue(date: Date): string {
@@ -86,6 +89,7 @@ export function EnrollCourseDialog({
   currentAcademicYear,
   hasAssociationFee,
   enrolledCourseIds,
+  trigger,
 }: EnrollCourseDialogProps) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -143,10 +147,12 @@ export function EnrollCourseDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" disabled={noAcademicYear}>
-          <Plus className="h-4 w-4" />
-          Iscrivi a corso
-        </Button>
+        {trigger ?? (
+          <Button size="sm" disabled={noAcademicYear}>
+            <Plus className="h-4 w-4" />
+            Iscrivi a corso
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
