@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react"
 import { FormProvider, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Loader2, Plus, Search, UserPlus } from "lucide-react"
+import { AlertTriangle, Loader2, Plus, Search, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { ParentRelationship } from "@prisma/client"
@@ -54,6 +54,9 @@ interface GuardianPickerDialogProps {
   // Bottone di apertura alternativo: l'avviso in cima alla scheda apre questo
   // stesso dialog invece di averne uno suo
   trigger?: React.ReactNode
+  // Cosa cambia per l'allieva collegando un genitore, quando cambia: lo
+  // decide guardianSection, qui si mostra prima della conferma
+  accessWarning?: string | null
 }
 
 function fullName(g: ExistingGuardian) {
@@ -90,6 +93,7 @@ export function GuardianPickerDialog({
   existingGuardians,
   onSuccess,
   trigger,
+  accessWarning,
 }: GuardianPickerDialogProps) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<"existing" | "new">("existing")
@@ -136,6 +140,20 @@ export function GuardianPickerDialog({
             all&apos;allieva.
           </DialogDescription>
         </DialogHeader>
+
+        {accessWarning ? (
+          <div className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
+            <div className="space-y-1">
+              <p className="font-semibold text-amber-900 dark:text-amber-100">
+                Cosa cambia per l&apos;allieva
+              </p>
+              <p className="text-amber-800 dark:text-amber-200">
+                {accessWarning}
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <Tabs
           value={tab}

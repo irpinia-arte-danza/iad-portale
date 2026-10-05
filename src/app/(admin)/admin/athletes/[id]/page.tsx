@@ -174,6 +174,8 @@ export default async function AthleteDetailPage({ params }: PageProps) {
           <GuardianListSection
             athleteId={athlete.id}
             parentRelations={athlete.parentRelations}
+            dateOfBirth={athlete.dateOfBirth}
+            hasOwnAccess={athlete.userId !== null}
           />
           {accessStatus ? (
             <AthleteAccessSection
