@@ -175,7 +175,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
         <Button asChild variant="ghost" size="sm" className="w-fit -ml-2">
           <Link href="/admin/email-templates">
             <ArrowLeft className="h-4 w-4" />
-            Tutti i template
+            Tutti i modelli
           </Link>
         </Button>
         <div className="flex flex-wrap items-center gap-3">

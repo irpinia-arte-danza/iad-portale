@@ -1,3 +1,4 @@
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { NO_ACCESS_ROUTE } from "@/lib/auth/account-state"
@@ -9,6 +10,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 
+import { AcademicYearChip } from "./_components/academic-year-chip"
 import { AdminSidebar } from "./_components/admin-sidebar"
 
 export default async function AdminLayout({
@@ -18,7 +20,8 @@ export default async function AdminLayout({
 }) {
   const { userId } = await requireAdmin()
 
-  const [user, brand] = await Promise.all([
+  const [cookieStore, user, brand, currentYear] = await Promise.all([
+    cookies(),
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -35,14 +38,22 @@ export default async function AdminLayout({
         asdName: true,
       },
     }),
+    prisma.academicYear.findFirst({
+      where: { isCurrent: true },
+      select: { label: true },
+    }),
   ])
+
+  // SidebarProvider scrive già il cookie quando la sidebar si apre o si
+  // chiude: leggerlo qui fa sì che Giuseppina la ritrovi come l'ha lasciata
+  const sidebarOpen = cookieStore.get("sidebar_state")?.value !== "false"
 
   if (!user) {
     redirect(NO_ACCESS_ROUTE)
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={sidebarOpen}>
       <AdminSidebar
         firstName={user.firstName}
         lastName={user.lastName}
@@ -56,7 +67,12 @@ export default async function AdminLayout({
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger />
-          <span className="text-sm font-medium">IAD Portale — Admin</span>
+          <span className="truncate text-sm font-medium">
+            IAD Portale — Admin
+          </span>
+          <div className="ml-auto">
+            <AcademicYearChip label={currentYear?.label ?? null} />
+          </div>
         </header>
         <div className="flex-1 p-4 md:p-6">{children}</div>
       </SidebarInset>
