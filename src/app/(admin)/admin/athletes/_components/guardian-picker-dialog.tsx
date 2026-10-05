@@ -51,6 +51,9 @@ interface GuardianPickerDialogProps {
   athleteId: string
   existingGuardians: ExistingGuardian[]
   onSuccess?: () => void
+  // Bottone di apertura alternativo: l'avviso in cima alla scheda apre questo
+  // stesso dialog invece di averne uno suo
+  trigger?: React.ReactNode
 }
 
 function fullName(g: ExistingGuardian) {
@@ -86,6 +89,7 @@ export function GuardianPickerDialog({
   athleteId,
   existingGuardians,
   onSuccess,
+  trigger,
 }: GuardianPickerDialogProps) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<"existing" | "new">("existing")
@@ -117,10 +121,12 @@ export function GuardianPickerDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="h-4 w-4" />
-          Collega genitore
-        </Button>
+        {trigger ?? (
+          <Button size="sm">
+            <Plus className="h-4 w-4" />
+            Collega genitore
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>

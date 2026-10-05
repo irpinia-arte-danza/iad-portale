@@ -8,6 +8,11 @@ import {
   CURRENT_CARD_ORDER,
 } from "@/lib/affiliations/card-status"
 import {
+  countGuardianGaps,
+  GUARDIAN_GAP_FILTER,
+  hasGuardianGap,
+} from "@/lib/athletes/guardian-gap"
+import {
   classifyCert,
   compareByCertificateExpiry,
   CURRENT_CERTIFICATE_ORDER,
@@ -16,9 +21,14 @@ import { todayDateOnly } from "@/lib/utils/date-only"
 
 export type AthleteListSort = "name" | "certificate" | "card"
 
+// Per ora un filtro solo: le minorenni senza genitori collegati, che senza
+// un elenco dedicato non si trovano.
+export type AthleteListFilter = typeof GUARDIAN_GAP_FILTER
+
 type ListFilters = {
   search?: string
   sort?: AthleteListSort
+  filter?: AthleteListFilter
   limit?: number
   offset?: number
 }
@@ -69,7 +79,13 @@ function toListRow(
 export async function listAthletes(filters: ListFilters = {}) {
   await requireAdmin()
 
-  const { search, sort = "name", limit = DEFAULT_LIMIT, offset = 0 } = filters
+  const {
+    search,
+    sort = "name",
+    filter,
+    limit = DEFAULT_LIMIT,
+    offset = 0,
+  } = filters
   const today = todayDateOnly()
 
   const where: Prisma.AthleteWhereInput = {
@@ -82,6 +98,18 @@ export async function listAthletes(filters: ListFilters = {}) {
           ],
         }
       : {}),
+    // "Senza genitore collegato": la parte esatta la fa il database (nessuna
+    // relazione con un genitore non cestinato); la minore età si applica dopo
+    // in memoria con isMinorAt, che è l'unica definizione di minorenne del
+    // progetto. Tradurla in confronto fra date in SQL vorrebbe dire scriverne
+    // una seconda, che il 29 febbraio non coinciderebbe con la prima.
+    // Le ritirate restano fuori: non c'è niente da sistemare.
+    ...(filter === GUARDIAN_GAP_FILTER
+      ? {
+          status: { not: "WITHDRAWN" as const },
+          parentRelations: { none: { parent: { deletedAt: null } } },
+        }
+      : {}),
   }
 
   const orderBy: Prisma.AthleteOrderByWithRelationInput[] = [
@@ -89,18 +117,35 @@ export async function listAthletes(filters: ListFilters = {}) {
     { firstName: "asc" },
   ]
 
-  if (sort === "certificate" || sort === "card") {
-    // Certificato e tessera sono relazioni: si ordina in memoria l'elenco
-    // completo (poche centinaia di allieve) e poi si pagina. A parità di
-    // scadenza resta l'ordine per nome (sort stabile).
+  const inMemory =
+    sort === "certificate" || sort === "card" || filter === GUARDIAN_GAP_FILTER
+
+  if (inMemory) {
+    // Certificato, tessera e filtro "senza genitore" dipendono da relazioni o
+    // dalla minore età: si lavora in memoria sull'elenco completo (poche
+    // centinaia di allieve) e poi si pagina. A parità di scadenza resta
+    // l'ordine per nome (sort stabile).
     const athletes = await prisma.athlete.findMany({
       where,
       include: athleteListInclude,
       orderBy,
     })
-    const rows = athletes
-      .map((athlete) => toListRow(athlete, today))
-      .sort((a, b) =>
+    let rows = athletes.map((athlete) => toListRow(athlete, today))
+
+    if (filter === GUARDIAN_GAP_FILTER) {
+      rows = rows.filter((row) =>
+        hasGuardianGap(
+          {
+            dateOfBirth: row.dateOfBirth,
+            linkedParents: row._count.parentRelations,
+          },
+          today,
+        ),
+      )
+    }
+
+    if (sort === "card" || sort === "certificate") {
+      rows.sort((a, b) =>
         sort === "card"
           ? compareByCardExpiry(a.card.expiryDate, b.card.expiryDate)
           : compareByCertificateExpiry(
@@ -108,6 +153,8 @@ export async function listAthletes(filters: ListFilters = {}) {
               b.certificate.expiryDate,
             ),
       )
+    }
+
     return { items: rows.slice(offset, offset + limit), totalCount: rows.length }
   }
 
@@ -126,6 +173,28 @@ export async function listAthletes(filters: ListFilters = {}) {
     items: athletes.map((athlete) => toListRow(athlete, today)),
     totalCount,
   }
+}
+
+// Quante minorenni sono senza genitore collegato. La usano la dashboard (per
+// decidere se mostrare la riga) e la lista allieve (per il numero sul filtro):
+// un conteggio solo, così non possono discordare.
+export async function countAthletesWithoutGuardian(): Promise<number> {
+  await requireAdmin()
+
+  const today = todayDateOnly()
+  const athletes = await prisma.athlete.findMany({
+    where: {
+      deletedAt: null,
+      status: { not: "WITHDRAWN" },
+      parentRelations: { none: { parent: { deletedAt: null } } },
+    },
+    select: { dateOfBirth: true },
+  })
+
+  return countGuardianGaps(
+    athletes.map((a) => ({ dateOfBirth: a.dateOfBirth, linkedParents: 0 })),
+    today,
+  )
 }
 
 const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
