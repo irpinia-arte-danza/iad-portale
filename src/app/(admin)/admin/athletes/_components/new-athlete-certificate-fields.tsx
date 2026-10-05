@@ -16,9 +16,12 @@ import {
   medicalCertFileError,
 } from "@/lib/medical-certificates/file-rules"
 import {
-  suggestedExpiryDate,
-  type NewAthleteCertificate,
-} from "@/lib/medical-certificates/new-athlete-certificate"
+  DEFAULT_EXPIRY_HINT,
+  defaultExpiryFromIssue,
+  isDefaultExpiry,
+  shouldRefillExpiry,
+} from "@/lib/medical-certificates/default-expiry"
+import type { NewAthleteCertificate } from "@/lib/medical-certificates/new-athlete-certificate"
 import {
   MEDICAL_CERT_TYPE_LABELS,
   MEDICAL_CERT_TYPES,
@@ -41,13 +44,17 @@ export function NewAthleteCertificateFields({
   const [fileError, setFileError] = React.useState<string | null>(null)
   const id = React.useId()
 
+  // La scadenza mostrata è ancora quella calcolata? Serve alla riga di
+  // spiegazione sotto il campo, che compare solo quando è precompilata.
+  const expiryIsCalculated = isDefaultExpiry(value.issueDate, value.expiryDate)
+
   function onIssueDateChange(issueDate: string) {
-    // Come nel dialog della scheda: scadenza proposta a un anno se manca
-    // o precede la nuova emissione
-    const expiryDate =
-      issueDate && (!value.expiryDate || value.expiryDate <= issueDate)
-        ? suggestedExpiryDate(issueDate)
-        : value.expiryDate
+    // Si ricalcola solo se la scadenza è vuota o è ancora quella proposta dal
+    // rilascio precedente. Una data scritta a mano non si sovrascrive: se il
+    // medico ne ha messa una più breve, è quella che vale.
+    const expiryDate = shouldRefillExpiry(value.issueDate, value.expiryDate)
+      ? defaultExpiryFromIssue(issueDate)
+      : value.expiryDate
     onChange({ ...value, issueDate, expiryDate })
   }
 
@@ -113,6 +120,11 @@ export function NewAthleteCertificateFields({
             value={value.expiryDate}
             onChange={(e) => onChange({ ...value, expiryDate: e.target.value })}
           />
+          {expiryIsCalculated ? (
+            <p className="text-xs text-muted-foreground">
+              {DEFAULT_EXPIRY_HINT}
+            </p>
+          ) : null}
         </div>
       </div>
       <div className="space-y-2">
