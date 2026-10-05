@@ -74,6 +74,11 @@ const RECEIPT_INFO_SELECT = {
   receiptNumber: true,
   issueDate: true,
   status: true,
+  // Congelati all'emissione: chi consegna la ricevuta legge questi, non
+  // l'anagrafica di oggi
+  athleteName: true,
+  payerName: true,
+  payerEmail: true,
 } satisfies Prisma.ReceiptSelect
 
 const PAYMENT_FOR_RECEIPT_SELECT = {
@@ -187,6 +192,9 @@ function toInfo(receipt: IssuedReceiptInfo): IssuedReceiptInfo {
     receiptNumber: receipt.receiptNumber,
     issueDate: receipt.issueDate,
     status: receipt.status,
+    athleteName: receipt.athleteName,
+    payerName: receipt.payerName,
+    payerEmail: receipt.payerEmail,
   }
 }
 

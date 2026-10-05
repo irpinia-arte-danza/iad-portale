@@ -23,6 +23,7 @@ import {
   type ReceiptDeliveryInfo,
 } from "../actions"
 import { ShareReceiptButton } from "./share-receipt-button"
+import { useFileShareSupport } from "./use-file-share-support"
 
 const NOTHING_YET: ReceiptDeliveryInfo = {
   email: NEVER_SENT,
@@ -38,9 +39,14 @@ type Props = {
   payerEmail: string | null
 }
 
-// Stato dell'invio e azioni sulla singola ricevuta: usato nel pannello del
-// pagamento, dove la ricevuta si consulta una alla volta. Lo stato si carica
-// all'apertura, così non serve passarlo attraverso la query del pagamento.
+// Stato dell'invio e azioni sulla singola ricevuta: subito dopo l'emissione e
+// nel pannello del pagamento. Lo stato si carica all'apertura, così non serve
+// passarlo attraverso la query del pagamento.
+//
+// L'ordine di rilievo dei tasti segue il mezzo con cui la ricevuta viene
+// consegnata davvero: da iPad è WhatsApp, quindi dove il browser condivide
+// file "Condividi" è il tasto pieno e l'email passa a outline. Su desktop,
+// dove la condivisione di file non c'è, l'email resta il tasto pieno.
 export function ReceiptEmailActions({
   receiptId,
   receiptNumber,
@@ -51,6 +57,7 @@ export function ReceiptEmailActions({
 }: Props) {
   const [info, setInfo] = useState<ReceiptDeliveryInfo | null>(null)
   const [sending, setSending] = useState(false)
+  const canShareFiles = useFileShareSupport()
 
   const blocker = receiptEmailBlocker({ status, payerName, payerEmail })
 
@@ -132,14 +139,17 @@ export function ReceiptEmailActions({
             Scarica
           </a>
         </Button>
-        {/* Compare solo dove il browser condivide file (iPad, iPhone) */}
+        {/* Compare solo dove il browser condivide file (iPad, iPhone), e lì
+            è l'azione principale */}
         <ShareReceiptButton
           receiptId={receiptId}
           receiptNumber={receiptNumber}
           athleteName={athleteName}
+          buttonVariant={canShareFiles ? "default" : "outline"}
           onShared={reload}
         />
         <Button
+          variant={canShareFiles ? "outline" : "default"}
           className="min-h-11 flex-1"
           onClick={send}
           disabled={sending || blocker !== null || email === null}

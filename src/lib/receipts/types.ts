@@ -20,6 +20,13 @@ export type IssuedReceiptInfo = {
   receiptNumber: string
   issueDate: Date
   status: ReceiptStatus
+  // Dati congelati sulla ricevuta all'emissione, non ricalcolati dal genitore
+  // di oggi: servono a consegnarla subito (nome del file condiviso,
+  // destinatario dell'email) senza rileggere il pagamento. Nullable per le
+  // ricevute emesse prima che venissero congelati.
+  athleteName: string | null
+  payerName: string | null
+  payerEmail: string | null
 }
 
 export type ReceiptIssuePreview = {

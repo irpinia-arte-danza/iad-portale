@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useSyncExternalStore } from "react"
+import { useRef, useState } from "react"
 import { Loader2, Share2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -9,6 +9,7 @@ import { receiptPdfFileName } from "@/lib/receipts/pdf-file-name"
 import { receiptPdfHref } from "@/lib/receipts/types"
 
 import { recordReceiptShared } from "../actions"
+import { useFileShareSupport } from "./use-file-share-support"
 
 // ─────────────────────────────────────────────────────────────────────────
 // "Condividi": apre il foglio di condivisione di iOS con il PDF già dentro,
@@ -34,40 +35,7 @@ import { recordReceiptShared } from "../actions"
 
 type ShareNavigator = Navigator & {
   share?: (data: ShareData) => Promise<void>
-  canShare?: (data: ShareData) => boolean
 }
-
-function detectFileShareSupport(): boolean {
-  if (typeof navigator === "undefined") return false
-  const nav = navigator as ShareNavigator
-  if (typeof nav.share !== "function" || typeof nav.canShare !== "function") {
-    return false
-  }
-  try {
-    // File di prova: canShare({ files }) è l'unico modo per sapere se questo
-    // browser condivide file e non solo link
-    const probe = new File(["%PDF-"], "prova.pdf", { type: "application/pdf" })
-    return nav.canShare({ files: [probe] })
-  } catch {
-    return false
-  }
-}
-
-// Rilevato una volta per pagina: useSyncExternalStore richiede uno snapshot
-// stabile, e creare un File di prova a ogni render sarebbe uno spreco
-let fileShareSupport: boolean | null = null
-
-function getSupportSnapshot(): boolean {
-  if (fileShareSupport === null) fileShareSupport = detectFileShareSupport()
-  return fileShareSupport
-}
-
-// Il supporto non cambia durante la vita della pagina: niente a cui iscriversi
-const subscribeNever = () => () => {}
-
-// Durante il render sul server navigator non esiste: il tasto compare dopo
-// l'idratazione, solo dove la condivisione di file c'è davvero
-const getServerSnapshot = () => false
 
 type Props = {
   receiptId: string
@@ -75,6 +43,9 @@ type Props = {
   athleteName: string
   // "icon" per l'elenco, "button" per il dettaglio
   variant?: "button" | "icon"
+  // Rilievo del tasto: dove il browser condivide file è lui l'azione
+  // principale, e l'invio per email passa in secondo piano
+  buttonVariant?: "default" | "outline"
   className?: string
   // Il dettaglio se ne serve per aggiornare la riga "Condivisa dal
   // gestionale il …" senza ricaricare la pagina
@@ -86,14 +57,11 @@ export function ShareReceiptButton({
   receiptNumber,
   athleteName,
   variant = "button",
+  buttonVariant = "outline",
   className,
   onShared,
 }: Props) {
-  const supported = useSyncExternalStore(
-    subscribeNever,
-    getSupportSnapshot,
-    getServerSnapshot,
-  )
+  const supported = useFileShareSupport()
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<File | null>(null)
   const pendingRef = useRef<Promise<File> | null>(null)
@@ -212,7 +180,7 @@ export function ShareReceiptButton({
   return (
     <Button
       type="button"
-      variant="outline"
+      variant={buttonVariant}
       className={className ?? "min-h-11 flex-1"}
       onPointerDown={prefetch}
       onClick={handleClick}

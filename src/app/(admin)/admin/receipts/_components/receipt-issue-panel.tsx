@@ -7,16 +7,16 @@ import {
   FileText,
   Info,
   Loader2,
-  Printer,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { isTraceablePaymentMethod } from "@/lib/payments/traceability"
-import { receiptPdfHref, receiptPreviewPdfHref } from "@/lib/receipts/types"
+import { receiptPreviewPdfHref } from "@/lib/receipts/types"
 import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { formatDateShort, formatEur } from "@/lib/utils/format"
 
+import { ReceiptEmailActions } from "./receipt-email-actions"
 import type { ReceiptIssueState } from "./use-receipt-issue"
 
 type Props = {
@@ -93,19 +93,21 @@ export function ReceiptIssuePanel({
             aprirlo e stamparlo subito.
           </p>
         ) : null}
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        {/* Le stesse azioni del dettaglio pagamento, qui: la ricevuta si
+            consegna adesso — su WhatsApp da iPad o per email — senza chiudere,
+            andare in Ricevute e ritrovarla. Le annullate le blocca già
+            ReceiptEmailActions, che non invia e lo dice. */}
+        <ReceiptEmailActions
+          receiptId={state.receipt.id}
+          receiptNumber={state.receipt.receiptNumber}
+          athleteName={state.receipt.athleteName ?? ""}
+          status={state.receipt.status}
+          payerName={state.receipt.payerName}
+          payerEmail={state.receipt.payerEmail}
+        />
+        <div className="flex sm:justify-end">
           <Button variant="outline" className="min-h-11" onClick={onClose}>
             Chiudi
-          </Button>
-          <Button asChild className="min-h-11">
-            <a
-              href={receiptPdfHref(state.receipt.id)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Printer className="h-4 w-4" />
-              {cancelled ? "Apri ricevuta annullata" : "Apri e stampa PDF"}
-            </a>
           </Button>
         </div>
       </div>
