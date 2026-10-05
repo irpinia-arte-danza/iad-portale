@@ -205,3 +205,60 @@ export function todoGroups(
     .map((group) => ({ group, tiles: tiles.filter((t) => t.group === group) }))
     .filter((g) => g.tiles.length > 0)
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Gli stessi numeri, accanto alle voci del menu.
+//
+// Chi lavora da iPad non passa dalla dashboard a ogni giro: il menu è l'unico
+// posto sempre a portata. I contatori sono quelli dei riquadri "Da fare",
+// ricavati qui dagli stessi conteggi, così la voce del menu e il riquadro
+// non possono dire numeri diversi.
+//
+// Le voci a zero non portano badge: un menu pieno di zeri si smette di
+// leggere, come la dashboard.
+// ─────────────────────────────────────────────────────────────────────────
+
+export type NavCounter = { count: number; tone: TodoTone }
+// Chiave = href della voce in ADMIN_NAV
+export type NavCounters = Record<string, NavCounter>
+
+export type NavCounterInput = Pick<
+  TodoCounters,
+  | "scadenzeInRitardo"
+  | "certificatiScaduti"
+  | "certificatiAssenti"
+  | "tessereDaFare"
+>
+
+export const NAV_COUNTER_HREF = {
+  scadenze: "/admin/scadenze",
+  certificati: "/admin/medical-certificates",
+  tessere: "/admin/tessere",
+} as const
+
+export function navCounters(counters: NavCounterInput): NavCounters {
+  const out: NavCounters = {}
+
+  if (counters.scadenzeInRitardo.count > 0) {
+    out[NAV_COUNTER_HREF.scadenze] = {
+      count: counters.scadenzeInRitardo.count,
+      tone: "amber",
+    }
+  }
+
+  // Scaduti e assenti insieme: sono le allieve che oggi non possono fare
+  // lezione, ed è l'unico rosso del menu perché è l'unico che blocca
+  const certificati = counters.certificatiScaduti + counters.certificatiAssenti
+  if (certificati > 0) {
+    out[NAV_COUNTER_HREF.certificati] = { count: certificati, tone: "red" }
+  }
+
+  if (counters.tessereDaFare.count > 0) {
+    out[NAV_COUNTER_HREF.tessere] = {
+      count: counters.tessereDaFare.count,
+      tone: "amber",
+    }
+  }
+
+  return out
+}

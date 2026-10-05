@@ -2,7 +2,11 @@ import { AffiliationEntity, AthleteStatus } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
-import type { TodoCounters } from "@/lib/dashboard/todo-tiles"
+import {
+  navCounters,
+  type NavCounters,
+  type TodoCounters,
+} from "@/lib/dashboard/todo-tiles"
 import { todayDateOnly } from "@/lib/utils/date-only"
 
 import { countAthleteSteps } from "../athletes/queries"
@@ -265,4 +269,32 @@ export async function getTodoCounters(): Promise<TodoCounters> {
     certificatiAssenti: certificati.missing,
     tessereDaFare: { count: daTesserare, seasonYear },
   }
+}
+
+/**
+ * I contatori accanto alle voci del menu, a ogni navigazione.
+ *
+ * Tre conteggi e non i dieci della dashboard: il menu mostra solo Scadenze,
+ * Certificati e Tessere, e questi tre vengono dalle stesse funzioni dei
+ * rispettivi riquadri — `scadenzeWhere` per le rate in ritardo,
+ * `getCertificateStatusCounts` per i certificati, `countTesseramentoQueue`
+ * per le tessere. Nessun predicato riscritto, quindi il numero nel menu e
+ * quello in dashboard coincidono per costruzione.
+ */
+export async function getNavCounters(): Promise<NavCounters> {
+  await requireAdmin()
+
+  const seasonYear = await getCurrentSeasonYear()
+  const [scadenzeInRitardo, certificati, daTesserare] = await Promise.all([
+    prisma.paymentSchedule.count({ where: scadenzeWhere({ stato: "IN_RITARDO" }) }),
+    getCertificateStatusCounts(),
+    countTesseramentoQueue(AffiliationEntity.ENDAS, seasonYear),
+  ])
+
+  return navCounters({
+    scadenzeInRitardo: { count: scadenzeInRitardo, amountCents: 0 },
+    certificatiScaduti: certificati.expired,
+    certificatiAssenti: certificati.missing,
+    tessereDaFare: { count: daTesserare, seasonYear },
+  })
 }
