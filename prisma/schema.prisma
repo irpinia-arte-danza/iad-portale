@@ -1443,6 +1443,8 @@ enum AuditAction {
   RECEIPT_SHARED
   // Tessere ENDAS/CSEN: caricamento singolo, caricamento in blocco dai PDF
   // dell'ente, cestino, ed export dell'elenco da tesserare per il referente
+  // Importo di una scadenza corretto a mano, nei due versi
+  SCHEDULE_AMOUNT_UPDATE
   // Iscrizione a un corso: annullata (era un errore) o ritirata (ha smesso)
   ENROLLMENT_CANCEL
   ENROLLMENT_WITHDRAW

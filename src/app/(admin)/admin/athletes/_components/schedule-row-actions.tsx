@@ -5,6 +5,7 @@ import {
   BanknoteArrowUp,
   CalendarX,
   MoreHorizontal,
+  PencilLine,
   Undo2,
 } from "lucide-react"
 
@@ -19,6 +20,7 @@ import {
 import type { FeeType, ScheduleStatus } from "@prisma/client"
 
 import type { ScheduleDisplayStatus } from "@/lib/utils/schedule-status"
+import { ScheduleAmountDialog } from "./schedule-amount-dialog"
 import { useOpenScheduleSettle } from "./schedule-settle-provider"
 import { ScheduleUnwaiveDialog } from "./schedule-unwaive-dialog"
 import { ScheduleWaiveDialog } from "./schedule-waive-dialog"
@@ -36,6 +38,9 @@ interface ScheduleRowActionsProps {
     amountCents: number
     waiverReason: string | null
     paymentId: string | null
+    // Quota mensile del corso, per il tasto "Riporta a …". null dove un
+    // riferimento non c'è (contributo di iscrizione, stage, saggio, costume).
+    referenceAmountCents: number | null
   }
 }
 
@@ -43,11 +48,15 @@ export function ScheduleRowActions({ schedule }: ScheduleRowActionsProps) {
   const openSettle = useOpenScheduleSettle()
   const [waiveOpen, setWaiveOpen] = useState(false)
   const [unwaiveOpen, setUnwaiveOpen] = useState(false)
+  const [amountOpen, setAmountOpen] = useState(false)
 
   const canSettle =
     schedule.status === "DUE" || schedule.displayStatus === "OVERDUE"
   const canWaive = canSettle
   const canUnwaive = schedule.status === "WAIVED"
+  // L'importo si cambia su tutto ciò che non è pagato, condoni compresi
+  const canEditAmount =
+    schedule.status !== "PAID" && schedule.paymentId === null
 
   return (
     <>
@@ -75,6 +84,12 @@ export function ScheduleRowActions({ schedule }: ScheduleRowActionsProps) {
               Salda
             </DropdownMenuItem>
           )}
+          {canEditAmount && (
+            <DropdownMenuItem onClick={() => setAmountOpen(true)}>
+              <PencilLine className="h-4 w-4" />
+              Modifica importo
+            </DropdownMenuItem>
+          )}
           {canWaive && (
             <>
               <DropdownMenuSeparator />
@@ -92,6 +107,27 @@ export function ScheduleRowActions({ schedule }: ScheduleRowActionsProps) {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {canEditAmount && (
+        <ScheduleAmountDialog
+          open={amountOpen}
+          onOpenChange={setAmountOpen}
+          schedule={{
+            id: schedule.id,
+            courseName: schedule.courseName,
+            dueDate: schedule.dueDate,
+            amountCents: schedule.amountCents,
+          }}
+          reference={
+            schedule.referenceAmountCents !== null
+              ? {
+                  amountCents: schedule.referenceAmountCents,
+                  label: "quota del corso",
+                }
+              : null
+          }
+        />
+      )}
 
       {canWaive && (
         <ScheduleWaiveDialog
