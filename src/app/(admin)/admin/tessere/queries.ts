@@ -1,6 +1,6 @@
 import "server-only"
 
-import { AffiliationEntity } from "@prisma/client"
+import { AffiliationEntity, Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
@@ -178,6 +178,32 @@ const REQUIRED_FIELDS: {
   { key: "residenceCap", label: "CAP" },
 ]
 
+// Chi va tesserata: allieva attiva, nessuna tessera di quell'ente per
+// quell'anno sociale. Esportato perché il riquadro "Da tesserare" in
+// dashboard conti le righe di questo elenco e non una query simile.
+export function tesseramentoQueueWhere(
+  entity: AffiliationEntity,
+  seasonYear: number,
+): Prisma.AthleteWhereInput {
+  return {
+    deletedAt: null,
+    status: { not: "WITHDRAWN" },
+    affiliations: {
+      none: { deletedAt: null, entity, cardYear: seasonYear },
+    },
+  }
+}
+
+export async function countTesseramentoQueue(
+  entity: AffiliationEntity,
+  seasonYear: number,
+): Promise<number> {
+  await requireAdmin()
+  return prisma.athlete.count({
+    where: tesseramentoQueueWhere(entity, seasonYear),
+  })
+}
+
 // Elenco da mandare al referente dell'ente: le allieve attive che per
 // quell'anno sociale una tessera non ce l'hanno ancora. È il passaggio che
 // precede il caricamento — prima si chiede il tesseramento, poi arrivano i PDF.
@@ -188,13 +214,7 @@ export async function getTesseramentoQueue(
   await requireAdmin()
 
   const athletes = await prisma.athlete.findMany({
-    where: {
-      deletedAt: null,
-      status: { not: "WITHDRAWN" },
-      affiliations: {
-        none: { deletedAt: null, entity, cardYear: seasonYear },
-      },
-    },
+    where: tesseramentoQueueWhere(entity, seasonYear),
     select: {
       id: true,
       firstName: true,

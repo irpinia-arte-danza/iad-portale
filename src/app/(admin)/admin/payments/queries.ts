@@ -22,8 +22,27 @@ type ListFilters = {
   search?: string
   feeType?: FeeType
   status?: PaymentStatus
+  // Solo i pagamenti che aspettano una ricevuta
+  missingReceipt?: boolean
   limit?: number
   offset?: number
+}
+
+// "Senza ricevuta" = un pagamento che una ricevuta la vuole e non l'ha:
+// non eliminato, incassato (non stornato) e senza ricevuta collegata.
+//
+// Gli stornati restano fuori perché su un pagamento stornato la ricevuta non
+// si emette (issueReceiptCore la rifiuta) e se ce n'era una risulta annullata:
+// non è un compito, è una storia chiusa.
+export const MISSING_RECEIPT_WHERE = {
+  deletedAt: null,
+  status: PaymentStatus.PAID,
+  receipt: { is: null },
+} as const satisfies Prisma.PaymentWhereInput
+
+export async function countPaymentsMissingReceipt(): Promise<number> {
+  await requireAdmin()
+  return prisma.payment.count({ where: MISSING_RECEIPT_WHERE })
 }
 
 const DEFAULT_LIMIT = 20
@@ -59,11 +78,15 @@ export async function listPayments(filters: ListFilters = {}) {
     search,
     feeType,
     status,
+    missingReceipt,
     limit = DEFAULT_LIMIT,
     offset = 0,
   } = filters
 
   const conditions: Prisma.PaymentWhereInput[] = [{ deletedAt: null }]
+  // Stesso predicato del contatore in dashboard: il numero sul riquadro è le
+  // righe di questo elenco
+  if (missingReceipt) conditions.push(MISSING_RECEIPT_WHERE)
   // Un pagamento su più scadenze compare sotto ciascuno dei suoi tipi quota
   if (feeType) {
     conditions.push({

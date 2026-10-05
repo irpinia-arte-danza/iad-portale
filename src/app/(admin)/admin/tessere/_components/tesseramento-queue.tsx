@@ -30,7 +30,8 @@ export function TesseramentoQueue({
   const incomplete = rows.filter((r) => r.missing.length > 0)
 
   return (
-    <Card>
+    // L'ancora è la destinazione del riquadro "Da tesserare" in dashboard
+    <Card id="da-tesserare" className="scroll-mt-20">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:space-y-0">
         <div className="space-y-1.5">
           <CardTitle>Da tesserare — anno sociale {seasonYear}</CardTitle>

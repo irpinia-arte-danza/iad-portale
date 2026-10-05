@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { withActiveCourseOrAssociationScheduleFilter } from "@/lib/queries/active-schedule-filter"
 import { isMinorAt } from "@/lib/utils/age"
+import { todayDateOnly } from "@/lib/utils/date-only"
 
 export type ScadenzeStatoFilter =
   | "DEFAULT"
@@ -88,13 +89,6 @@ const SCHEDULE_ATHLETE_SELECT = {
   },
 } satisfies Prisma.AthleteSelect
 
-function startOfUTCToday(): Date {
-  const now = new Date()
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  )
-}
-
 function athleteSearch(q: string): Prisma.AthleteWhereInput {
   return {
     OR: [
@@ -116,8 +110,18 @@ function athleteSearch(q: string): Prisma.AthleteWhereInput {
   }
 }
 
-function buildWhere(filter: ScadenzeFilter): Prisma.PaymentScheduleWhereInput {
-  const today = startOfUTCToday()
+/**
+ * Il filtro dell'elenco Scadenze, esportato perché i riquadri "Da fare" in
+ * dashboard contino esattamente le righe che l'elenco mostra: un predicato
+ * solo, non due query scritte a parte che col tempo divergono.
+ */
+export function scadenzeWhere(
+  filter: ScadenzeFilter,
+): Prisma.PaymentScheduleWhereInput {
+  // todayDateOnly e non il giorno UTC: fra mezzanotte e le 2 ora di Roma il
+  // giorno UTC è ancora quello prima, e una rata in scadenza oggi finirebbe
+  // fra quelle in ritardo
+  const today = todayDateOnly()
   const in7days = new Date(today)
   in7days.setUTCDate(in7days.getUTCDate() + 7)
 
@@ -176,7 +180,7 @@ export async function getScadenze(
 ): Promise<ScadenzaWithDetails[]> {
   await requireAdmin()
 
-  const where = buildWhere(filter)
+  const where = scadenzeWhere(filter)
   const orderBy = buildOrderBy(filter.sortBy)
 
   const schedules = await prisma.paymentSchedule.findMany({
@@ -219,7 +223,7 @@ export async function getScadenze(
     })
   }
 
-  const today = startOfUTCToday()
+  const today = todayDateOnly()
 
   return schedules.flatMap((s) => {
     const athlete = s.courseEnrollment?.athlete ?? s.athlete

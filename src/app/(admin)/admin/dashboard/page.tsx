@@ -1,8 +1,8 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { AlertTriangle, ArrowRight, Stethoscope, UserX } from "lucide-react"
+import { AlertTriangle } from "lucide-react"
 
-import { athletesWithoutGuardianHref } from "@/lib/athletes/guardian-gap"
+import { todoTiles } from "@/lib/dashboard/todo-tiles"
 import { createClient } from "@/lib/supabase/server"
 import { prisma } from "@/lib/prisma"
 import {
@@ -15,8 +15,10 @@ import { todayDateOnly } from "@/lib/utils/date-only"
 
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
-import { countAthletesWithoutGuardian } from "../athletes/queries"
-import { getCertificateStatusCounts } from "../medical-certificates/queries"
+import {
+  listAthletesWithRelations,
+  listOpenSchedulesByAthlete,
+} from "../payments/queries"
 
 import {
   countUpcomingStages,
@@ -24,7 +26,7 @@ import {
   getDashboardStats,
   getRecentAthletes,
   getRecentParents,
-  getScadenzeKPI,
+  getTodoCounters,
   getUpcomingStages,
 } from "./queries"
 import {
@@ -36,8 +38,8 @@ import {
 import { AnalyticsSection } from "./_components/analytics-section"
 import { KpiCards } from "./_components/kpi-cards"
 import { RecentActivity } from "./_components/recent-activity"
+import { TodoBlock } from "./_components/todo-block"
 import { QuickActions } from "./_components/quick-actions"
-import { ScadenzeKpiWidget } from "./_components/scadenze-kpi-widget"
 import { ShowcaseWidget } from "./_components/showcase-widget"
 import { UpcomingStagesWidget } from "./_components/upcoming-stages-widget"
 
@@ -58,7 +60,7 @@ export default async function AdminDashboardPage() {
   const [
     user,
     stats,
-    scadenzeKpi,
+    todoCounters,
     athletes,
     parents,
     enrollmentsTrend,
@@ -67,18 +69,18 @@ export default async function AdminDashboardPage() {
     retention,
     academicYears,
     fiscalYears,
-    certCounts,
-    withoutGuardianCount,
     upcomingStages,
     upcomingStagesCount,
     showcaseStats,
+    formAthletes,
+    openSchedulesByAthlete,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: authUser.id },
       select: { firstName: true },
     }),
     getDashboardStats(),
-    getScadenzeKPI(),
+    getTodoCounters(),
     getRecentAthletes(5),
     getRecentParents(5),
     getEnrollmentsTrend(12),
@@ -106,34 +108,14 @@ export default async function AdminDashboardPage() {
       where: { year: { in: [fiscalYearNow, fiscalYearNow + 1] } },
       select: { year: true, isCurrent: true },
     }),
-    getCertificateStatusCounts(),
-    countAthletesWithoutGuardian(),
     getUpcomingStages(3),
     countUpcomingStages(),
     getCurrentShowcaseStats(),
+    listAthletesWithRelations(),
+    listOpenSchedulesByAthlete(),
   ])
 
-  const certNeedsAttention =
-    certCounts.expired + certCounts.expiring + certCounts.missing
-  const certHasExpired = certCounts.expired > 0
-  const certPalette = certHasExpired
-    ? {
-        wrap: "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30",
-        title: "text-red-900 dark:text-red-100",
-        text: "text-red-800 dark:text-red-200",
-        icon: "text-red-700 dark:text-red-300",
-      }
-    : {
-        wrap: "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30",
-        title: "text-amber-900 dark:text-amber-100",
-        text: "text-amber-800 dark:text-amber-200",
-        icon: "text-amber-700 dark:text-amber-300",
-      }
-  const certDeepLink = certHasExpired
-    ? "/admin/medical-certificates?status=expired"
-    : certCounts.expiring > 0
-      ? "/admin/medical-certificates?status=expiring"
-      : "/admin/medical-certificates?status=missing"
+  const tiles = todoTiles(todoCounters)
 
   // Luglio-agosto nessun anno copre la data odierna: il corrente resta l'anno
   // appena concluso fino all'avvio del successivo, non è un'anomalia.
@@ -171,7 +153,7 @@ export default async function AdminDashboardPage() {
       <ResourceHeader
         breadcrumbs={[{ label: "Dashboard" }]}
         title={`Ciao ${user?.firstName ?? "Admin"} 👋`}
-        description="Ecco un riepilogo della situazione IAD oggi."
+        description="Cosa c'è da fare oggi. I numeri dell'anno sono più sotto."
       />
       <ResourceContent>
         <div className="flex flex-col gap-6">
@@ -211,67 +193,11 @@ export default async function AdminDashboardPage() {
               </div>
             </div>
           ) : null}
-          {certNeedsAttention > 0 ? (
-            <div
-              className={`flex items-start gap-3 rounded-md border p-4 text-sm ${certPalette.wrap}`}
-            >
-              <Stethoscope
-                className={`mt-0.5 h-5 w-5 shrink-0 ${certPalette.icon}`}
-              />
-              <div className="flex-1 space-y-1">
-                <p className={`font-semibold ${certPalette.title}`}>
-                  Certificati medici da gestire
-                </p>
-                <p className={certPalette.text}>
-                  {[
-                    certCounts.expired > 0
-                      ? `${certCounts.expired} scaduti`
-                      : null,
-                    certCounts.expiring > 0
-                      ? `${certCounts.expiring} in scadenza`
-                      : null,
-                    certCounts.missing > 0
-                      ? `${certCounts.missing} mancanti`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                  .
-                </p>
-              </div>
-              <Link
-                href={certDeepLink}
-                className={`flex shrink-0 items-center gap-1 text-xs font-medium underline underline-offset-4 ${certPalette.title}`}
-              >
-                Vai
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-          ) : null}
-          {withoutGuardianCount > 0 ? (
-            <div className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950/30">
-              <UserX className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
-              <div className="flex-1 space-y-1">
-                <p className="font-semibold text-amber-900 dark:text-amber-100">
-                  Allieve senza genitore collegato
-                </p>
-                <p className="text-amber-800 dark:text-amber-200">
-                  {withoutGuardianCount === 1
-                    ? "1 allieva minorenne non ha nessun genitore collegato: alla sua famiglia non arrivano solleciti, inviti né promemoria, e non le si può emettere una ricevuta."
-                    : `${withoutGuardianCount} allieve minorenni non hanno nessun genitore collegato: alle loro famiglie non arrivano solleciti, inviti né promemoria, e non si possono emettere ricevute.`}
-                </p>
-              </div>
-              <Link
-                href={athletesWithoutGuardianHref()}
-                className="flex shrink-0 items-center gap-1 text-xs font-medium text-amber-900 underline underline-offset-4 dark:text-amber-100"
-              >
-                Vedile
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-          ) : null}
-          <ScadenzeKpiWidget kpi={scadenzeKpi} />
-          <KpiCards stats={stats} />
+          <TodoBlock tiles={tiles} />
+          <QuickActions
+            athletes={formAthletes}
+            openSchedulesByAthlete={openSchedulesByAthlete}
+          />
           <div className="grid gap-4 md:grid-cols-2">
             <UpcomingStagesWidget
               stages={upcomingStages}
@@ -279,6 +205,7 @@ export default async function AdminDashboardPage() {
             />
             <ShowcaseWidget stats={showcaseStats} />
           </div>
+          <KpiCards stats={stats} />
           <AnalyticsSection
             enrollmentsTrend={enrollmentsTrend}
             incomeTrend={incomeTrend}
@@ -286,7 +213,6 @@ export default async function AdminDashboardPage() {
             retention={retention}
           />
           <RecentActivity athletes={athletes} parents={parents} />
-          <QuickActions />
         </div>
       </ResourceContent>
     </>

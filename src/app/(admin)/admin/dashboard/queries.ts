@@ -1,22 +1,21 @@
-import { AthleteStatus, ScheduleStatus } from "@prisma/client"
+import { AffiliationEntity, AthleteStatus } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
-import { withActiveCourseOrAssociationScheduleFilter } from "@/lib/queries/active-schedule-filter"
+import type { TodoCounters } from "@/lib/dashboard/todo-tiles"
+import { todayDateOnly } from "@/lib/utils/date-only"
+
+import { countAthleteSteps } from "../athletes/queries"
+import { getCertificateStatusCounts } from "../medical-certificates/queries"
+import { countPaymentsMissingReceipt } from "../payments/queries"
+import { scadenzeWhere } from "../scadenze/queries"
+import {
+  countTesseramentoQueue,
+  getCurrentSeasonYear,
+} from "../tessere/queries"
 
 export async function getDashboardStats() {
   await requireAdmin()
-
-  const now = new Date()
-  const today = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  )
-  const firstOfMonth = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
-  )
-  const nextMonth = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
-  )
 
   const [
     athletesTotal,
@@ -24,9 +23,6 @@ export async function getDashboardStats() {
     athletesTrial,
     athletesSuspended,
     parentsTotal,
-    schedulesOverdue,
-    schedulesDueThisMonth,
-    schedulesPaidThisMonth,
   ] = await Promise.all([
     prisma.athlete.count({ where: { deletedAt: null } }),
     prisma.athlete.count({
@@ -39,62 +35,33 @@ export async function getDashboardStats() {
       where: { deletedAt: null, status: AthleteStatus.SUSPENDED },
     }),
     prisma.parent.count({ where: { deletedAt: null } }),
-    prisma.paymentSchedule.count({
-      where: withActiveCourseOrAssociationScheduleFilter({
-        status: ScheduleStatus.DUE,
-        dueDate: { lt: today },
-      }),
-    }),
-    prisma.paymentSchedule.count({
-      where: withActiveCourseOrAssociationScheduleFilter({
-        status: ScheduleStatus.DUE,
-        dueDate: { gte: today, lt: nextMonth },
-      }),
-    }),
-    prisma.paymentSchedule.count({
-      where: withActiveCourseOrAssociationScheduleFilter({
-        status: ScheduleStatus.PAID,
-        updatedAt: { gte: firstOfMonth, lt: nextMonth },
-      }),
-    }),
   ])
 
+  // Le scadenze non stanno più qui: contava le rate in ritardo con una
+  // condizione sua, scritta a mano, che nessuna card mostrava. Il numero
+  // vero è quello del riquadro "Da fare", che usa il filtro dell'elenco.
   return {
     athletesTotal,
     athletesActive,
     athletesTrial,
     athletesSuspended,
     parentsTotal,
-    schedulesOverdue,
-    schedulesDueThisMonth,
-    schedulesPaidThisMonth,
   }
 }
 
 export async function getScadenzeKPI() {
   await requireAdmin()
 
-  const now = new Date()
-  const today = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  )
-  const in7days = new Date(today)
-  in7days.setUTCDate(in7days.getUTCDate() + 7)
-
+  // Lo stesso filtro dell'elenco Scadenze, non una query scritta a parte:
+  // il riquadro in dashboard e la lista che apre contano le stesse righe.
   const [inRitardo, inScadenza7gg] = await Promise.all([
     prisma.paymentSchedule.aggregate({
-      where: withActiveCourseOrAssociationScheduleFilter({
-        status: ScheduleStatus.DUE,
-        dueDate: { lt: today },
-      }),
+      where: scadenzeWhere({ stato: "IN_RITARDO" }),
       _sum: { amountCents: true },
       _count: true,
     }),
     prisma.paymentSchedule.aggregate({
-      where: withActiveCourseOrAssociationScheduleFilter({
-        status: ScheduleStatus.DUE,
-        dueDate: { gte: today, lte: in7days },
-      }),
+      where: scadenzeWhere({ stato: "IN_SCADENZA_7GG" }),
       _sum: { amountCents: true },
       _count: true,
     }),
@@ -141,8 +108,7 @@ export async function getRecentAthletes(limit = 5) {
 
 export async function getUpcomingStages(limit = 3) {
   await requireAdmin()
-  const today = new Date()
-  today.setUTCHours(0, 0, 0, 0)
+  const today = todayDateOnly()
 
   return prisma.stage.findMany({
     where: {
@@ -159,8 +125,7 @@ export async function getUpcomingStages(limit = 3) {
 
 export async function countUpcomingStages() {
   await requireAdmin()
-  const today = new Date()
-  today.setUTCHours(0, 0, 0, 0)
+  const today = todayDateOnly()
   return prisma.stage.count({
     where: { deletedAt: null, date: { gte: today } },
   })
@@ -262,4 +227,42 @@ export async function getRecentParents(limit = 5) {
       },
     },
   })
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// I numeri del blocco "Da fare".
+//
+// Ogni contatore viene dal modulo dell'elenco che il riquadro apre, e usa il
+// suo stesso predicato: le scadenze da `scadenzeWhere`, i pagamenti senza
+// ricevuta da `MISSING_RECEIPT_WHERE`, i passi delle allieve dalla stessa
+// `athleteSetupChecklist` che disegna il blocco "Da completare" nella scheda,
+// i certificati e le tessere dalle query delle loro pagine. Qui non si
+// riscrive nessuna condizione.
+// ─────────────────────────────────────────────────────────────────────────
+export async function getTodoCounters(): Promise<TodoCounters> {
+  await requireAdmin()
+
+  const seasonYear = await getCurrentSeasonYear()
+
+  const [scadenze, senzaRicevuta, steps, certificati, daTesserare] =
+    await Promise.all([
+      getScadenzeKPI(),
+      countPaymentsMissingReceipt(),
+      countAthleteSteps(),
+      getCertificateStatusCounts(),
+      countTesseramentoQueue(AffiliationEntity.ENDAS, seasonYear),
+    ])
+
+  return {
+    scadenzeInRitardo: scadenze.inRitardo,
+    inScadenza7gg: scadenze.inScadenza7gg.count,
+    pagamentiSenzaRicevuta: senzaRicevuta,
+    allieveSenzaGenitore: steps.guardian,
+    allieveSenzaCorso: steps.course,
+    allieveSenzaEmail: steps.email,
+    certificatiScaduti: certificati.expired,
+    certificatiInScadenza: certificati.expiring,
+    certificatiAssenti: certificati.missing,
+    tessereDaFare: { count: daTesserare, seasonYear },
+  }
 }
