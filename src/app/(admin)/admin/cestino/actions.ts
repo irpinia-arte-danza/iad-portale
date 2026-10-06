@@ -312,6 +312,16 @@ export async function restoreCostume(id: string): Promise<ActionResult> {
 // (Payment, TeacherCompensation) per compliance.
 // ============================================================================
 
+// ─────────────────────────────────────────────────────────────────────────
+// Eliminazione definitiva: NON raggiungibile dall'interfaccia.
+//
+// Il tasto "Elimina definitivamente" del Cestino è stato tolto (regola del
+// progetto: cestino, mai cancellazione). Le funzioni qui sotto restano per
+// una richiesta di cancellazione GDPR, da eseguire a mano e con criterio:
+// nessun componente le importa. Prima di ricollegarle a un tasto, rileggere
+// la sezione "Sicurezza e privacy" di CLAUDE.md.
+// ─────────────────────────────────────────────────────────────────────────
+
 const COMPLIANCE_BLOCK_PAYMENT =
   "Impossibile eliminare definitivamente: esistono pagamenti collegati. " +
   "I dati fiscali devono essere conservati per legge."

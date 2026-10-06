@@ -47,14 +47,8 @@ const STATUS_VARIANT: Record<Status, "default" | "secondary" | "destructive" | "
 }
 
 export function StagesTable({ stages }: { stages: StageListItem[] }) {
-  if (stages.length === 0) {
-    return (
-      <div className="rounded-md border border-dashed py-16 text-center text-sm text-muted-foreground">
-        Nessuno stage ancora creato. Clicca «Nuovo stage» per iniziare.
-      </div>
-    )
-  }
-
+  // Lo stato vuoto lo mostra la pagina (EmptyState): qui si arriva solo con
+  // almeno uno stage
   return (
     <div className="rounded-md border overflow-x-auto">
       <Table>

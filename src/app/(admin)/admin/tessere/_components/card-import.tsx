@@ -219,12 +219,44 @@ export function CardImport({ entity }: Props) {
           Carica le tessere {entity}
         </CardTitle>
         <CardDescription>
-          Trascina qui tutti i PDF insieme. Il sistema li legge, li abbina alle
+          Scegli tutti i PDF insieme. Il sistema li legge, li abbina alle
           allieve e mostra cosa farebbe: niente viene salvato finché non
           confermi.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <input
+          ref={inputRef}
+          type="file"
+          accept={CARD_FILE_ACCEPT}
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files) addFiles(e.target.files)
+          }}
+        />
+
+        {/* Il tasto è l'azione, ovunque: su iPad e telefono non si trascina
+            niente, e un'area tratteggiata grande quanto la card con un
+            tastino grigio dentro faceva sembrare il trascinamento l'unico
+            modo. */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button
+            type="button"
+            className="min-h-11"
+            onClick={() => inputRef.current?.click()}
+          >
+            <Upload className="h-4 w-4" />
+            Scegli i PDF delle tessere
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Solo PDF, max 3 MB l&apos;uno, fino a {CARD_MAX_FILES_PER_BATCH}{" "}
+            per volta
+          </p>
+        </div>
+
+        {/* Il trascinamento resta per chi lavora col mouse: da 1024 in su,
+            e piccolo */}
         <div
           onDragOver={(e) => {
             e.preventDefault()
@@ -237,37 +269,11 @@ export function CardImport({ entity }: Props) {
             if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files)
           }}
           className={cn(
-            "rounded-lg border-2 border-dashed p-8 text-center transition-colors",
+            "hidden rounded-lg border border-dashed px-4 py-3 text-center text-xs text-muted-foreground transition-colors lg:block",
             dragging ? "border-primary bg-primary/5" : "border-muted",
           )}
         >
-          <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-          <p className="text-sm font-medium">
-            Trascina qui i PDF delle tessere
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Solo PDF, max 3 MB l&apos;uno, fino a{" "}
-            {CARD_MAX_FILES_PER_BATCH} per volta
-          </p>
-          <input
-            ref={inputRef}
-            type="file"
-            accept={CARD_FILE_ACCEPT}
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files) addFiles(e.target.files)
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-4 min-h-11"
-            onClick={() => inputRef.current?.click()}
-          >
-            Scegli i file
-          </Button>
+          oppure trascina qui i PDF
         </div>
 
         {files.length > 0 ? (

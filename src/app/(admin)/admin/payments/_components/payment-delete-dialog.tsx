@@ -56,7 +56,7 @@ export function PaymentDeleteDialog({
               <AlertTriangle className="h-5 w-5 text-destructive" />
             </div>
             <AlertDialogTitle className="pt-1.5">
-              Eliminare definitivamente questo pagamento?
+              Eliminare questo pagamento?
             </AlertDialogTitle>
           </div>
         </AlertDialogHeader>
@@ -92,9 +92,9 @@ export function PaymentDeleteDialog({
             <p className="text-sm">
               <strong>Attenzione.</strong> Se il pagamento è collegato a una
               scadenza, la scadenza tornerà automaticamente a{" "}
-              <em>Da pagare</em>. L&apos;eliminazione è un soft-delete: i
-              dati restano nel database per audit, ma non saranno più
-              visibili nell&apos;interfaccia.
+              <em>Da pagare</em>. Il pagamento resta in archivio per i
+              controlli, ma <strong>non finisce nel Cestino</strong> e non
+              si ripristina da lì: se serve di nuovo, va registrato da capo.
             </p>
           </div>
         </div>
@@ -112,7 +112,7 @@ export function PaymentDeleteDialog({
                 Eliminazione…
               </>
             ) : (
-              "Elimina definitivamente"
+              "Elimina pagamento"
             )}
           </Button>
         </AlertDialogFooter>

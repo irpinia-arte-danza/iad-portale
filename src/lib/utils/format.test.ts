@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { formatEuro } from "./format"
+import { formatEuro, formatEuroAxis } from "./format"
 
 // Lo spazio prima del simbolo è un NBSP (U+00A0): Intl lo mette così, e i
 // test lo normalizzano per restare leggibili
@@ -35,5 +35,16 @@ describe("formatEuro", () => {
 
   it("importi grandi: un separatore per gruppo", () => {
     expect(eur(1234567890)).toBe("12.345.678,90 €")
+  })
+})
+
+describe("formatEuroAxis", () => {
+  const axis = (cents: number) => formatEuroAxis(cents).replace(/\u00a0/g, " ")
+
+  it("le tacche di un asse: senza centesimi, con il separatore", () => {
+    expect(axis(0)).toBe("0 €")
+    expect(axis(50000)).toBe("500 €")
+    expect(axis(100000)).toBe("1.000 €")
+    expect(axis(150000)).toBe("1.500 €")
   })
 })

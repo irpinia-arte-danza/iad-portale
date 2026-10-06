@@ -11,7 +11,8 @@ import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { pdfStyles } from "../styles"
 import { IADHeaderMark } from "./iad-header"
 
-import { formatEuroPdf, formatSignedEuroPdf } from "@/lib/pdf/format"
+import { managementResult } from "@/lib/bilancio/result"
+import { formatEuroPdf } from "@/lib/pdf/format"
 type Props = {
   year: number
   periodFrom: Date
@@ -105,6 +106,7 @@ export function BilancioPDF({
 }: Props) {
   const generatedAt = new Date()
   const { totals, entrateByType, usciteByType } = data
+  const result = managementResult(totals.netCents)
 
   return (
     <Document
@@ -150,14 +152,9 @@ export function BilancioPDF({
               tone="danger"
             />
             <KpiBox
-              label="Saldo netto"
-              value={formatSignedEuroPdf(totals.netCents)}
-              tone={totals.netCents >= 0 ? "success" : "danger"}
-            />
-            <KpiBox
-              label="Margine"
-              value={formatPercent(totals.marginPercent)}
-              tone={totals.marginPercent >= 0 ? "success" : "danger"}
+              label={result.label}
+              value={formatEuroPdf(result.amountCents)}
+              tone={result.isDeficit ? "danger" : "success"}
             />
           </View>
           <View
@@ -395,7 +392,7 @@ export function BilancioPDF({
                 fontFamily: "Helvetica-Bold",
               }}
             >
-              Risultato di esercizio {year}
+              {result.label} {year}
             </Text>
             <Text
               style={{
@@ -404,7 +401,7 @@ export function BilancioPDF({
                 color: totals.netCents >= 0 ? "#047857" : "#b91c1c",
               }}
             >
-              {formatSignedEuroPdf(totals.netCents)}
+              {formatEuroPdf(result.amountCents)}
             </Text>
           </View>
         </View>

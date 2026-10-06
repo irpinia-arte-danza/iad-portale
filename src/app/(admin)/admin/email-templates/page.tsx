@@ -1,11 +1,14 @@
 import Link from "next/link"
 
 import { EmailCategory } from "@prisma/client"
-import { ArrowRight, Circle, Mail } from "lucide-react"
+import { ArrowRight, Mail } from "lucide-react"
 
+import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+import { templateUsage } from "@/lib/resend/template-usage"
 
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
@@ -39,19 +42,17 @@ export default async function EmailTemplatesPage() {
   return (
     <>
       <ResourceHeader
-        breadcrumbs={[{ label: "Modelli email" }]}
-        title="Modelli email"
-        description="Gestisci oggetto e corpo delle email automatiche inviate alle famiglie."
+        breadcrumbs={[{ label: "Testi delle email" }]}
+        title="Testi delle email"
+        description="I testi usati quando premi Invia"
       />
       <ResourceContent>
         {templates.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-12 text-center">
-            <Mail className="mx-auto h-8 w-8 text-muted-foreground" />
-            <h3 className="mt-3 text-base font-medium">Nessun template</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              I template vengono creati dal seed iniziale del database.
-            </p>
-          </div>
+          <EmptyState
+            icon={Mail}
+            title="Nessun testo configurato"
+            description="Qui compaiono i testi di solleciti, ricevute e inviti, da adattare alla scuola"
+          />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {templates.map((t) => (
@@ -80,24 +81,23 @@ export default async function EmailTemplatesPage() {
                     <span className="font-medium">{t.subject}</span>
                   </div>
                   <div className="mt-auto flex items-center justify-between gap-3 pt-2">
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <Circle
-                        className={
-                          t.isActive
-                            ? "h-2 w-2 fill-green-500 text-green-500"
-                            : "h-2 w-2 fill-muted-foreground/40 text-muted-foreground/40"
-                        }
-                      />
-                      <span
-                        className={
-                          t.isActive
-                            ? "text-green-700 dark:text-green-400"
-                            : "text-muted-foreground"
-                        }
-                      >
-                        {t.isActive ? "Attivo" : "Disattivato"}
-                      </span>
-                    </div>
+                    {/* "Attivo" non diceva niente: quello che serve sapere è
+                        quando parte questo testo. Disattivato resta, perché
+                        è l'eccezione. */}
+                    <p className="min-w-0 text-xs text-muted-foreground">
+                      {!t.isActive ? (
+                        "Disattivato: non viene inviato"
+                      ) : templateUsage(t) ? (
+                        <>
+                          Usato in:{" "}
+                          <span className="text-foreground">
+                            {templateUsage(t)}
+                          </span>
+                        </>
+                      ) : (
+                        "Non usato da nessun invio"
+                      )}
+                    </p>
                     <Button asChild size="sm" variant="outline">
                       <Link href={`/admin/email-templates/${t.slug}`}>
                         Modifica

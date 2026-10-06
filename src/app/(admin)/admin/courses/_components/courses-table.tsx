@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
 
 import {
   ResponsiveList,
@@ -63,6 +64,16 @@ function teacherNames(course: CourseRow): string[] {
 }
 
 export function CoursesTable({ courses, teachers }: CoursesTableProps) {
+  // "Assegna" apre il dialog di modifica della riga: lo stato sta qui perché
+  // il link e il menu ⋯ sono due celle diverse
+  const [assigningId, setAssigningId] = useState<string | null>(null)
+
+  // Se nessun corso ha una fascia d'età, la colonna è una fila di trattini:
+  // non si mostra
+  const anyAgeRange = courses.some(
+    (c) => c.minAge !== null || c.maxAge !== null,
+  )
+
   // ── Colonne ─────────────────────────────────────────────────────────────
   // Alta: nome, iscritte e stato. Contributo e insegnante da 1024, età e
   // tipo da 1280.
@@ -126,9 +137,22 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
       width: "md:w-48",
       cell: (course) => {
         const names = teacherNames(course)
+        // Un trattino non dice che manca qualcosa da fare: "Assegna" sì, e
+        // porta dritto al modulo
+        if (names.length === 0) {
+          return (
+            <button
+              type="button"
+              className="text-sm underline underline-offset-4 hover:text-foreground"
+              onClick={() => setAssigningId(course.id)}
+            >
+              Assegna
+            </button>
+          )
+        }
         return (
           <span className="truncate text-sm" title={names.join(", ")}>
-            {names.length === 0 ? "—" : names.join(", ")}
+            {names.join(", ")}
           </span>
         )
       },
@@ -163,7 +187,7 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
       label="Corsi"
       items={courses}
       getId={(course) => course.id}
-      columns={columns}
+      columns={anyAgeRange ? columns : columns.filter((c) => c.key !== "eta")}
       empty={{
         title: "Nessun corso trovato",
         hint: "Prova a modificare la ricerca o aggiungi il primo corso.",
@@ -185,11 +209,17 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
             al mese
           </span>,
           <span key="insegnante">
-            {names.length === 0
-              ? "Nessuna insegnante assegnata"
-              : names.length === 1
-                ? names[0]
-                : names.join(", ")}
+            {names.length === 0 ? (
+              <button
+                type="button"
+                className="underline underline-offset-4"
+                onClick={() => setAssigningId(course.id)}
+              >
+                Assegna un&apos;insegnante
+              </button>
+            ) : (
+              names.join(", ")
+            )}
             {course.isActive ? "" : " · archiviato"}
           </span>,
         ]
@@ -202,6 +232,8 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
           layout="responsive"
           course={course}
           teachers={teachers}
+          editRequested={assigningId === course.id}
+          onEditClosed={() => setAssigningId(null)}
         />
       )}
     />

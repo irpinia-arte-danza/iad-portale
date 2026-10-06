@@ -1,7 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
@@ -11,6 +11,7 @@ import {
   expenseCreateSchema,
   type ExpenseCreateValues,
 } from "@/lib/schemas/expense"
+import { expenseRecipientLabel } from "@/lib/expenses/labels"
 import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -84,6 +85,14 @@ export function ExpenseForm({
       ...defaultValues,
     },
   })
+
+  // Per un compenso sportivo chi riceve i soldi è il percettore, non un
+  // fornitore: l'etichetta segue il tipo scelto
+  // useWatch e non form.watch: è l'API che il compilatore di React sa
+  // memoizzare (form.watch fa saltare l'ottimizzazione di tutto il form)
+  const recipientLabel = expenseRecipientLabel(
+    useWatch({ control: form.control, name: "type" }),
+  )
 
   function onSubmit(values: ExpenseCreateValues) {
     startTransition(async () => {
@@ -168,10 +177,14 @@ export function ExpenseForm({
           name="recipient"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Fornitore / beneficiario (opzionale)</FormLabel>
+              <FormLabel>{recipientLabel} (opzionale)</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="es. Nome fornitore o beneficiario"
+                  placeholder={
+                    recipientLabel === "Percettore"
+                      ? "es. Nome e cognome di chi riceve il compenso"
+                      : "es. Nome del fornitore"
+                  }
                   {...field}
                   value={field.value ?? ""}
                 />

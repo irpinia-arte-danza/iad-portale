@@ -1,12 +1,18 @@
 "use client"
 
-import { useEffect, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import {
   Form,
   FormControl,
@@ -19,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { useBeforeUnloadGuard } from "@/lib/hooks/use-dirty-form"
+import { cn } from "@/lib/utils"
 import {
   associationSchema,
   type AssociationValues,
@@ -53,6 +60,23 @@ export function AssociationTab({ initial, onDirtyChange }: AssociationTabProps) 
   }, [isDirty, onDirtyChange])
 
   const gymSame = form.watch("gymSameAsLegal")
+
+  // Dati fiscali facoltativi: chiusi di default. Un errore di validazione
+  // lì dentro li apre da solo — un campo sbagliato che non si vede non si
+  // corregge.
+  const [fiscalOpen, setFiscalOpen] = useState(false)
+  const { errors } = form.formState
+  const fiscalHasError = Boolean(
+    errors.asdVatNumber || errors.asdPec || errors.asdSdiCode,
+  )
+  const [vatValue, pecValue, sdiValue] = form.watch([
+    "asdVatNumber",
+    "asdPec",
+    "asdSdiCode",
+  ])
+  const fiscalFilled = [vatValue, pecValue, sdiValue].some(
+    (v) => typeof v === "string" && v.trim().length > 0,
+  )
 
   function onSubmit(values: AssociationValues) {
     startTransition(async () => {
@@ -132,26 +156,6 @@ export function AssociationTab({ initial, onDirtyChange }: AssociationTabProps) 
 
             <FormField
               control={form.control}
-              name="asdVatNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Partita IVA (opzionale)</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      value={field.value ?? ""}
-                      placeholder="11 cifre"
-                      inputMode="numeric"
-                      className="font-mono"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="asdEmail"
               render={({ field }) => (
                 <FormItem>
@@ -166,47 +170,6 @@ export function AssociationTab({ initial, onDirtyChange }: AssociationTabProps) 
                       {...field}
                     />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="asdPec"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>PEC (opzionale)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="email@pec.it"
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="asdSdiCode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Codice SDI (opzionale)</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      value={field.value ?? ""}
-                      placeholder="7 caratteri alfanumerici"
-                      className="font-mono"
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Destinatario fatture elettroniche (se ASD registrata al SdI).
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -272,6 +235,97 @@ export function AssociationTab({ initial, onDirtyChange }: AssociationTabProps) 
                 </FormItem>
               )}
             />
+
+            {/* Partita IVA, PEC e SDI: una ASD senza attività commerciale non
+                li ha, e in cima al modulo sembravano obbligatori. Chiusi di
+                default; si aprono da soli se c'è un errore da correggere. */}
+            <Collapsible
+              open={fiscalOpen || fiscalHasError}
+              onOpenChange={setFiscalOpen}
+              className="sm:col-span-2"
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-11 w-full justify-between px-2"
+                >
+                  <span>
+                    Dati fiscali facoltativi
+                    {fiscalFilled ? (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        compilati
+                      </span>
+                    ) : null}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 transition-transform",
+                      (fiscalOpen || fiscalHasError) && "rotate-180",
+                    )}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="grid gap-4 pt-3 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="asdVatNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Partita IVA</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value ?? ""}
+                          placeholder="11 cifre"
+                          inputMode="numeric"
+                          className="font-mono"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="asdPec"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PEC</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="email@pec.it"
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="asdSdiCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Codice SDI</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value ?? ""}
+                          placeholder="7 caratteri alfanumerici"
+                          className="font-mono"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CollapsibleContent>
+            </Collapsible>
           </CardContent>
         </Card>
 

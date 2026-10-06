@@ -1,3 +1,7 @@
+import { CalendarDays } from "lucide-react"
+
+import { EmptyState } from "@/components/empty-state"
+
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
 
@@ -10,11 +14,27 @@ export const dynamic = "force-dynamic"
 export default async function StagesPage() {
   const stages = await listStages({ includeDeleted: true })
 
+  if (stages.length === 0) {
+    return (
+      <>
+        <ResourceHeader breadcrumbs={[{ label: "Stage" }]} title="Stage" />
+        <ResourceContent>
+          <EmptyState
+            icon={CalendarDays}
+            title="Nessuno stage in programma"
+            description="Le famiglie ricevono l'invito solo quando premi Invia"
+            action={<StageCreateDialog />}
+          />
+        </ResourceContent>
+      </>
+    )
+  }
+
   return (
     <>
       <ResourceHeader
         breadcrumbs={[{ label: "Stage" }]}
-        title="Stage workshop"
+        title="Stage"
         description="Eventi occasionali a iscrizione, con contributo e capienza dedicata."
         action={<StageCreateDialog />}
       />

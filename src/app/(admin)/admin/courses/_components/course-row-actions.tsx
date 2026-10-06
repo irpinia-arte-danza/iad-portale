@@ -42,14 +42,21 @@ interface CourseRowActionsProps {
   }
   teachers: Array<{ id: string; firstName: string; lastName: string }>
   layout?: RowActionsLayout
+  // "Assegna" nella colonna Insegnante apre questo stesso dialog: un modulo
+  // solo, non una seconda strada per fare la stessa cosa
+  editRequested?: boolean
+  onEditClosed?: () => void
 }
 
 export function CourseRowActions({
   course,
   teachers,
   layout,
+  editRequested = false,
+  onEditClosed,
 }: CourseRowActionsProps) {
-  const [editOpen, setEditOpen] = useState(false)
+  const [editOpenLocal, setEditOpen] = useState(false)
+  const editOpen = editOpenLocal || editRequested
   const [isPending, startTransition] = useTransition()
 
   function handleToggle() {
@@ -85,7 +92,13 @@ export function CourseRowActions({
     <>
       <RowActionsRenderer actions={actions} layout={layout} />
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open)
+          if (!open) onEditClosed?.()
+        }}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Modifica corso</DialogTitle>
@@ -116,7 +129,10 @@ export function CourseRowActions({
               })),
               teacherId: course.teacherId ?? "",
             }}
-            onSuccess={() => setEditOpen(false)}
+            onSuccess={() => {
+              setEditOpen(false)
+              onEditClosed?.()
+            }}
           />
         </DialogContent>
       </Dialog>

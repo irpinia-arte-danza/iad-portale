@@ -1,3 +1,5 @@
+import { bilancioPresetRange } from "@/lib/bilancio/periods"
+import { todayDateOnly } from "@/lib/utils/date-only"
 import { toDateInputValue } from "@/lib/utils/format"
 
 import { ResourceContent } from "../../_components/resource-content"
@@ -43,13 +45,20 @@ export default async function BilancioPage({ searchParams }: PageProps) {
   const fiscalStart = new Date(now.getFullYear(), 0, 1)
   const fiscalEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999)
 
+  // Senza periodo nell'URL si apre sull'anno fiscale, calcolato sul giorno
+  // di Roma con la stessa funzione dei chip: così il chip "Anno fiscale"
+  // risulta acceso anche nei minuti dopo la mezzanotte di Capodanno, quando
+  // per il server (UTC) è ancora l'anno prima
+  const todayIso = todayDateOnly().toISOString().slice(0, 10)
+  const fiscalYear = bilancioPresetRange("anno-fiscale", todayIso)
+
   const { iso: fromIso, date: from } = parseDateBoundary(
-    resolved.from,
+    resolved.from ?? fiscalYear.from,
     fiscalStart,
     false,
   )
   const { iso: toIso, date: to } = parseDateBoundary(
-    resolved.to,
+    resolved.to ?? fiscalYear.to,
     fiscalEnd,
     true,
   )
@@ -60,12 +69,16 @@ export default async function BilancioPage({ searchParams }: PageProps) {
     <>
       <ResourceHeader
         breadcrumbs={[{ label: "Bilancio" }]}
-        title="Bilancio entrate vs uscite"
-        description="Panoramica finanziaria per periodo. KPI, categorie e trend mensile."
+        title="Bilancio"
+        description="Entrate, uscite e avanzo di gestione del periodo."
       />
       <ResourceContent>
         <div className="flex flex-col gap-6">
-          <BilancioFilters defaultFrom={fromIso} defaultTo={toIso} />
+          <BilancioFilters
+            from={fromIso}
+            to={toIso}
+            todayIso={todayIso}
+          />
           <BilancioSummary totals={result.totals} />
           <BilancioTrendChart data={result.monthly} />
           <div className="grid gap-6 xl:grid-cols-2">

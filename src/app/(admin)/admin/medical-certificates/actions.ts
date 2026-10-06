@@ -9,6 +9,7 @@ import {
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { CERT_REMINDER_TEMPLATE_SLUG } from "@/lib/resend/template-usage"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { renderTemplate } from "@/lib/resend/render-template"
@@ -24,7 +25,7 @@ import {
 } from "@/lib/schemas/medical-certificate"
 import { uuidSchema } from "@/lib/schemas/common"
 
-const TEMPLATE_SLUG = "cert-reminder"
+const TEMPLATE_SLUG = CERT_REMINDER_TEMPLATE_SLUG
 const RATE_LIMIT_PER_DAY = 3
 
 const DATE_IT = new Intl.DateTimeFormat("it-IT", {

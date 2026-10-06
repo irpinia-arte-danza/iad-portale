@@ -1,7 +1,8 @@
-import { Percent, TrendingDown, TrendingUp, Wallet } from "lucide-react"
+import { TrendingDown, TrendingUp, Wallet } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
-import { formatEuro, formatPercent } from "@/lib/utils/format"
+import { managementResult } from "@/lib/bilancio/result"
+import { formatEuro } from "@/lib/utils/format"
 
 import type { BilancioTotals } from "../queries"
 
@@ -10,10 +11,10 @@ interface BilancioSummaryProps {
 }
 
 export function BilancioSummary({ totals }: BilancioSummaryProps) {
-  const netPositive = totals.netCents >= 0
+  const result = managementResult(totals.netCents)
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-3">
       <Card>
         <CardContent className="flex flex-col gap-1 px-4">
           <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
@@ -48,43 +49,25 @@ export function BilancioSummary({ totals }: BilancioSummaryProps) {
         </CardContent>
       </Card>
 
+      {/* Avanzo o disavanzo di gestione: un'ASD non ha un "saldo netto" né
+          un margine percentuale. Con il disavanzo l'importo è senza segno,
+          lo dice già la parola. */}
       <Card>
         <CardContent className="flex flex-col gap-1 px-4">
           <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
             <Wallet className="h-4 w-4 text-muted-foreground" />
-            Saldo netto
+            {result.label}
           </div>
           <p
             className={`font-mono text-2xl font-semibold ${
-              netPositive
-                ? "text-emerald-600 dark:text-emerald-500"
-                : "text-rose-600 dark:text-rose-500"
+              result.isDeficit
+                ? "text-rose-600 dark:text-rose-500"
+                : "text-emerald-600 dark:text-emerald-500"
             }`}
           >
-            {formatEuro(totals.netCents)}
+            {formatEuro(result.amountCents)}
           </p>
           <p className="text-xs text-muted-foreground">Entrate − Uscite</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="flex flex-col gap-1 px-4">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
-            <Percent className="h-4 w-4 text-muted-foreground" />
-            Margine
-          </div>
-          <p
-            className={`font-mono text-2xl font-semibold ${
-              netPositive
-                ? "text-emerald-600 dark:text-emerald-500"
-                : "text-rose-600 dark:text-rose-500"
-            }`}
-          >
-            {formatPercent(totals.marginPercent)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Saldo netto / Entrate
-          </p>
         </CardContent>
       </Card>
     </div>

@@ -125,7 +125,7 @@ export async function sendReceiptEmailCore(params: {
       ok: false,
       code: "TEMPLATE",
       error:
-        "Il template «ricevuta-emessa» manca o è disattivato: controllalo in Impostazioni → Template email.",
+        "Il template «ricevuta-emessa» manca o è disattivato: controllalo in Testi delle email.",
     }
   }
 

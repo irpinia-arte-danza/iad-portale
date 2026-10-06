@@ -126,7 +126,7 @@ export function MedicalCertsClient({ rows }: { rows: AthleteCertRow[] }) {
       setSelected(new Set())
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Errore invio reminder",
+        err instanceof Error ? err.message : "Errore nell'invio del promemoria",
       )
     } finally {
       setBusy(false)
@@ -184,7 +184,7 @@ export function MedicalCertsClient({ rows }: { rows: AthleteCertRow[] }) {
           }
         >
           <Mail className="mr-1 h-4 w-4" />
-          Invia reminder ai selezionati
+          Invia promemoria ai selezionati
           {actionableSelected.length > 0
             ? ` (${actionableSelected.length})`
             : ""}
@@ -304,7 +304,7 @@ export function MedicalCertsClient({ rows }: { rows: AthleteCertRow[] }) {
                           }
                         >
                           <Mail className="mr-1 h-4 w-4" />
-                          Reminder
+                          Promemoria
                         </Button>
                       </div>
                     </TableCell>
@@ -326,14 +326,14 @@ export function MedicalCertsClient({ rows }: { rows: AthleteCertRow[] }) {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirmTarget?.kind === "bulk"
-                ? `Invia ${confirmTarget.athleteIds.length} reminder?`
-                : `Invia reminder a ${confirmTarget?.kind === "single" ? confirmTarget.label : ""}?`}
+                ? `Inviare ${confirmTarget.athleteIds.length} promemoria?`
+                : `Inviare il promemoria a ${confirmTarget?.kind === "single" ? confirmTarget.label : ""}?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               Il genitore riceverà un&apos;email con i dettagli del
               certificato in scadenza. Le allieve senza certificato o con
               certificato valido (&gt;30 giorni) verranno saltate. Limite 3
-              reminder per allieva nelle ultime 24 ore.
+              promemoria per allieva nelle ultime 24 ore.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

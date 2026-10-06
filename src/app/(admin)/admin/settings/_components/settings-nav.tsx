@@ -35,7 +35,7 @@ export const SETTINGS_TABS: {
   { key: "associazione", label: "Associazione", icon: Building2 },
   { key: "brand", label: "Brand", icon: Palette },
   { key: "ricevute", label: "Ricevute", icon: FileText },
-  { key: "reminder", label: "Reminder", icon: BellRing },
+  { key: "reminder", label: "Promemoria", icon: BellRing },
   { key: "admin", label: "Admin", icon: ShieldCheck },
 ]
 
@@ -75,7 +75,9 @@ export function SettingsNav({ active, onChange }: SettingsNavProps) {
       {/* Desktop: horizontal tabs */}
       <nav
         aria-label="Sezioni impostazioni"
-        className="hidden md:flex flex-wrap gap-1 border-b"
+        // Su iPad le sei schede non stanno in una riga: scorrono in
+        // orizzontale invece di andare a capo su due righe
+        className="hidden gap-1 overflow-x-auto border-b md:flex"
       >
         {SETTINGS_TABS.map((t) => {
           const Icon = t.icon
@@ -86,7 +88,7 @@ export function SettingsNav({ active, onChange }: SettingsNavProps) {
               type="button"
               onClick={() => onChange(t.key)}
               className={cn(
-                "inline-flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                "inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors",
                 isActive
                   ? "border-foreground text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",
