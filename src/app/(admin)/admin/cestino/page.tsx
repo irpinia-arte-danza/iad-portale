@@ -48,7 +48,7 @@ export default async function CestinoPage() {
       <ResourceHeader
         breadcrumbs={[{ label: "Cestino" }]}
         title="Cestino"
-        description="Elementi eliminati. Puoi ripristinarli o eliminarli definitivamente. L'eliminazione definitiva è irreversibile e blocca i record con dati fiscali (pagamenti, compensi). Saggi e costumi sono solo ripristinabili (preservano lo storico partecipazioni/assegnazioni)."
+        description="Quello che elimini finisce qui e si può ripristinare. Niente viene cancellato per sempre."
       />
       <ResourceContent>
         <CestinoClient

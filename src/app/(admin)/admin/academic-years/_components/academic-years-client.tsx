@@ -62,6 +62,9 @@ type AYRow = {
 
 type Props = {
   years: AYRow[]
+  // null = non è il momento di preparare l'anno successivo (vedi
+  // canPrepareNextAcademicYear): il tasto non compare
+  prepareNext: { label: string; currentStillRunning: boolean } | null
 }
 
 
@@ -95,7 +98,7 @@ function deriveSuggestion(years: AYRow[]) {
   }
 }
 
-export function AcademicYearsClient({ years }: Props) {
+export function AcademicYearsClient({ years, prepareNext }: Props) {
   const [formOpen, setFormOpen] = React.useState(false)
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [startNewOpen, setStartNewOpen] = React.useState(false)
@@ -114,6 +117,7 @@ export function AcademicYearsClient({ years }: Props) {
         enrollmentsCount: current._count.enrollments,
         paymentsCount: current._count.payments,
         lessonsCount: current._count.lessons,
+        endDate: current.endDate,
       }
     : null
 
@@ -154,15 +158,30 @@ export function AcademicYearsClient({ years }: Props) {
         </div>
       ) : null}
 
+      {/* Un tasto solo, e solo quando serve: prima "Inizia nuovo anno
+          accademico" era sempre lì, anche a ottobre con l'anno appena
+          partito. "Nuovo anno" (creare un anno a mano) si usa di rado e sta
+          nel menu. */}
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="outline" onClick={openCreate}>
-          <Plus className="mr-1 h-4 w-4" />
-          Nuovo anno
-        </Button>
-        <Button onClick={() => setStartNewOpen(true)}>
-          <Sparkles className="mr-1 h-4 w-4" />
-          Inizia nuovo anno accademico
-        </Button>
+        {prepareNext ? (
+          <Button onClick={() => setStartNewOpen(true)}>
+            <Sparkles className="mr-1 h-4 w-4" />
+            Prepara il {prepareNext.label}
+          </Button>
+        ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" aria-label="Altre azioni">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={openCreate}>
+              <Plus className="h-4 w-4" />
+              Nuovo anno
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="rounded-md border">
@@ -278,6 +297,7 @@ export function AcademicYearsClient({ years }: Props) {
         open={startNewOpen}
         onOpenChange={setStartNewOpen}
         current={currentSummary}
+        currentStillRunning={prepareNext?.currentStillRunning ?? false}
         suggestedLabel={suggestion.label}
         suggestedStart={suggestion.startDate}
         suggestedEnd={suggestion.endDate}

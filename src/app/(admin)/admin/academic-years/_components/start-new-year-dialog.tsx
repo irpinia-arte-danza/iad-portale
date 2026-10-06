@@ -28,7 +28,11 @@ import {
   academicYearSchema,
   type AcademicYearValues,
 } from "@/lib/schemas/academic-year"
-import { toDateInputValue } from "@/lib/utils/format"
+import {
+  formatDateShort,
+  formatEuro,
+  toDateInputValue,
+} from "@/lib/utils/format"
 
 import { createAndSetCurrentAcademicYear } from "../actions"
 
@@ -38,12 +42,16 @@ type CurrentSummary = {
   enrollmentsCount: number
   paymentsCount: number
   lessonsCount: number
+  endDate: Date
 } | null
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   current: CurrentSummary
+  // L'anno corrente non è ancora finito (giugno): cambia cosa succede
+  // stanotte, e il riepilogo lo deve dire
+  currentStillRunning: boolean
   suggestedLabel: string
   suggestedStart: Date
   suggestedEnd: Date
@@ -54,6 +62,7 @@ export function StartNewYearDialog({
   open,
   onOpenChange,
   current,
+  currentStillRunning,
   suggestedLabel,
   suggestedStart,
   suggestedEnd,
@@ -89,7 +98,7 @@ export function StartNewYearDialog({
     setBusy(true)
     const result = await createAndSetCurrentAcademicYear(values)
     if (result.ok) {
-      toast.success("Nuovo anno accademico impostato come corrente")
+      toast.success(`Anno ${values.label} creato e impostato come corrente`)
       onOpenChange(false)
     } else {
       toast.error(result.error)
@@ -102,44 +111,78 @@ export function StartNewYearDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-amber-500" />
-            Inizia nuovo anno accademico
+            <Sparkles className="h-5 w-5 text-muted-foreground" />
+            Prepara il {suggestedLabel}
           </DialogTitle>
           <DialogDescription>
-            Crea il nuovo anno e imposta come corrente in un&apos;unica azione.
+            Prima di confermare, ecco cosa succede e cosa no.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {current ? (
-            <div className="rounded-md border bg-muted/30 p-3 text-sm">
-              <p className="font-medium">
-                Anno corrente: <span className="font-mono">{current.label}</span>
-              </p>
-              <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
-                <li>
-                  · {current.enrollmentsCount}{" "}
-                  {current.enrollmentsCount === 1 ? "iscrizione" : "iscrizioni"}
-                </li>
-                <li>
-                  · {current.paymentsCount}{" "}
-                  {current.paymentsCount === 1 ? "pagamento" : "pagamenti"}
-                </li>
-                <li>
-                  · {current.lessonsCount}{" "}
-                  {current.lessonsCount === 1 ? "lezione" : "lezioni"}
-                </li>
-              </ul>
+          {/* Il riepilogo dice quello che l'azione fa davvero: crea l'anno e
+              lo imposta come corrente. Non copia iscrizioni né rate — e
+              scriverlo è il punto, perché è la cosa che ci si aspetta di più */}
+          <dl className="space-y-3 rounded-md border bg-muted/30 p-3 text-sm">
+            <div>
+              <dt className="font-medium">Cosa viene creato</dt>
+              <dd className="text-muted-foreground">
+                L&apos;anno {suggestedLabel}, con il contributo di iscrizione
+                del {current?.label ?? "anno precedente"} (
+                <span className="font-mono">
+                  {formatEuro(Math.round(suggestedFeeEur * 100))}
+                </span>
+                ). Date e importo si possono cambiare qui sotto.
+              </dd>
             </div>
-          ) : null}
+            <div>
+              <dt className="font-medium">Cosa resta com&apos;è</dt>
+              <dd className="text-muted-foreground">
+                Allieve, genitori, insegnanti e corsi: non appartengono a un
+                anno, li ritrovi tutti.
+              </dd>
+            </div>
+            {current ? (
+              <div>
+                <dt className="font-medium">Cosa non viene toccato</dt>
+                <dd className="text-muted-foreground">
+                  Iscrizioni, rate, pagamenti, ricevute e presenze del{" "}
+                  {current.label} restano nel {current.label} e si consultano
+                  come oggi ({current.enrollmentsCount}{" "}
+                  {current.enrollmentsCount === 1 ? "iscrizione" : "iscrizioni"}
+                  , {current.paymentsCount}{" "}
+                  {current.paymentsCount === 1 ? "pagamento" : "pagamenti"},{" "}
+                  {current.lessonsCount}{" "}
+                  {current.lessonsCount === 1 ? "lezione" : "lezioni"}).
+                </dd>
+              </div>
+            ) : null}
+            <div>
+              <dt className="font-medium">Cosa c&apos;è da fare dopo</dt>
+              <dd className="text-muted-foreground">
+                Iscrivere le allieve ai corsi del {suggestedLabel}: le
+                iscrizioni non si copiano da un anno all&apos;altro.
+              </dd>
+            </div>
+          </dl>
 
           <div className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
-            <p className="text-amber-900 dark:text-amber-100">
-              Da ora le dashboard genitori e insegnanti mostreranno solo i dati
-              del nuovo anno. Le allieve attive andranno re-iscritte
-              manualmente ai corsi del nuovo anno.
-            </p>
+            <div className="space-y-1 text-amber-900 dark:text-amber-100">
+              <p>
+                Appena confermi, il {suggestedLabel} diventa l&apos;anno
+                corrente: le aree di genitori e insegnanti mostrano il nuovo
+                anno.
+              </p>
+              {current && currentStillRunning ? (
+                <p>
+                  Il {current.label} però non è finito (termina il{" "}
+                  {formatDateShort(current.endDate)}): stanotte il portale lo
+                  rimette come corrente da solo, e passa al {suggestedLabel}{" "}
+                  il {formatDateShort(suggestedStart)}.
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <Form {...form}>
@@ -263,7 +306,7 @@ export function StartNewYearDialog({
                       Creazione...
                     </>
                   ) : (
-                    "Conferma e imposta come corrente"
+                    `Crea il ${suggestedLabel}`
                   )}
                 </Button>
               </DialogFooter>
