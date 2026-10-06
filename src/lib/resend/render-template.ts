@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { substituteVariables, type TemplateVars } from "./template-vars";
+import {
+  substituteVariables,
+  substituteVariablesHtml,
+  type TemplateVars,
+} from "./template-vars";
 
 export type RenderedTemplate = {
   slug: string;
@@ -27,7 +31,8 @@ export async function renderTemplate(
   return {
     slug: template.slug,
     subject: substituteVariables(template.subject, vars),
-    bodyHtml: substituteVariables(template.bodyHtml, vars),
+    // Nel corpo HTML i valori passano per l'escape: un nome non è HTML
+    bodyHtml: substituteVariablesHtml(template.bodyHtml, vars),
     bodyText: template.bodyText ? substituteVariables(template.bodyText, vars) : null,
   };
 }

@@ -32,7 +32,11 @@ import {
   MOCK_TEMPLATE_VARS,
   TEMPLATE_VAR_GROUPS,
 } from "@/lib/resend/mock-vars"
-import { substituteVariables } from "@/lib/resend/template-vars"
+import {
+  substituteVariables,
+  substituteVariablesHtml,
+} from "@/lib/resend/template-vars"
+import { EmailHtmlPreview } from "@/components/email-html-preview"
 
 import { StickySaveBar } from "../../../settings/_components/sticky-save-bar"
 import { updateEmailTemplate } from "../../actions"
@@ -99,7 +103,8 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   const preview = useMemo(
     () => ({
       subject: substituteVariables(subject, MOCK_TEMPLATE_VARS),
-      bodyHtml: substituteVariables(bodyHtml, MOCK_TEMPLATE_VARS),
+      // Stessa sostituzione dell'invio vero: i valori passano per l'escape
+      bodyHtml: substituteVariablesHtml(bodyHtml, MOCK_TEMPLATE_VARS),
       bodyText: bodyText
         ? substituteVariables(bodyText, MOCK_TEMPLATE_VARS)
         : "",
@@ -263,9 +268,10 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                 <span className="text-muted-foreground">Oggetto: </span>
                 <span className="font-medium">{preview.subject}</span>
               </div>
-              <div
-                className="prose prose-sm dark:prose-invert max-h-96 max-w-none overflow-y-auto rounded border bg-muted/30 p-3"
-                dangerouslySetInnerHTML={{ __html: preview.bodyHtml }}
+              <EmailHtmlPreview
+                title="Anteprima del corpo dell'email"
+                html={preview.bodyHtml}
+                className="block h-96 w-full rounded border bg-white"
               />
               {preview.bodyText ? (
                 <div>

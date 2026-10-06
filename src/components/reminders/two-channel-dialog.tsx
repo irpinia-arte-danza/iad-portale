@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Loader2, Mail, MessageCircle, Send } from "lucide-react"
 
+import { EmailHtmlPreview } from "@/components/email-html-preview"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -193,9 +194,9 @@ export function TwoChannelReminderDialog({
                     <span>{preview.warning}</span>
                   </div>
                 ) : null}
-                <div
-                  className="prose prose-sm dark:prose-invert max-h-64 max-w-none overflow-y-auto rounded border bg-muted/30 p-3"
-                  dangerouslySetInnerHTML={{ __html: preview.bodyHtml }}
+                <EmailHtmlPreview
+                  title="Anteprima dell'email"
+                  html={preview.bodyHtml}
                 />
               </div>
             ) : (
