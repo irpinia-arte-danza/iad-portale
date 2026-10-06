@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { AlertTriangle, ChevronLeft, Phone, ShieldAlert } from "lucide-react"
+import { AlertTriangle, ChevronLeft, ShieldAlert } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,11 +13,10 @@ import {
 } from "@/components/ui/card"
 import { prisma } from "@/lib/prisma"
 import { requireTeacher } from "@/lib/auth/require-teacher"
-import {
-  classifyCert,
-  CURRENT_CERTIFICATE_ORDER,
-} from "@/lib/medical-certificates/certificate-status"
+import { classifyCert } from "@/lib/medical-certificates/certificate-status"
 import { formatDateShort } from "@/lib/utils/format"
+
+import { getCourseRoster } from "../../_actions/queries"
 
 type PageProps = {
   params: Promise<{ id: string }>
@@ -66,59 +65,9 @@ export default async function TeacherCourseDetailPage({ params }: PageProps) {
   if (!course) notFound()
   if (course.teacherCourses.length === 0) notFound()
 
-  // Allieve attive iscritte AY corrente con genitore primario + cert medico
-  // più recente
-  const enrollments = await prisma.courseEnrollment.findMany({
-    where: {
-      courseId: course.id,
-      withdrawalDate: null,
-      deletedAt: null,
-      academicYear: { isCurrent: true },
-      athlete: { deletedAt: null },
-    },
-    select: {
-      athlete: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          dateOfBirth: true,
-          parentRelations: {
-            where: {
-              parent: { deletedAt: null },
-            },
-            orderBy: [
-              { isPrimaryContact: "desc" },
-              { isPrimaryPayer: "desc" },
-            ],
-            take: 1,
-            select: {
-              relationship: true,
-              parent: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  phone: true,
-                },
-              },
-            },
-          },
-          // Certificato corrente: quelli nel Cestino non contano
-          medicalCertificates: {
-            where: { deletedAt: null },
-            orderBy: CURRENT_CERTIFICATE_ORDER,
-            take: 1,
-            select: { expiryDate: true },
-          },
-        },
-      },
-    },
-    orderBy: [
-      { athlete: { lastName: "asc" } },
-      { athlete: { firstName: "asc" } },
-    ],
-  })
+  // Allieve attive iscritte all'anno corrente, con la scadenza del
+  // certificato. Dei genitori qui non arriva niente (vedi getCourseRoster).
+  const enrollments = await getCourseRoster(course.id)
 
   // Stats presenze 30gg per ogni allieva
   const since = new Date()
@@ -207,7 +156,6 @@ export default async function TeacherCourseDetailPage({ params }: PageProps) {
             <ul className="divide-y">
               {enrollments.map((e) => {
                 const a = e.athlete
-                const parentRel = a.parentRelations[0]
                 const cert = a.medicalCertificates[0]?.expiryDate ?? null
                 const certStatus = classifyCert(cert)
                 const stats = statsByAthlete.get(a.id) ?? {
@@ -256,38 +204,6 @@ export default async function TeacherCourseDetailPage({ params }: PageProps) {
                       ) : null}
                     </div>
 
-                    {parentRel ? (
-                      <div className="flex items-center gap-2 pl-13 text-xs text-muted-foreground sm:pl-13">
-                        <span>
-                          Genitore:{" "}
-                          <strong className="text-foreground">
-                            {parentRel.parent.firstName}{" "}
-                            {parentRel.parent.lastName}
-                          </strong>
-                        </span>
-                        {parentRel.parent.phone ? (
-                          <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="ml-auto h-9 min-h-9 gap-1"
-                          >
-                            <a href={`tel:${parentRel.parent.phone}`}>
-                              <Phone className="h-3 w-3" />
-                              <span className="font-mono">
-                                {parentRel.parent.phone}
-                              </span>
-                            </a>
-                          </Button>
-                        ) : (
-                          <span className="ml-auto text-xs">— no telefono</span>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Nessun genitore collegato.
-                      </p>
-                    )}
 
                     {stats.total > 0 ? (
                       <p className="text-xs text-muted-foreground">
