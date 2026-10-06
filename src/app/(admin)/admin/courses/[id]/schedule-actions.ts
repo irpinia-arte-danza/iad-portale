@@ -13,14 +13,16 @@ import {
   type CourseScheduleValues,
 } from "@/lib/schemas/course-schedule"
 import { toDateOnly, toDateOnlyOrNull } from "@/lib/utils/date-only"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
 
 function mapPrismaError(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2025") return "Orario non trovato"
     if (error.code === "P2003") return "Riferimento a corso inesistente"
   }
-  console.error("[schedule action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[schedule action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 function revalidateCourse(courseId: string) {

@@ -10,6 +10,7 @@ import { classifyCard } from "@/lib/affiliations/card-status"
 import { formatDateShort } from "@/lib/utils/format"
 
 import { getPortalCardUrl } from "../../_actions/card-actions"
+import { logError } from "@/lib/logging/log-error"
 
 type Props = {
   card: {
@@ -39,7 +40,7 @@ export function AthleteCardBlock({ card }: Props) {
       }
       window.open(result.data.signedUrl, "_blank", "noopener,noreferrer")
     } catch (error) {
-      console.error("[portale] download tessera", error)
+      logError("[portale] download tessera", error)
       toast.error("Errore durante il download")
     } finally {
       setLoading(false)

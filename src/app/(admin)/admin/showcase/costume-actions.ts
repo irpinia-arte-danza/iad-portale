@@ -18,6 +18,8 @@ import {
   type CostumeUpdateValues,
   type UpdateAssignmentSizeValues,
 } from "@/lib/schemas/costume"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
 
 const SHOWCASE_PATH = "/admin/showcase"
 const DASHBOARD_PATH = "/admin/dashboard"
@@ -29,8 +31,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2003") return "Riferimento a record inesistente"
     if (error.code === "P2025") return "Risorsa non trovata"
   }
-  console.error("[costume action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[costume action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 function emptyToNull(value: string | undefined | null): string | null {

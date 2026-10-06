@@ -16,6 +16,10 @@ import {
   type TeacherCreateValues,
   type TeacherUpdateValues,
 } from "@/lib/schemas/teacher"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
+import { logAudit } from "@/lib/audit/log-audit"
+import { changedFields } from "@/lib/audit/changed-fields"
 
 const TEACHERS_PATH = "/admin/teachers"
 
@@ -38,8 +42,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2025") return "Insegnante non trovato"
     if (error.code === "P2003") return "Riferimento a record inesistente"
   }
-  console.error("[teachers action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[teachers action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 // Creare un insegnante NON invia nulla: l'accesso al portale è un'azione
@@ -47,7 +51,7 @@ function mapPrismaError(error: unknown): string {
 export async function createTeacher(
   values: TeacherCreateValues,
 ): Promise<ActionResult<{ id: string }>> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const parsed = teacherCreateSchema.safeParse(values)
   if (!parsed.success) {
@@ -63,6 +67,13 @@ export async function createTeacher(
       select: { id: true },
     })
 
+    await logAudit({
+      userId,
+      action: "TEACHER_CREATE",
+      entityType: "Teacher",
+      entityId: teacher.id,
+      changes: { fields: Object.keys(parsed.data) },
+    })
     revalidatePath(TEACHERS_PATH)
     return { ok: true, data: { id: teacher.id } }
   } catch (error) {
@@ -74,7 +85,7 @@ export async function updateTeacher(
   id: string,
   values: TeacherUpdateValues,
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(id)
   if (!idParsed.success) {
@@ -90,9 +101,19 @@ export async function updateTeacher(
   }
 
   try {
+    const before = await prisma.teacher.findUnique({
+      where: { id: idParsed.data },
+    })
     await prisma.teacher.update({
       where: { id: idParsed.data, deletedAt: null },
       data: cleanEmptyStrings(parsed.data),
+    })
+    await logAudit({
+      userId,
+      action: "TEACHER_UPDATE",
+      entityType: "Teacher",
+      entityId: idParsed.data,
+      changes: { fields: changedFields(before, cleanEmptyStrings(parsed.data)) },
     })
     revalidatePath(TEACHERS_PATH)
     return { ok: true }
@@ -102,7 +123,7 @@ export async function updateTeacher(
 }
 
 export async function softDeleteTeacher(id: string): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(id)
   if (!idParsed.success) {
@@ -154,6 +175,13 @@ export async function softDeleteTeacher(id: string): Promise<ActionResult> {
         : []),
     ])
 
+    await logAudit({
+      userId,
+      action: "TEACHER_SOFT_DELETE",
+      entityType: "Teacher",
+      entityId: idParsed.data,
+      changes: undefined,
+    })
     revalidatePath(TEACHERS_PATH)
     return { ok: true }
   } catch (error) {

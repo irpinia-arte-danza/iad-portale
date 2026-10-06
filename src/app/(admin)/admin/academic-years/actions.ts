@@ -13,6 +13,8 @@ import {
   type AcademicYearValues,
 } from "@/lib/schemas/academic-year"
 import { toDateOnly } from "@/lib/utils/date-only"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
 
 const AY_PATH = "/admin/academic-years"
 
@@ -21,8 +23,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2002") return "Anno con questo label già esistente"
     if (error.code === "P2025") return "Anno accademico non trovato"
   }
-  console.error("[academic-years action] error", error)
-  return "Errore interno, riprova"
+  logError("[academic-years action] error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 function normalize(values: AcademicYearValues) {

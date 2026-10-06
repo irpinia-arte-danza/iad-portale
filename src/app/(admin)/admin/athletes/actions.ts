@@ -13,6 +13,10 @@ import {
   type AthleteCreateValues,
   type AthleteUpdateValues,
 } from "@/lib/schemas/athlete"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
+import { logAudit } from "@/lib/audit/log-audit"
+import { changedFields } from "@/lib/audit/changed-fields"
 
 const ATHLETES_PATH = "/admin/athletes"
 
@@ -30,14 +34,14 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2025") return "Allieva non trovata"
     if (error.code === "P2003") return "Riferimento a record inesistente"
   }
-  console.error("[athletes action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[athletes action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 export async function createAthlete(
   values: AthleteCreateValues
 ): Promise<ActionResult<{ id: string }>> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const parsed = athleteCreateSchema.safeParse(values)
   if (!parsed.success) {
@@ -53,6 +57,13 @@ export async function createAthlete(
       data: cleaned,
       select: { id: true },
     })
+    await logAudit({
+      userId,
+      action: "ATHLETE_CREATE",
+      entityType: "Athlete",
+      entityId: athlete.id,
+      changes: { fields: Object.keys(cleaned) },
+    })
     revalidatePath(ATHLETES_PATH)
     return { ok: true, data: { id: athlete.id } }
   } catch (error) {
@@ -64,7 +75,7 @@ export async function updateAthlete(
   id: string,
   values: AthleteUpdateValues
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(id)
   if (!idParsed.success) {
@@ -81,9 +92,19 @@ export async function updateAthlete(
 
   try {
     const cleaned = cleanEmptyStrings(parsed.data)
+    const before = await prisma.athlete.findUnique({
+      where: { id: idParsed.data },
+    })
     await prisma.athlete.update({
       where: { id: idParsed.data, deletedAt: null },
       data: cleaned,
+    })
+    await logAudit({
+      userId,
+      action: "ATHLETE_UPDATE",
+      entityType: "Athlete",
+      entityId: idParsed.data,
+      changes: { fields: changedFields(before, cleaned) },
     })
     revalidatePath(ATHLETES_PATH)
     revalidatePath(`${ATHLETES_PATH}/${idParsed.data}`)
@@ -94,7 +115,7 @@ export async function updateAthlete(
 }
 
 export async function softDeleteAthlete(id: string): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(id)
   if (!idParsed.success) {
@@ -129,6 +150,13 @@ export async function softDeleteAthlete(id: string): Promise<ActionResult> {
         : []),
     ])
 
+    await logAudit({
+      userId,
+      action: "ATHLETE_SOFT_DELETE",
+      entityType: "Athlete",
+      entityId: idParsed.data,
+      changes: undefined,
+    })
     revalidatePath(ATHLETES_PATH)
     return { ok: true }
   } catch (error) {

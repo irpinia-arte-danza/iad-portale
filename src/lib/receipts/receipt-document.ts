@@ -14,6 +14,7 @@ import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { receiptPdfFileName as buildReceiptPdfFileName } from "./pdf-file-name"
 
 import type { ReceiptLine } from "./types"
+import { logError } from "@/lib/logging/log-error"
 
 // Caricamento e rendering del PDF di una ricevuta già emessa. Il rendering
 // produce il file da archiviare (receipt-pdf-store.ts): chi apre la ricevuta
@@ -159,10 +160,10 @@ export async function renderReceiptPdfFromData(
     // Il logo (immagine remota, formato caricato dall'admin) non deve impedire
     // la consegna della ricevuta: si ritenta con il marchio testuale, e la
     // causa resta nei log per sistemare il logo.
-    console.error(
+    logError(
       "[receipt pdf] render with logo failed, retrying without logo",
-      logContext,
       error,
+      logContext,
     )
     return renderToBuffer(
       ReceiptPdf({ receipt, brand: { ...brandData, logoUrl: null } }),

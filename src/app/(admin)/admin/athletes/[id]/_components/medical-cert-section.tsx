@@ -52,6 +52,7 @@ import {
   softDeleteMedicalCertificate,
 } from "../medical-cert-actions"
 import { MedicalCertFormDialog } from "./medical-cert-form-dialog"
+import { logError } from "@/lib/logging/log-error"
 
 type CertItem = {
   id: string
@@ -117,7 +118,7 @@ export function MedicalCertSection({
       }
       window.open(target, "_blank", "noopener,noreferrer")
     } catch (error) {
-      console.error("[medical-cert] download error", error)
+      logError("[medical-cert] download error", error)
       toast.error("Errore download certificato")
     } finally {
       setDownloadingId(null)

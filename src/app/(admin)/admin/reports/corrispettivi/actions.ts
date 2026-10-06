@@ -9,6 +9,7 @@ import {
   getCorrispettivi,
   type CorrispettiviResult,
 } from "./queries"
+import { logError } from "@/lib/logging/log-error"
 
 const FEE_TYPES: FeeType[] = [
   "ASSOCIATION",
@@ -79,7 +80,7 @@ export async function fetchCorrispettivi(
     const result = await getCorrispettivi({ from, to, feeType, method })
     return { ok: true, data: { result } }
   } catch (error) {
-    console.error("[corrispettivi action] fetch failed", error)
+    logError("[corrispettivi action] fetch failed", error)
     return { ok: false, error: "Errore durante il caricamento" }
   }
 }

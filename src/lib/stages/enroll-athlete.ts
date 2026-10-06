@@ -3,6 +3,8 @@ import "server-only"
 import { FeeType, Prisma, ScheduleStatus } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
 
 // Iscrizione di un'allieva a uno stage (+ scadenza di pagamento + audit),
 // condivisa da:
@@ -66,8 +68,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2003") return "Riferimento a record inesistente"
     if (error.code === "P2025") return "Risorsa non trovata"
   }
-  console.error("[stage enroll] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[stage enroll] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 export async function enrollAthleteCore(

@@ -10,6 +10,7 @@ import { receiptPdfHref } from "@/lib/receipts/types"
 
 import { recordReceiptShared } from "../actions"
 import { useFileShareSupport } from "./use-file-share-support"
+import { logError } from "@/lib/logging/log-error"
 
 // ─────────────────────────────────────────────────────────────────────────
 // "Condividi": apre il foglio di condivisione di iOS con il PDF già dentro,
@@ -124,7 +125,7 @@ export function ShareReceiptButton({
       await recordReceiptShared(receiptId)
       onShared?.()
     } catch (error) {
-      console.error("[receipt share] audit non registrato", error)
+      logError("[receipt share] audit non registrato", error)
     }
   }
 

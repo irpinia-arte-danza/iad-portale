@@ -20,6 +20,8 @@ import {
 } from "@/lib/supabase/storage-medical-cert"
 import { toDateOnly } from "@/lib/utils/date-only"
 import { validateFileSignature } from "@/lib/utils/file-signature"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE, userFacingMessage } from "@/lib/errors"
 
 const MAX_BYTES = 3 * 1024 * 1024
 
@@ -28,8 +30,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2003") return "Allieva non trovata"
     if (error.code === "P2025") return "Certificato non trovato"
   }
-  console.error("[medical-cert action] error", error)
-  return "Errore interno, riprova"
+  logError("[medical-cert action] error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 // Scheda allieva, lista allieve (colonna certificato) e riepilogo certificati
@@ -131,11 +133,8 @@ export async function createMedicalCertificate(
       } catch (uploadError) {
         // Rollback DB record se upload fallisce
         await prisma.medicalCertificate.delete({ where: { id: cert.id } })
-        const message =
-          uploadError instanceof Error
-            ? uploadError.message
-            : "Upload fallito"
-        return { ok: false, error: message }
+        logError("[medical-cert action] upload failed", uploadError, { certId: cert.id })
+        return { ok: false, error: userFacingMessage(uploadError) }
       }
     }
 

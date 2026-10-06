@@ -15,6 +15,7 @@ import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { formatEuro, formatMeseIt } from "@/lib/utils/format"
 import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
+import { logError } from "@/lib/logging/log-error"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -265,10 +266,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           text: rendered.bodyText,
         })
       } catch (err) {
-        console.error("[cron/reminders] render failed", {
+        logError("[cron/reminders] render failed", err, {
           milestone: m.key,
           scheduleId: sched.id,
-          err,
         })
         s.failed++
       }

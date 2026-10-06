@@ -19,6 +19,7 @@ import {
 } from "@/lib/receipts/receipt-pdf-store"
 import { uuidSchema } from "@/lib/schemas/common"
 import { createClient } from "@/lib/supabase/server"
+import { logError } from "@/lib/logging/log-error"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -221,7 +222,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       error instanceof ReceiptArchiveError || error instanceof ReceiptRenderError
         ? error.code
         : "RENDER_FAILED"
-    console.error("[receipt pdf] delivery failed", { ...logContext, code }, error)
+    logError("[receipt pdf] delivery failed", error, { ...logContext, code })
     return messagePage({ ...pdfFailureMessage(code, isAdmin), backHref })
   }
 
@@ -234,7 +235,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         reason: receipt.cancelReason,
       })
     } catch (error) {
-      console.error("[receipt pdf] cancelled stamp failed", logContext, error)
+      logError("[receipt pdf] cancelled stamp failed", error, logContext)
       return messagePage({
         status: 500,
         title: "PDF non generato",

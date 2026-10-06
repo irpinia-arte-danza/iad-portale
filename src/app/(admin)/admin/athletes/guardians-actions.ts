@@ -13,6 +13,9 @@ import {
   type GuardianRelationValues,
   type NewGuardianParentValues,
 } from "@/lib/schemas/guardian"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
+import { logAudit } from "@/lib/audit/log-audit"
 
 const ATHLETES_PATH = "/admin/athletes"
 
@@ -31,8 +34,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2025") return "Record non trovato"
     if (error.code === "P2003") return "Riferimento a record inesistente"
   }
-  console.error("[guardians action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[guardians action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 async function clearPrimaryFlagsBeforeWrite(
@@ -72,7 +75,7 @@ export async function linkExistingGuardian(
   parentId: string,
   relationData: GuardianRelationValues
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const athleteIdParsed = uuidSchema.safeParse(athleteId)
   const parentIdParsed = uuidSchema.safeParse(parentId)
@@ -89,7 +92,7 @@ export async function linkExistingGuardian(
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const pivot = await prisma.$transaction(async (tx) => {
       await clearPrimaryFlagsBeforeWrite(
         tx,
         athleteIdParsed.data,
@@ -106,6 +109,13 @@ export async function linkExistingGuardian(
       })
       return pivot
     })
+    await logAudit({
+      userId,
+      action: "GUARDIAN_LINK",
+      entityType: "AthleteParent",
+      entityId: pivot.id,
+      changes: { athleteId: athleteIdParsed.data, parentId: parentIdParsed.data, relationship: parsed.data.relationship },
+    })
     revalidatePath(`${ATHLETES_PATH}/${athleteIdParsed.data}`)
     return { ok: true }
   } catch (error) {
@@ -118,7 +128,7 @@ export async function linkNewGuardian(
   parentData: NewGuardianParentValues,
   relationData: GuardianRelationValues
 ): Promise<ActionResult<{ parentId: string }>> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const athleteIdParsed = uuidSchema.safeParse(athleteId)
   if (!athleteIdParsed.success) {
@@ -164,10 +174,24 @@ export async function linkNewGuardian(
         },
         select: { id: true },
       })
-      return { parentId: parent.id }
+      return { parentId: parent.id, pivotId: pivot.id }
+    })
+    await logAudit({
+      userId,
+      action: "PARENT_CREATE",
+      entityType: "Parent",
+      entityId: result.parentId,
+      changes: { fields: Object.keys(parentParsed.data) },
+    })
+    await logAudit({
+      userId,
+      action: "GUARDIAN_LINK",
+      entityType: "AthleteParent",
+      entityId: result.pivotId,
+      changes: { athleteId: athleteIdParsed.data, parentId: result.parentId, relationship: relationParsed.data.relationship },
     })
     revalidatePath(`${ATHLETES_PATH}/${athleteIdParsed.data}`)
-    return { ok: true, data: result }
+    return { ok: true, data: { parentId: result.parentId } }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }
   }
@@ -176,7 +200,7 @@ export async function linkNewGuardian(
 export async function unlinkGuardian(
   athleteParentId: string
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(athleteParentId)
   if (!idParsed.success) {
@@ -186,13 +210,20 @@ export async function unlinkGuardian(
   try {
     const pivot = await prisma.athleteParent.findUnique({
       where: { id: idParsed.data },
-      select: { athleteId: true },
+      select: { athleteId: true, parentId: true },
     })
     if (!pivot) {
       return { ok: false, error: "Collegamento non trovato" }
     }
     await prisma.athleteParent.delete({
       where: { id: idParsed.data },
+    })
+    await logAudit({
+      userId,
+      action: "GUARDIAN_UNLINK",
+      entityType: "AthleteParent",
+      entityId: idParsed.data,
+      changes: { athleteId: pivot.athleteId, parentId: pivot.parentId },
     })
     revalidatePath(`${ATHLETES_PATH}/${pivot.athleteId}`)
     return { ok: true }
@@ -205,7 +236,7 @@ export async function updateGuardianRelation(
   athleteParentId: string,
   relationData: GuardianRelationValues
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(athleteParentId)
   if (!idParsed.success) {
@@ -247,6 +278,13 @@ export async function updateGuardianRelation(
     if (!athleteId) {
       return { ok: false, error: "Record non trovato" }
     }
+    await logAudit({
+      userId,
+      action: "GUARDIAN_LINK",
+      entityType: "AthleteParent",
+      entityId: idParsed.data,
+      changes: { athleteId, update: true, fields: Object.keys(parsed.data) },
+    })
     revalidatePath(`${ATHLETES_PATH}/${athleteId}`)
     return { ok: true }
   } catch (error) {

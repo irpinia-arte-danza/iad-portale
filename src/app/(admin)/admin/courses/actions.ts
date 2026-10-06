@@ -14,6 +14,10 @@ import {
   type CourseCreateValues,
   type CourseUpdateValues,
 } from "@/lib/schemas/course"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
+import { logAudit } from "@/lib/audit/log-audit"
+import { changedFields } from "@/lib/audit/changed-fields"
 
 const COURSES_PATH = "/admin/courses"
 
@@ -25,8 +29,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2025") return "Corso non trovato"
     if (error.code === "P2003") return "Riferimento a record inesistente"
   }
-  console.error("[courses action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[courses action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 // Risolve la lista teachers da inviare alla M2M:
@@ -75,7 +79,7 @@ function normalizeCourseFields(values: CourseCreateValues) {
 export async function createCourse(
   values: CourseCreateValues,
 ): Promise<ActionResult<{ id: string }>> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const parsed = courseCreateSchema.safeParse(values)
   if (!parsed.success) {
@@ -108,6 +112,13 @@ export async function createCourse(
       }
       return c
     })
+    await logAudit({
+      userId,
+      action: "COURSE_CREATE",
+      entityType: "Course",
+      entityId: course.id,
+      changes: { fields: Object.keys(normalizeCourseFields(parsed.data)), teachers: teachers.length },
+    })
     revalidatePath(COURSES_PATH)
     return { ok: true, data: { id: course.id } }
   } catch (error) {
@@ -119,7 +130,7 @@ export async function updateCourse(
   id: string,
   values: CourseUpdateValues,
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(id)
   if (!idParsed.success) {
@@ -138,6 +149,7 @@ export async function updateCourse(
   const primary = teachers.find((t) => t.isPrimary) ?? null
 
   try {
+    const before = await prisma.course.findUnique({ where: { id: idParsed.data } })
     await prisma.$transaction(async (tx) => {
       await tx.course.update({
         where: { id: idParsed.data },
@@ -162,6 +174,13 @@ export async function updateCourse(
         })
       }
     })
+    await logAudit({
+      userId,
+      action: "COURSE_UPDATE",
+      entityType: "Course",
+      entityId: idParsed.data,
+      changes: { fields: changedFields(before, normalizeCourseFields(parsed.data)), teachers: teachers.length },
+    })
     revalidatePath(COURSES_PATH)
     return { ok: true }
   } catch (error) {
@@ -173,7 +192,7 @@ export async function toggleCourseActive(
   id: string,
   isActive: boolean,
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(id)
   if (!idParsed.success) {
@@ -187,6 +206,13 @@ export async function toggleCourseActive(
     await prisma.course.update({
       where: { id: idParsed.data },
       data: { isActive },
+    })
+    await logAudit({
+      userId,
+      action: "COURSE_UPDATE",
+      entityType: "Course",
+      entityId: idParsed.data,
+      changes: { fields: ["isActive"], isActive },
     })
     revalidatePath(COURSES_PATH)
     return { ok: true }

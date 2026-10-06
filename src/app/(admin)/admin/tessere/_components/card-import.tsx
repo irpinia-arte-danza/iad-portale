@@ -45,6 +45,7 @@ import { cn } from "@/lib/utils"
 import { formatDateShort } from "@/lib/utils/format"
 
 import { importCardFile, previewCardImport, type ParsedFile } from "../actions"
+import { logError } from "@/lib/logging/log-error"
 
 // Quanti file per chiamata: i PDF viaggiano interi, meglio non fare un unico
 // corpo enorme. Le righe restano numerate come i file scelti.
@@ -163,7 +164,7 @@ export function CardImport({ entity }: Props) {
       }
       setParsedFiles(collected)
     } catch (error) {
-      console.error("[tessere] lettura fallita", error)
+      logError("[tessere] lettura fallita", error)
       toast.error("Errore durante la lettura dei PDF")
     } finally {
       setReading(false)

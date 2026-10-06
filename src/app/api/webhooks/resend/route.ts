@@ -3,6 +3,7 @@ import { Webhook } from "svix"
 
 import { prisma } from "@/lib/prisma"
 import { EmailStatus, Prisma } from "@prisma/client"
+import { logError } from "@/lib/logging/log-error"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     const wh = new Webhook(webhookSecret)
     event = wh.verify(rawBody, headers) as ResendWebhookPayload
   } catch (err) {
-    console.error("[webhook/resend] Signature verification failed", err)
+    logError("[webhook/resend] Signature verification failed", err)
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
   }
 
@@ -144,10 +145,7 @@ export async function POST(request: NextRequest) {
         data: update as Prisma.EmailLogUpdateManyMutationInput,
       })
     } catch (err) {
-      console.error(
-        `[webhook/resend] Update failed for ${emailLog.id}`,
-        err,
-      )
+      logError("[webhook/resend] update failed", err, { emailLogId: emailLog.id })
       return NextResponse.json({ error: "Update failed" }, { status: 500 })
     }
   }

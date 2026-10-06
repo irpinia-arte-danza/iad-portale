@@ -12,6 +12,7 @@ import {
   upcomingAcademicYearLabel,
 } from "@/lib/school-calendar"
 import { todayDateOnly } from "@/lib/utils/date-only"
+import { logError } from "@/lib/logging/log-error"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -128,7 +129,7 @@ async function runStep<T>(
   try {
     return await step()
   } catch (error) {
-    console.error(`${LOG_PREFIX} step ${name} failed`, error)
+    logError(`${LOG_PREFIX} step ${name} failed`, error)
     return { action: "error" }
   }
 }

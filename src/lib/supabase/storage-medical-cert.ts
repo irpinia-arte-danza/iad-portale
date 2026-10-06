@@ -7,6 +7,7 @@ import {
   MEDICAL_CERT_MAX_BYTES,
 } from "@/lib/medical-certificates/file-rules"
 import { detectMimeFromSignature } from "@/lib/utils/file-signature"
+import { UserFacingError } from "@/lib/errors"
 
 export const MEDICAL_CERT_BUCKET = "medical-certificates"
 
@@ -36,12 +37,12 @@ export async function uploadMedicalCertFile(
   file: File,
 ): Promise<UploadedMedicalCert> {
   if (!ALLOWED_MIME_SET.has(file.type)) {
-    throw new Error(
+    throw new UserFacingError(
       `Formato non supportato. Ammessi: PDF, JPEG, PNG (ricevuto ${file.type})`,
     )
   }
   if (file.size > MAX_BYTES) {
-    throw new Error("File troppo grande (max 3 MB)")
+    throw new UserFacingError("File troppo grande (max 3 MB)")
   }
 
   const supabase = createAdminClient()
@@ -50,7 +51,7 @@ export async function uploadMedicalCertFile(
   const arrayBuffer = await file.arrayBuffer()
   const signatureMime = detectMimeFromSignature(arrayBuffer)
   if (!signatureMime || !ALLOWED_MIME_SET.has(signatureMime)) {
-    throw new Error("Il contenuto del file non corrisponde a un formato ammesso.")
+    throw new UserFacingError("Il contenuto del file non corrisponde a un formato ammesso.")
   }
 
   const buffer = Buffer.from(arrayBuffer)

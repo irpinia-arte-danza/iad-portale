@@ -10,6 +10,7 @@ import { attendanceEditCutoff } from "@/lib/attendance/edit-window"
 import { requireTeacher } from "@/lib/auth/require-teacher"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
+import { logError } from "@/lib/logging/log-error"
 
 // ─────────────────────────────────────────────────────────────────────
 // Helper: verifica che il corso sia tra i corsi assegnati al teacher.
@@ -111,7 +112,7 @@ export async function createOrFindTodayLesson(
     revalidatePath("/teacher/dashboard")
     return { ok: true, data: { lessonId: lesson.id } }
   } catch (error) {
-    console.error("[teacher session] create lesson failed", error)
+    logError("[teacher session] create lesson failed", error)
     return { ok: false, error: "Errore creazione lezione" }
   }
 }
@@ -237,7 +238,7 @@ export async function saveAttendance(
     revalidatePath("/teacher/dashboard")
     return { ok: true }
   } catch (error) {
-    console.error("[teacher session] save attendance failed", error)
+    logError("[teacher session] save attendance failed", error)
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2003") {
         return { ok: false, error: "Riferimento a record inesistente" }
