@@ -8,7 +8,9 @@ export type TemplateVarGroup = {
 export const MOCK_TEMPLATE_VARS: TemplateVars = {
   genitore_nome: "Maria Rossi",
   allieva_nome: "Elena Rossi",
-  importo: "50,00",
+  // Col simbolo, come lo scrive formatEuro: l'anteprima deve mostrare quello
+  // che il destinatario leggerà
+  importo: "50,00 €",
   data_scadenza: "15/10/2025",
   mese: "Ottobre 2025",
   corso_nome: "Hip Hop Giovanissimi",

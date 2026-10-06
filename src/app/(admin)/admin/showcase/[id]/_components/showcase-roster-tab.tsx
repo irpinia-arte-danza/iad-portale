@@ -49,16 +49,13 @@ import {
 } from "../../actions"
 import type { ShowcaseWithDetails } from "../../queries"
 
+import { formatEuro } from "@/lib/utils/format"
 const DATE_IT = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
 })
 
-const EUR = new Intl.NumberFormat("it-IT", {
-  style: "currency",
-  currency: "EUR",
-})
 
 type EnrollableAthlete = {
   id: string
@@ -393,8 +390,8 @@ export function ShowcaseRosterTab({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   2 scadenze separate (caparra{" "}
-                  {EUR.format(showcase.firstInstallmentCents / 100)} + saldo{" "}
-                  {EUR.format(showcase.secondInstallmentCents / 100)})
+                  {formatEuro(showcase.firstInstallmentCents)} + saldo{" "}
+                  {formatEuro(showcase.secondInstallmentCents)})
                 </p>
               </div>
             </button>
@@ -420,10 +417,9 @@ export function ShowcaseRosterTab({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   1 scadenza unica (
-                  {EUR.format(
-                    (showcase.firstInstallmentCents +
-                      showcase.secondInstallmentCents) /
-                      100,
+                  {formatEuro(
+                    showcase.firstInstallmentCents +
+                      showcase.secondInstallmentCents,
                   )}
                   )
                 </p>
@@ -582,7 +578,7 @@ function ParticipationRowCmp({
         ) : (
           <div className="flex flex-col gap-1 text-xs">
             <span className="font-mono">
-              {EUR.format(paidCents / 100)} / {EUR.format(totalCents / 100)}
+              {formatEuro(paidCents)} / {formatEuro(totalCents)}
             </span>
             <span className="text-muted-foreground">
               prox.{" "}

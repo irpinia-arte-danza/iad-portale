@@ -7,6 +7,8 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   test: {
-    include: ["src/**/*.test.ts"],
+    // .tsx per i test che rendono un componente con react-dom/server:
+    // niente jsdom, si guarda il markup che esce (vedi responsive-list)
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 })

@@ -22,6 +22,7 @@ import { getParentById } from "../queries"
 import { AccessStatusCard } from "../../_components/access/access-status-card"
 import { getAccessStatus } from "@/lib/auth/access-status"
 
+import { fullName } from "@/lib/utils/person-name"
 const RELATIONSHIP_LABELS: Record<ParentRelationship, string> = {
   MOTHER: "Madre",
   FATHER: "Padre",
@@ -63,7 +64,9 @@ export default async function ParentDetailPage({ params }: PageProps) {
   }
 
   const accessStatus = await getAccessStatus("PARENT", parent)
-  const fullName = `${parent.lastName} ${parent.firstName}`
+  // Nome Cognome: nel titolo di una scheda si sta guardando una persona,
+  // non la si sta cercando in un elenco ordinato per cognome
+  const nome = fullName(parent)
   const athleteCount = parent.athleteRelations.length
 
   return (
@@ -71,9 +74,9 @@ export default async function ParentDetailPage({ params }: PageProps) {
       <ResourceHeader
         breadcrumbs={[
           { label: "Genitori", href: "/admin/parents" },
-          { label: fullName },
+          { label: nome },
         ]}
-        title={fullName}
+        title={nome}
         action={<ParentDetailHeader parent={parent} />}
       />
       <ResourceContent>

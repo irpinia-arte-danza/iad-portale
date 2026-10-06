@@ -1,6 +1,6 @@
 import { todayInRome } from "@/lib/receipts/numbering"
 import { getDailyEmailQuota } from "@/lib/resend/daily-quota"
-import { formatEur } from "@/lib/utils/format"
+import { formatEuro } from "@/lib/utils/format"
 
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
@@ -58,7 +58,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
             {year}: <strong className="text-foreground">{summary.validCount}</strong>{" "}
             {summary.validCount === 1 ? "ricevuta valida" : "ricevute valide"} per{" "}
             <strong className="font-mono text-foreground">
-              {formatEur(summary.validAmountCents)}
+              {formatEuro(summary.validAmountCents)}
             </strong>
             {summary.cancelledCount > 0
               ? ` · ${summary.cancelledCount} ${summary.cancelledCount === 1 ? "annullata" : "annullate"}`

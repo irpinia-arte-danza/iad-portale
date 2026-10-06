@@ -1,7 +1,7 @@
 import { Percent, TrendingDown, TrendingUp, Wallet } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
-import { formatEur, formatPercent } from "@/lib/utils/format"
+import { formatEuro, formatPercent } from "@/lib/utils/format"
 
 import type { BilancioTotals } from "../queries"
 
@@ -21,7 +21,7 @@ export function BilancioSummary({ totals }: BilancioSummaryProps) {
             Entrate
           </div>
           <p className="font-mono text-2xl font-semibold">
-            {formatEur(totals.entrateCents)}
+            {formatEuro(totals.entrateCents)}
           </p>
           <p className="text-xs text-muted-foreground">
             {totals.countEntrate}{" "}
@@ -39,7 +39,7 @@ export function BilancioSummary({ totals }: BilancioSummaryProps) {
             Uscite
           </div>
           <p className="font-mono text-2xl font-semibold">
-            −{formatEur(totals.usciteCents)}
+            −{formatEuro(totals.usciteCents)}
           </p>
           <p className="text-xs text-muted-foreground">
             {totals.countUscite}{" "}
@@ -61,7 +61,7 @@ export function BilancioSummary({ totals }: BilancioSummaryProps) {
                 : "text-rose-600 dark:text-rose-500"
             }`}
           >
-            {formatEur(totals.netCents)}
+            {formatEuro(totals.netCents)}
           </p>
           <p className="text-xs text-muted-foreground">Entrate − Uscite</p>
         </CardContent>

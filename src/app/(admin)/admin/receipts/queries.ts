@@ -15,6 +15,7 @@ import {
 } from "@/lib/receipts/receipt-email"
 import { getReceiptEmailStates } from "@/lib/receipts/receipt-email-status"
 import { prisma } from "@/lib/prisma"
+import { listNameOrFrozen } from "@/lib/utils/person-name"
 
 // Il chip attivo nell'elenco
 export type ReceiptDeliveryFilter =
@@ -57,12 +58,17 @@ const receiptListItem = Prisma.validator<Prisma.ReceiptDefaultArgs>()({
     athleteName: true,
     amountCents: true,
     cancelledAt: true,
+    // Il pagante congelato è una stringa sola: `payerId` è il genitore, e
+    // serve a scrivere "Cognome Nome" nell'elenco senza toccare il dato
+    // salvato sulla ricevuta (vedi listNameOrFrozen)
+    payerId: true,
     payment: {
       select: {
         id: true,
         athleteId: true,
         paymentDate: true,
         amountCents: true,
+        athlete: { select: { firstName: true, lastName: true } },
       },
     },
   },
@@ -72,6 +78,10 @@ export type ReceiptListItem = Prisma.ReceiptGetPayload<typeof receiptListItem>
 
 // Riga dell'elenco con lo stato dell'invio, ricavato da EmailLog
 export type ReceiptListRow = ReceiptListItem & {
+  // Nomi come li scrivono gli altri elenchi: "Cognome Nome" quando
+  // l'anagrafica c'è ancora, altrimenti il dato congelato della ricevuta
+  athleteListName: string | null
+  payerListName: string | null
   emailState: ReceiptEmailState
   // Motivo per cui non si può inviare (annullata, pagante senza email); null
   // se si può. Decide anche cosa è selezionabile per l'invio multiplo.
@@ -140,15 +150,37 @@ export async function listReceipts(filters: ReceiptListFilters) {
     }),
   ])
 
-  const [emailStates, deliveryStates] = await Promise.all([
+  const payerIds = [
+    ...new Set(items.flatMap((r) => (r.payerId ? [r.payerId] : []))),
+  ]
+
+  const [emailStates, deliveryStates, payers] = await Promise.all([
     getReceiptEmailStates(items.map((r) => r.id)),
     getDeliveryStates(items.map((r) => ({ id: r.id, status: r.status }))),
+    // Niente FK su payerId (la ricevuta si conserva 10 anni, il genitore
+    // può sparire): una query sola e quello che manca resta congelato
+    payerIds.length === 0
+      ? Promise.resolve([])
+      : prisma.parent.findMany({
+          where: { id: { in: payerIds } },
+          select: { id: true, firstName: true, lastName: true },
+        }),
   ])
+
+  const payerById = new Map(payers.map((p) => [p.id, p]))
 
   const rows: ReceiptListRow[] = items.map((r) => {
     const delivery = deliveryStates[r.id]
+    const payer = r.payerId ? payerById.get(r.payerId) : undefined
     return {
       ...r,
+      athleteListName: listNameOrFrozen(r.payment?.athlete, r.athleteName),
+      // Pagante: il genitore se c'è, l'allieva quando paga per sé
+      // (payerId resta vuoto), altrimenti il nome congelato
+      payerListName: listNameOrFrozen(
+        payer ?? (r.payerId === null ? r.payment?.athlete : null),
+        r.payerName,
+      ),
       emailState: emailStates[r.id],
       emailBlocker: receiptEmailBlocker(r),
       delivery,

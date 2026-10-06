@@ -21,7 +21,7 @@ import { groupByPayer } from "@/lib/scadenze/payer-grouping"
 import { reminderWhatsappText } from "@/lib/scadenze/reminder-text"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { uuidSchema } from "@/lib/schemas/common"
-import { formatMeseIt } from "@/lib/utils/format"
+import { formatEuro, formatMeseIt } from "@/lib/utils/format"
 import { withActiveCourseOrAssociationScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 const DATE_IT = new Intl.DateTimeFormat("it-IT", {
@@ -30,10 +30,6 @@ const DATE_IT = new Intl.DateTimeFormat("it-IT", {
   year: "numeric",
 })
 
-const CURRENCY_IT = new Intl.NumberFormat("it-IT", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
 
 function startOfUTCToday(): Date {
   const now = new Date()
@@ -100,10 +96,6 @@ function reminderPeriod(schedule: {
 function formatList(values: string[]): string {
   if (values.length <= 1) return values[0] ?? ""
   return `${values.slice(0, -1).join(", ")} e ${values[values.length - 1]}`
-}
-
-function formatEuroAmount(cents: number): string {
-  return CURRENCY_IT.format(cents / 100)
 }
 
 export async function getScadenzeCSVData(
@@ -182,7 +174,7 @@ export async function getScadenzeCSVData(
         contact.ok ? contact.recipient.email : "",
         parent?.phone ?? "",
         s.courseEnrollment?.course.name ?? s.notes ?? "—",
-        CURRENCY_IT.format(s.amountCents / 100),
+        formatEuro(s.amountCents),
         DATE_IT.format(s.dueDate),
         String(giorniRitardo),
         email?.lastSent ? DATE_IT.format(email.lastSent) : "",
@@ -266,10 +258,7 @@ export async function previewReminder(
   const vars = {
     genitore_nome: recipientName,
     allieva_nome: athleteName,
-    importo: (schedule.amountCents / 100).toLocaleString("it-IT", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }),
+    importo: formatEuro(schedule.amountCents),
     data_scadenza: schedule.dueDate.toLocaleDateString("it-IT", {
       day: "2-digit",
       month: "2-digit",
@@ -280,7 +269,7 @@ export async function previewReminder(
     tipo_quota: FEE_TYPE_LABELS[schedule.feeType] ?? "",
     // Anche con una rata sola: l'anteprima deve mostrare quello che il
     // destinatario leggerà, e l'invio riempie sempre questa variabile
-    elenco_rate: `${athleteName} — ${reminderPeriod(schedule)}: ${formatEuroAmount(schedule.amountCents)} €`,
+    elenco_rate: `${athleteName} — ${reminderPeriod(schedule)}: ${formatEuro(schedule.amountCents)}`,
   }
 
   const rendered = await renderTemplate(templateSlug, vars)
@@ -473,7 +462,7 @@ export async function sendReminderBatch(
       genitore_nome: first.recipientName,
       allieva_nome: formatList(allieve),
       // Con una rata sola è esattamente quello che usciva prima
-      importo: formatEuroAmount(totalCents),
+      importo: formatEuro(totalCents),
       data_scadenza: DATE_IT.format(earliest.dueDate),
       mese: formatList(periodi),
       corso_nome: first.courseName,
@@ -482,7 +471,7 @@ export async function sendReminderBatch(
       elenco_rate: items
         .map(
           (i) =>
-            `${i.athleteName} — ${i.periodo}: ${formatEuroAmount(i.amountCents)} €`,
+            `${i.athleteName} — ${i.periodo}: ${formatEuro(i.amountCents)}`,
         )
         .join("; "),
     }

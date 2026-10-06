@@ -13,6 +13,8 @@ import {
 import type { AccessStatus } from "@/lib/auth/access-status-types"
 
 import { AccessStatusBadge } from "../../_components/access/access-status-badge"
+import { listName } from "@/lib/utils/person-name"
+
 import { SendAccessButton } from "../../_components/access/send-access-button"
 import { TeacherRowActions } from "./teacher-row-actions"
 
@@ -75,7 +77,7 @@ export function TeachersTable({ teachers, accessStatuses }: TeachersTableProps) 
                   >
                     <div className="flex flex-col">
                       <span className="font-medium">
-                        {teacher.lastName} {teacher.firstName}
+                        {listName(teacher)}
                       </span>
                       <span className="sm:hidden truncate max-w-[200px] text-xs text-muted-foreground">
                         {teacher.email || teacher.phone || "—"}

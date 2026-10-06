@@ -26,6 +26,8 @@ import {
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { todayDateOnly } from "@/lib/utils/date-only"
 
+import { scadenzeWhere } from "../scadenze/queries"
+
 export type AthleteListSort = "name" | "certificate" | "card"
 
 export type { AthleteListFilter } from "@/lib/athletes/list-filters"
@@ -87,10 +89,48 @@ type ChecklistYear = {
   startDate: Date
 } | null
 
+export type AthleteOverdue = { count: number; amountCents: number }
+
+const NO_OVERDUE: AthleteOverdue = { count: 0, amountCents: 0 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Contributi in ritardo per allieva.
+//
+// Il predicato non si riscrive: è `scadenzeWhere({ stato: "IN_RITARDO" })`,
+// lo stesso dell'elenco Scadenze e del riquadro in dashboard. Una query
+// sola per tutta la lista (le rate scadute sono poche centinaia) e somma in
+// memoria, perché la rata è legata all'allieva per due strade diverse —
+// direttamente (contributo di iscrizione) o attraverso l'iscrizione al corso
+// — e un groupBy non le vede entrambe.
+// ─────────────────────────────────────────────────────────────────────────
+async function overdueByAthlete(): Promise<Record<string, AthleteOverdue>> {
+  const schedules = await prisma.paymentSchedule.findMany({
+    where: scadenzeWhere({ stato: "IN_RITARDO" }),
+    select: {
+      amountCents: true,
+      athleteId: true,
+      courseEnrollment: { select: { athleteId: true } },
+    },
+  })
+
+  const byAthlete: Record<string, AthleteOverdue> = {}
+  for (const s of schedules) {
+    const athleteId = s.athleteId ?? s.courseEnrollment?.athleteId
+    if (!athleteId) continue
+    const current = byAthlete[athleteId] ?? { count: 0, amountCents: 0 }
+    byAthlete[athleteId] = {
+      count: current.count + 1,
+      amountCents: current.amountCents + s.amountCents,
+    }
+  }
+  return byAthlete
+}
+
 function toListRow(
   record: AthleteListRecord,
   today: Date,
   currentAcademicYear: ChecklistYear,
+  overdue: Record<string, AthleteOverdue> = {},
 ) {
   const { medicalCertificates, affiliations, enrollments, ...athlete } = record
   const expiryDate = medicalCertificates[0]?.expiryDate ?? null
@@ -99,6 +139,8 @@ function toListRow(
     ...athlete,
     certificate: { expiryDate, status: classifyCert(expiryDate, today) },
     card: { expiryDate: cardExpiry, status: classifyCard(cardExpiry, today) },
+    // Quanto deve, in ritardo: sotto 768 è una delle due righe della card
+    overdue: overdue[record.id] ?? NO_OVERDUE,
     // Gli stessi passi che la scheda mostra in "Da completare"
     setupSteps: athleteSetupChecklist(
       {
@@ -165,16 +207,17 @@ export async function listAthletes(filters: ListFilters = {}) {
     // dipendono da relazioni, dalla minore età e dall'anno accademico: si
     // lavora in memoria sull'elenco completo (poche decine di allieve) e poi
     // si pagina. A parità di scadenza resta l'ordine per nome (sort stabile).
-    const [athletes, currentAcademicYear] = await Promise.all([
+    const [athletes, currentAcademicYear, overdue] = await Promise.all([
       prisma.athlete.findMany({
         where,
         include: athleteListInclude,
         orderBy,
       }),
       currentAcademicYearForChecklist(),
+      overdueByAthlete(),
     ])
     let rows = athletes.map((athlete) =>
-      toListRow(athlete, today, currentAcademicYear),
+      toListRow(athlete, today, currentAcademicYear, overdue),
     )
 
     if (filter) {
@@ -196,21 +239,23 @@ export async function listAthletes(filters: ListFilters = {}) {
     return { items: rows.slice(offset, offset + limit), totalCount: rows.length }
   }
 
-  const [athletes, totalCount, currentAcademicYear] = await Promise.all([
-    prisma.athlete.findMany({
-      where,
-      include: athleteListInclude,
-      orderBy,
-      take: limit,
-      skip: offset,
-    }),
-    prisma.athlete.count({ where }),
-    currentAcademicYearForChecklist(),
-  ])
+  const [athletes, totalCount, currentAcademicYear, overdue] =
+    await Promise.all([
+      prisma.athlete.findMany({
+        where,
+        include: athleteListInclude,
+        orderBy,
+        take: limit,
+        skip: offset,
+      }),
+      prisma.athlete.count({ where }),
+      currentAcademicYearForChecklist(),
+      overdueByAthlete(),
+    ])
 
   return {
     items: athletes.map((athlete) =>
-      toListRow(athlete, today, currentAcademicYear),
+      toListRow(athlete, today, currentAcademicYear, overdue),
     ),
     totalCount,
   }

@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts"
 
-import { formatEur } from "@/lib/utils/format"
+import { formatEuro } from "@/lib/utils/format"
 
 import type { IncomeTrendPoint } from "../../analytics-queries"
 
@@ -65,7 +65,7 @@ export function IncomeTrendChart({ data }: IncomeTrendChartProps) {
           />
           <Tooltip
             formatter={(value) => [
-              formatEur(typeof value === "number" ? value : 0),
+              formatEuro(typeof value === "number" ? value : 0),
               "Incassi",
             ]}
             contentStyle={{

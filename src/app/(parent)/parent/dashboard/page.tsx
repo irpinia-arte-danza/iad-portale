@@ -21,7 +21,7 @@ import { portalWording } from "@/lib/portal/wording"
 import { associationFeeDescription } from "@/lib/fees/association-fee-label"
 import { receiptPdfHref } from "@/lib/receipts/types"
 import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
-import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
 import {
@@ -246,7 +246,7 @@ export default async function ParentDashboardPage() {
                               </div>
                               <div className="flex shrink-0 items-center gap-2">
                                 <span className="font-mono text-sm tabular-nums">
-                                  {formatEur(s.amountCents)}
+                                  {formatEuro(s.amountCents)}
                                 </span>
                                 {cls === "overdue" ? (
                                   <Badge variant="destructive">Scaduta</Badge>
@@ -295,7 +295,7 @@ export default async function ParentDashboardPage() {
                                   "text-muted-foreground line-through",
                               )}
                             >
-                              {formatEur(p.amountCents)}
+                              {formatEuro(p.amountCents)}
                             </span>
                           </li>
                         ))}
@@ -419,7 +419,7 @@ export default async function ParentDashboardPage() {
                             >
                               <span>{line.description}</span>
                               <span className="shrink-0 font-mono tabular-nums">
-                                {formatEur(line.amountCents)}
+                                {formatEuro(line.amountCents)}
                               </span>
                             </li>
                           ))}
@@ -444,7 +444,7 @@ export default async function ParentDashboardPage() {
                             "text-muted-foreground line-through",
                         )}
                       >
-                        {formatEur(p.amountCents)}
+                        {formatEuro(p.amountCents)}
                       </span>
                       {p.receipt ? (
                         <a
@@ -534,7 +534,7 @@ function SummaryAlert({
               {overdueCount === 1
                 ? "1 contributo scaduto"
                 : `${overdueCount} contributi scaduti`}{" "}
-              · {formatEur(overdueCents)}
+              · {formatEuro(overdueCents)}
             </p>
             <p className="text-xs">
               Salda al più presto per evitare la sospensione della copertura.
@@ -558,7 +558,7 @@ function SummaryAlert({
               {soonCount === 1
                 ? "1 contributo in scadenza"
                 : `${soonCount} contributi in scadenza`}{" "}
-              · {formatEur(soonCents)}
+              · {formatEuro(soonCents)}
             </p>
             <p className="text-xs">
               Scadenza entro 7 giorni.

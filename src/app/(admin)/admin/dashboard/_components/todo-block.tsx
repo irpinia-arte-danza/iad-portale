@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card"
 import { todoSections, type TodoTile } from "@/lib/dashboard/todo-tiles"
 import { TONE_SURFACE, TONE_TEXT } from "@/lib/status/tone"
-import { formatEur } from "@/lib/utils/format"
+import { formatEuro } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ function TodoTileLink({ tile }: { tile: TodoTile }) {
         </p>
         {tile.amountCents !== undefined ? (
           <p className="font-mono text-xs text-muted-foreground">
-            {formatEur(tile.amountCents)}
+            {formatEuro(tile.amountCents)}
           </p>
         ) : null}
         {tile.note ? (

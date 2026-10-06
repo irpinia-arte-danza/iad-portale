@@ -6,7 +6,7 @@ import { classifyCert } from "@/lib/medical-certificates/certificate-status"
 import { daysOverdue } from "@/lib/scadenze/due-label"
 import { compareCurrentFirst } from "@/lib/utils/expiry-status"
 import { statusTone, type StatusTone } from "@/lib/status/tone"
-import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 
 // ─────────────────────────────────────────────────────────────────────────
 // I tre stati in testa alla scheda: certificato, contributi, tessera.
@@ -114,7 +114,7 @@ export function athleteStatusStrip(input: StatusInput): AthleteStatusStrip {
   const contributions = {
     tone: statusTone({ kind: "contributions", overdue: overdueCents > 0 }),
     label: overdueCents > 0 ? "Contributi in ritardo" : "Contributi in regola",
-    detail: overdueCents > 0 ? formatEur(overdueCents) : null,
+    detail: overdueCents > 0 ? formatEuro(overdueCents) : null,
     action: null,
     overdueCents,
   }

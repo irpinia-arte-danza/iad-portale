@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { formatEur } from "@/lib/utils/format"
+import { formatEuro } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
 import type {
@@ -102,7 +102,7 @@ export function ScadenzeFilters({
               <span className="font-mono text-xs opacity-80">
                 {entry.count}
                 {withAmount && entry.amountCents > 0
-                  ? ` · ${formatEur(entry.amountCents)}`
+                  ? ` · ${formatEuro(entry.amountCents)}`
                   : ""}
               </span>
             </Button>

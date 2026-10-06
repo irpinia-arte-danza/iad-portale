@@ -9,6 +9,7 @@ import type { ReceiptLine } from "@/lib/receipts/types"
 import { pdfColors, pdfStyles } from "../styles"
 import { IADHeaderMark } from "./iad-header"
 
+import { formatEuroPdf } from "@/lib/pdf/format"
 export type ReceiptBrand = {
   asdName: string
   asdFiscalCode: string
@@ -58,13 +59,6 @@ function formatDateIt(date: Date | null | undefined): string {
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0")
   const yyyy = d.getUTCFullYear()
   return `${dd}/${mm}/${yyyy}`
-}
-
-function formatEurFromCents(cents: number): string {
-  return `€ ${(cents / 100)
-    .toFixed(2)
-    .replace(".", ",")
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`
 }
 
 function composeAddress(b: ReceiptBrand): string {
@@ -385,7 +379,7 @@ export function ReceiptPdf({
                 >
                   <Text style={styles.lineDescription}>{line.description}</Text>
                   <Text style={styles.lineAmount}>
-                    {formatEurFromCents(line.amountCents)}
+                    {formatEuroPdf(line.amountCents)}
                   </Text>
                 </View>
               ))}
@@ -395,7 +389,7 @@ export function ReceiptPdf({
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Importo ricevuto</Text>
             <Text style={styles.totalsValue}>
-              {formatEurFromCents(receipt.amountCents)}
+              {formatEuroPdf(receipt.amountCents)}
             </Text>
           </View>
         </View>

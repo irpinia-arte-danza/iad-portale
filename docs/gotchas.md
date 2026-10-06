@@ -11,6 +11,8 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.8 Sidebar tooltip
   - §17.42 `sidebar.tsx` è modificato a mano: `shadcn add sidebar` lo sovrascrive
   - §17.43 I colori di stato non si scrivono nei componenti: si chiedono a `statusTone`
+  - §17.44 Elenchi responsive: una riga sola nel DOM, non tabella + card
+  - §17.45 `Intl` in italiano non raggruppa le migliaia sotto le 5 cifre
 - [Prisma / Schema](#prisma--schema)
   - §17.2 Prisma version pinning
   - §17.3 Prisma CLI env loading
@@ -73,6 +75,18 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
 - i moduli di dominio (`athlete-status.ts`, `due-label.ts`, `delivery.ts`, `todo-tiles.ts`) espongono `tone: StatusTone`, mai un nome di colore: `"amber"` in un tipo tornava a essere una decisione grafica presa nel posto sbagliato.
 
 Regola pratica: in un componente di stato non deve comparire `red-*`, `amber-*`, `rose-*` o `orange-*`. Restano legittimi fuori dagli stati: avvisi di configurazione (anni accademici/fiscali da creare, reminder spenti), conferme distruttive (`variant="destructive"`, box di conseguenza nei dialog), errori di validazione dei form, e le aree `/parent` e `/teacher`, dove il destinatario è un altro e il rosso su una rata scaduta è l'avviso di sospensione previsto dal regolamento. Un test in `tone.test.ts` verifica che `TONE_BADGE` non contenga nomi di colore. Scoperto: PR #42 "colori di stato", ottobre 2026.
+
+**§17.44 Elenchi responsive — una riga sola nel DOM, non tabella + card**: la via breve per fare "tabella da 768, card sotto" è rendere due alberi e nasconderne uno con `hidden md:block` / `md:hidden`. Non si fa: ogni riga contiene il menu ⋯ e i suoi dialog, e due copie vogliono dire **due istanze di stato** per riga (su 200 righe, 400 dialog montati) con il rischio che si apra quello della copia invisibile. `ResponsiveList` (`src/components/lists/responsive-list.tsx`) rende **una riga**, un `flex` che diventa colonna sotto 768 e riga da 768 in su, dove:
+
+- le celle oltre la prima portano `hidden md:flex` / `hidden lg:flex` / `hidden xl:flex` secondo la priorità della colonna (`visibleColumnsAt` dice quali restano a una data larghezza, e c'è un test);
+- le intestazioni e le celle condividono le classi di larghezza (`md:w-28`, `md:flex-1`): è così che restano allineate senza `<table>`;
+- i wrapper interni usano `md:contents`, così da 768 in su le celle diventano figlie dirette della riga e il `flex` le allinea come una tabella;
+- le due righe di stato della card sono `md:hidden` e non duplicano niente: in tabella quelle informazioni sono già colonne;
+- le azioni sono **un solo nodo** (`RowActionsRenderer layout="responsive"`), che al suo interno mostra i tasti a tutta larghezza sotto 768 e il menu ⋯ da 768: due inneschi, un dialog.
+
+Corollario: le azioni di una riga si descrivono come **dati** (`RowAction[]` in `src/components/lists/row-actions.tsx`), non come JSX, altrimenti la versione card e quella tabella divergono alla prima modifica. Niente ruoli ARIA di tabella: con `display: contents` le celle non sono figlie dirette della riga e una struttura dichiarata a metà confonde più di una lista. Per i bersagli del dito c'è la variante `pointer-coarse` di Tailwind 4, applicata una volta sola nei componenti condivisi (`Button` size `icon*` → `size-11`, `Checkbox` → `::after` di 44×44 centrato sulla casella): non va ripetuta riga per riga, e con `className="h-11 md:h-9"` sul singolo tasto le due regole hanno la stessa specificità e vince l'ordine del foglio, cioè il caso. Scoperto: PR #43 "liste in card", ottobre 2026.
+
+**§17.45 `Intl.NumberFormat("it-IT", { style: "currency" })` non mette il punto delle migliaia sotto le 5 cifre**: `formatEuro(103500)` dava `1035,00 €` e `formatEuro(1234500)` dava `12.345,00 €`. Non è un bug di Node: il CLDR per l'italiano ha `minimumGroupingDigits: 2`, quindi il separatore compare solo da cinque cifre. Giuseppina legge importi di quattro cifre tutti i giorni (il totale di un mese, il bilancio di un trimestre) e li vuole con il punto: serve `useGrouping: true` esplicito. Vale anche al contrario: un formattatore scritto a mano con `.toFixed(2).replace(".", ",")` più una regex per i gruppi (era il caso dei tre PDF) raggruppa sempre, e quindi non coincideva con quello che mostrava l'interfaccia. Da qui la regola: **un solo `formatEuro`** in `src/lib/utils/format.ts`, e nei PDF il solo `formatEuroPdf` (`src/lib/pdf/format.ts`), che è lo stesso con lo spazio insecabile di `Intl` normalizzato a spazio normale perché il motore di `@react-pdf` lo misura male. Scoperto: PR #43, ottobre 2026.
 
 **§17.8 Shadcn Sidebar richiede TooltipProvider globale**: shadcn `<Sidebar>` usa internamente `<Tooltip>` per i menu item in modalità `collapsible="icon"` (vedi `SidebarMenuButton` in `src/components/ui/sidebar.tsx`). Richiede quindi `<TooltipProvider>` mounted in un ancestor (tipicamente root layout). Sintomo se mancante: Runtime Error `"Tooltip must be used within TooltipProvider"`, cascade su ThemeProvider/altri provider (React error boundary pulls everything down). Fix: `import { TooltipProvider } from "@/components/ui/tooltip"` in `src/app/layout.tsx`, wrap `{children}` dentro `ThemeProvider`. Scoperto: 20 aprile 2026, Sprint 0 Fase 3D.2.
 

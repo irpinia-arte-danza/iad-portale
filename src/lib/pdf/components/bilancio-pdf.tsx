@@ -11,6 +11,7 @@ import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { pdfStyles } from "../styles"
 import { IADHeaderMark } from "./iad-header"
 
+import { formatEuroPdf, formatSignedEuroPdf } from "@/lib/pdf/format"
 type Props = {
   year: number
   periodFrom: Date
@@ -36,20 +37,8 @@ function formatDateTimeIt(date: Date): string {
   return `${dd}/${mm}/${yyyy} ${hh}:${mi}`
 }
 
-function formatEurFromCents(cents: number): string {
-  return `€ ${(cents / 100)
-    .toFixed(2)
-    .replace(".", ",")
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`
-}
-
 function formatPercent(share: number): string {
   return `${(share * 100).toFixed(1).replace(".", ",")}%`
-}
-
-function formatSignedEur(cents: number): string {
-  const sign = cents >= 0 ? "" : "-"
-  return `${sign}${formatEurFromCents(Math.abs(cents))}`
 }
 
 function KpiBox({
@@ -152,17 +141,17 @@ export function BilancioPDF({
           >
             <KpiBox
               label="Entrate"
-              value={formatEurFromCents(totals.entrateCents)}
+              value={formatEuroPdf(totals.entrateCents)}
               tone="success"
             />
             <KpiBox
               label="Uscite"
-              value={formatEurFromCents(totals.usciteCents)}
+              value={formatEuroPdf(totals.usciteCents)}
               tone="danger"
             />
             <KpiBox
               label="Saldo netto"
-              value={formatSignedEur(totals.netCents)}
+              value={formatSignedEuroPdf(totals.netCents)}
               tone={totals.netCents >= 0 ? "success" : "danger"}
             />
             <KpiBox
@@ -237,7 +226,7 @@ export function BilancioPDF({
                         { width: "25%", textAlign: "right" },
                       ]}
                     >
-                      {formatEurFromCents(e.totalCents)}
+                      {formatEuroPdf(e.totalCents)}
                     </Text>
                     <Text
                       style={[
@@ -272,7 +261,7 @@ export function BilancioPDF({
                     },
                   ]}
                 >
-                  {formatEurFromCents(totals.entrateCents)}
+                  {formatEuroPdf(totals.entrateCents)}
                 </Text>
                 <Text
                   style={[
@@ -337,7 +326,7 @@ export function BilancioPDF({
                         { width: "25%", textAlign: "right" },
                       ]}
                     >
-                      {formatEurFromCents(e.totalCents)}
+                      {formatEuroPdf(e.totalCents)}
                     </Text>
                     <Text
                       style={[
@@ -372,7 +361,7 @@ export function BilancioPDF({
                     },
                   ]}
                 >
-                  {formatEurFromCents(totals.usciteCents)}
+                  {formatEuroPdf(totals.usciteCents)}
                 </Text>
                 <Text
                   style={[
@@ -415,7 +404,7 @@ export function BilancioPDF({
                 color: totals.netCents >= 0 ? "#047857" : "#b91c1c",
               }}
             >
-              {formatSignedEur(totals.netCents)}
+              {formatSignedEuroPdf(totals.netCents)}
             </Text>
           </View>
         </View>

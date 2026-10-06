@@ -24,16 +24,13 @@ import type { PortalWording } from "@/lib/portal/wording"
 import type { ParentStageItem } from "../../_actions/stages"
 import { parentEnrollAthletesInStage } from "../../_actions/stage-actions"
 
+import { formatEuro } from "@/lib/utils/format"
 const DATE_IT = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
   month: "long",
   year: "numeric",
 })
 
-const CURRENCY_IT = new Intl.NumberFormat("it-IT", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
 
 type Props = {
   stage: ParentStageItem
@@ -139,7 +136,7 @@ export function ParentStageCard({ stage, wording, selfService }: Props) {
         <div className="rounded-md border bg-muted/30 p-3 text-sm">
           <span className="text-muted-foreground">Contributo:</span>{" "}
           <strong className="font-mono tabular-nums">
-            € {CURRENCY_IT.format(stage.feeCents / 100)}
+            {formatEuro(stage.feeCents)}
           </strong>
           {stage.registrationDeadline && (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -176,8 +173,8 @@ export function ParentStageCard({ stage, wording, selfService }: Props) {
             <DialogHeader>
               <DialogTitle>Iscrizione a «{stage.title}»</DialogTitle>
               <DialogDescription>
-                {wording.stageSelectHint} Importo: €{" "}
-                {CURRENCY_IT.format(stage.feeCents / 100)}
+                {wording.stageSelectHint} Importo:{" "}
+                {formatEuro(stage.feeCents)}
                 {selfService ? "." : " per ciascuna."}
               </DialogDescription>
             </DialogHeader>

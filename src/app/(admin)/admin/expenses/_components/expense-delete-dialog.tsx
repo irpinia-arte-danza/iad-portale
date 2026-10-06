@@ -19,6 +19,7 @@ import { EXPENSE_TYPE_LABELS } from "@/lib/schemas/expense"
 import { deleteExpense } from "../actions"
 import type { ExpenseListItem } from "../queries"
 
+import { formatEuro } from "@/lib/utils/format"
 interface ExpenseDeleteDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -26,10 +27,6 @@ interface ExpenseDeleteDialogProps {
   onSuccess?: () => void
 }
 
-const CURRENCY = new Intl.NumberFormat("it-IT", {
-  style: "currency",
-  currency: "EUR",
-})
 
 const DATE_SHORT = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
@@ -87,7 +84,7 @@ export function ExpenseDeleteDialog({
               <dd className="truncate">{expense.description}</dd>
               <dt className="text-muted-foreground">Importo</dt>
               <dd className="font-mono font-semibold">
-                {CURRENCY.format(expense.amountCents / 100)}
+                {formatEuro(expense.amountCents)}
               </dd>
             </dl>
           </div>

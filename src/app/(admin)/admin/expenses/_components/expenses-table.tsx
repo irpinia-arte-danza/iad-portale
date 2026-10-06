@@ -20,14 +20,11 @@ import type { ExpenseListItem } from "../queries"
 import { ExpenseEditDialog } from "./expense-edit-dialog"
 import { ExpenseRowActions } from "./expense-row-actions"
 
+import { formatEuro } from "@/lib/utils/format"
 interface ExpensesTableProps {
   expenses: ExpenseListItem[]
 }
 
-const CURRENCY = new Intl.NumberFormat("it-IT", {
-  style: "currency",
-  currency: "EUR",
-})
 
 const DATE_SHORT = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
@@ -86,7 +83,7 @@ export function ExpensesTable({ expenses }: ExpensesTableProps) {
                   {e.description}
                 </TableCell>
                 <TableCell className="text-right font-mono font-semibold">
-                  {CURRENCY.format(e.amountCents / 100)}
+                  {formatEuro(e.amountCents)}
                 </TableCell>
                 <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                   {PAYMENT_METHOD_LABELS[e.method]}

@@ -1,17 +1,14 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Archive, ArchiveRestore, MoreHorizontal, Pencil } from "lucide-react"
+import { Archive, ArchiveRestore, Pencil } from "lucide-react"
 import { toast } from "sonner"
 
-import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  RowActionsRenderer,
+  type RowAction,
+  type RowActionsLayout,
+} from "@/components/lists/row-actions"
 import {
   Dialog,
   DialogContent,
@@ -44,9 +41,14 @@ interface CourseRowActionsProps {
     }[]
   }
   teachers: Array<{ id: string; firstName: string; lastName: string }>
+  layout?: RowActionsLayout
 }
 
-export function CourseRowActions({ course, teachers }: CourseRowActionsProps) {
+export function CourseRowActions({
+  course,
+  teachers,
+  layout,
+}: CourseRowActionsProps) {
   const [editOpen, setEditOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
@@ -62,40 +64,26 @@ export function CourseRowActions({ course, teachers }: CourseRowActionsProps) {
     })
   }
 
+  const actions: RowAction[] = [
+    {
+      key: "edit",
+      label: "Modifica",
+      icon: Pencil,
+      onSelect: () => setEditOpen(true),
+    },
+    {
+      key: "toggle",
+      label: course.isActive ? "Archivia" : "Riattiva",
+      icon: course.isActive ? Archive : ArchiveRestore,
+      disabled: isPending,
+      separatorBefore: true,
+      onSelect: handleToggle,
+    },
+  ]
+
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Azioni"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4" />
-            Modifica
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleToggle} disabled={isPending}>
-            {course.isActive ? (
-              <>
-                <Archive className="h-4 w-4" />
-                Archivia
-              </>
-            ) : (
-              <>
-                <ArchiveRestore className="h-4 w-4" />
-                Riattiva
-              </>
-            )}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <RowActionsRenderer actions={actions} layout={layout} />
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-lg">

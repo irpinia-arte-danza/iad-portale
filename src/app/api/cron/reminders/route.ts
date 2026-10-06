@@ -12,7 +12,7 @@ import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
-import { formatMeseIt } from "@/lib/utils/format"
+import { formatEuro, formatMeseIt } from "@/lib/utils/format"
 import { withActiveScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
 export const runtime = "nodejs"
@@ -238,10 +238,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const vars = {
         genitore_nome: recipient.name,
         allieva_nome: `${athlete.firstName} ${athlete.lastName}`,
-        importo: (sched.amountCents / 100).toLocaleString("it-IT", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
+        importo: formatEuro(sched.amountCents),
         data_scadenza: sched.dueDate.toLocaleDateString("it-IT", {
           day: "2-digit",
           month: "2-digit",

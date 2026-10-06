@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { receiptPdfHref } from "@/lib/receipts/types"
 import { TONE_BADGE } from "@/lib/status/tone"
-import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
 import type { ReceiptListRow } from "../queries"
@@ -101,12 +101,12 @@ export function ReceiptRow({
       </div>
 
       <div className="min-w-0 [grid-area:allieva]">
-        <p className="truncate text-sm">{r.athleteName ?? "—"}</p>
+        <p className="truncate text-sm">{r.athleteListName ?? "—"}</p>
       </div>
 
       <div className="min-w-0 [grid-area:pagante]">
         <p className="truncate text-sm text-muted-foreground">
-          {r.payerName ?? "—"}
+          {r.payerListName ?? "—"}
         </p>
         {noEmail ? (
           <p className="truncate text-xs text-muted-foreground">
@@ -130,7 +130,7 @@ export function ReceiptRow({
 
       <div className="[grid-area:importo] md:text-right">
         <p className="font-mono text-sm">
-          {r.amountCents !== null ? formatEur(r.amountCents) : "—"}
+          {r.amountCents !== null ? formatEuro(r.amountCents) : "—"}
         </p>
       </div>
 
@@ -157,12 +157,8 @@ export function ReceiptRow({
         ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-11 w-11 md:h-9 md:w-9"
-              aria-label="Altre azioni"
-            >
+            {/* La misura la decide la variante: 44 col dito, 32 col mouse */}
+            <Button variant="ghost" size="icon" aria-label="Altre azioni">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>

@@ -19,7 +19,7 @@ import type { OpenScheduleOption } from "@/app/(admin)/admin/payments/queries"
 import { receiptPdfHref } from "@/lib/receipts/types"
 import { dueLabel } from "@/lib/scadenze/due-label"
 import { TONE_TEXT } from "@/lib/status/tone"
-import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
 import { useOpenScheduleSettle } from "../../_components/schedule-settle-provider"
@@ -99,7 +99,7 @@ export function AthleteOverview({
                 <CardDescription>
                   {openSchedules.length === 0
                     ? "Nessun contributo aperto."
-                    : `${openSchedules.length} ${openSchedules.length === 1 ? "contributo aperto" : "contributi aperti"} · ${formatEur(total)}`}
+                    : `${openSchedules.length} ${openSchedules.length === 1 ? "contributo aperto" : "contributi aperti"} · ${formatEuro(total)}`}
                 </CardDescription>
               </div>
               {openSchedules.length > 1 ? (
@@ -144,7 +144,7 @@ export function AthleteOverview({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-sm">
-                            {formatEur(s.amountCents)}
+                            {formatEuro(s.amountCents)}
                           </span>
                           <Button
                             size="sm"
@@ -198,7 +198,7 @@ export function AthleteOverview({
                           </p>
                         </div>
                         <span className="font-mono text-sm">
-                          {formatEur(p.amountCents)}
+                          {formatEuro(p.amountCents)}
                         </span>
                       </div>
                       {p.receipt ? (

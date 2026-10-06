@@ -41,7 +41,7 @@ import {
 } from "@/lib/schemas/enrollment"
 import { COURSE_TYPE_LABELS } from "@/lib/schemas/course"
 import { toDateOnly, todayDateOnly } from "@/lib/utils/date-only"
-import { formatDateShort, formatEur, formatMeseIt } from "@/lib/utils/format"
+import { formatDateShort, formatEuro, formatMeseIt } from "@/lib/utils/format"
 
 import { createEnrollment } from "../enrollments-actions"
 
@@ -195,7 +195,7 @@ export function EnrollCourseDialog({
                       <SelectContent>
                         {availableCourses.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
-                            {c.name} · {formatEur(c.monthlyFeeCents)}/mese
+                            {c.name} · {formatEuro(c.monthlyFeeCents)}/mese
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -277,7 +277,7 @@ export function EnrollCourseDialog({
                         : "rate mensili"}{" "}
                       da{" "}
                       <span className="font-mono tabular-nums">
-                        {formatEur(preview.monthly.amountCents)}
+                        {formatEuro(preview.monthly.amountCents)}
                       </span>
                       {preview.monthly.count === 1
                         ? `, ${monthName(preview.monthly.firstDueDate)}`
@@ -305,7 +305,7 @@ export function EnrollCourseDialog({
                     <p>
                       Contributo di iscrizione {yearSlash}:{" "}
                       <span className="font-mono tabular-nums">
-                        {formatEur(preview.association.amountCents)}
+                        {formatEuro(preview.association.amountCents)}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {" "}

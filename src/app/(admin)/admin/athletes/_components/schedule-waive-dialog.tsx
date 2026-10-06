@@ -33,6 +33,7 @@ import {
 
 import { waiveSchedule } from "../schedules-actions"
 
+import { formatEuro } from "@/lib/utils/format"
 interface ScheduleWaiveDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -51,13 +52,6 @@ function formatDate(date: Date): string {
     month: "short",
     year: "numeric",
   })
-}
-
-function formatEur(cents: number): string {
-  return new Intl.NumberFormat("it-IT", {
-    style: "currency",
-    currency: "EUR",
-  }).format(cents / 100)
 }
 
 export function ScheduleWaiveDialog({
@@ -94,7 +88,7 @@ export function ScheduleWaiveDialog({
           <AlertDialogTitle>Segnare la scadenza come non dovuta?</AlertDialogTitle>
           <AlertDialogDescription>
             {schedule.courseName} — scadenza {formatDate(schedule.dueDate)} —{" "}
-            {formatEur(schedule.amountCents)}. Questo contributo non è dovuto e non
+            {formatEuro(schedule.amountCents)}. Questo contributo non è dovuto e non
             verrà richiesto. Indica il motivo (es. mese di chiusura, borsa di
             studio).
           </AlertDialogDescription>

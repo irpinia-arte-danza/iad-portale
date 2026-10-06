@@ -14,16 +14,13 @@ import {
 
 import type { StageListItem } from "../queries"
 
+import { formatEuro } from "@/lib/utils/format"
 const DATE_IT = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
 })
 
-const CURRENCY_IT = new Intl.NumberFormat("it-IT", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
 
 type Status = "UPCOMING" | "PAST" | "CANCELLED"
 
@@ -99,7 +96,7 @@ export function StagesTable({ stages }: { stages: StageListItem[] }) {
                   {s.enrolledCount}/{s.capacity}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  € {CURRENCY_IT.format(s.feeCents / 100)}
+                  {formatEuro(s.feeCents)}
                 </TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANT[st]}>

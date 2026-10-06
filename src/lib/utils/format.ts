@@ -1,6 +1,19 @@
+// ─────────────────────────────────────────────────────────────────────────
+// L'unico posto dove si formatta un importo.
+//
+// Prima c'erano diciotto formattatori sparsi (CURRENCY, CURRENCY_IT, EUR,
+// euroFormatter, formatEurFromCents nei PDF…): alcuni mettevano il simbolo
+// davanti, altri dietro, e i PDF lo calcolavano a mano con una regex.
+//
+// `useGrouping: true` non è decorativo: per l'italiano il CLDR dice
+// minimumGroupingDigits = 2, quindi di default 1035 esce "1035,00 €" senza
+// punto e solo da 10.000 in su il separatore compare. Giuseppina legge
+// importi di quattro cifre tutti i giorni, e li vuole con il punto.
+// ─────────────────────────────────────────────────────────────────────────
 const CURRENCY_IT = new Intl.NumberFormat("it-IT", {
   style: "currency",
   currency: "EUR",
+  useGrouping: true,
 })
 
 const DATE_SHORT_IT = new Intl.DateTimeFormat("it-IT", {
@@ -53,7 +66,8 @@ const PERCENT_IT = new Intl.NumberFormat("it-IT", {
   maximumFractionDigits: 1,
 })
 
-export function formatEur(cents: number): string {
+/** Importo in centesimi → "1.035,00 €" */
+export function formatEuro(cents: number): string {
   return CURRENCY_IT.format(cents / 100)
 }
 

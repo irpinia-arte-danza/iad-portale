@@ -23,14 +23,11 @@ import { softDeleteShowcase } from "../../actions"
 import { ShowcaseForm } from "../../_components/showcase-form"
 import type { ShowcaseWithDetails } from "../../queries"
 
+import { formatEuro } from "@/lib/utils/format"
 type Props = {
   showcase: ShowcaseWithDetails
 }
 
-const EUR = new Intl.NumberFormat("it-IT", {
-  style: "currency",
-  currency: "EUR",
-})
 
 const DATE_IT = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
@@ -54,8 +51,8 @@ export function ShowcaseInfoTab({ showcase }: Props) {
     })
   }
 
-  const total =
-    (showcase.firstInstallmentCents + showcase.secondInstallmentCents) / 100
+  const totalCents =
+    showcase.firstInstallmentCents + showcase.secondInstallmentCents
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -91,13 +88,13 @@ export function ShowcaseInfoTab({ showcase }: Props) {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Totale contributo</span>
               <span className="font-mono font-medium">
-                {EUR.format(total)}
+                {formatEuro(totalCents)}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Caparra</span>
               <span className="font-mono">
-                {EUR.format(showcase.firstInstallmentCents / 100)}
+                {formatEuro(showcase.firstInstallmentCents)}
               </span>
             </div>
             <div className="flex justify-between text-xs text-muted-foreground">
@@ -107,7 +104,7 @@ export function ShowcaseInfoTab({ showcase }: Props) {
             <div className="flex justify-between pt-2">
               <span className="text-muted-foreground">Saldo</span>
               <span className="font-mono">
-                {EUR.format(showcase.secondInstallmentCents / 100)}
+                {formatEuro(showcase.secondInstallmentCents)}
               </span>
             </div>
             <div className="flex justify-between text-xs text-muted-foreground">

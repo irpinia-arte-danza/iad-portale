@@ -4,22 +4,19 @@ import Link from "next/link"
 import { ArrowDown } from "lucide-react"
 
 import { CardStatusBadge } from "@/components/affiliations/card-status-badge"
-import { CertStatusBadge } from "@/components/medical-certificates/cert-status-badge"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  ResponsiveList,
+  type ListColumn,
+} from "@/components/lists/responsive-list"
+import { CertStatusBadge } from "@/components/medical-certificates/cert-status-badge"
 import { Badge } from "@/components/ui/badge"
 import type { CardStatus } from "@/lib/affiliations/card-status"
 import type { CertStatus } from "@/lib/medical-certificates/certificate-status"
-import { statusTone } from "@/lib/status/tone"
+import { statusTone, TONE_TEXT } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 import { computeAge } from "@/lib/utils/date-helpers"
-import { formatDateShort } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
+import { listName } from "@/lib/utils/person-name"
 
 import { AthleteRowActions } from "./athlete-row-actions"
 
@@ -42,6 +39,8 @@ type AthleteRow = {
   residenceCap: string | null
   instructorNotes: string | null
   _count: { parentRelations: number }
+  // Contributi scaduti e non pagati, stesso predicato dell'elenco Scadenze
+  overdue: { count: number; amountCents: number }
   // Certificato corrente, stato calcolato lato server
   certificate: { expiryDate: Date | null; status: CertStatus }
   // Tessera dell'ente corrente, stesso trattamento
@@ -101,156 +100,192 @@ function SortLink({
   )
 }
 
+function expiryLine(
+  date: Date | null,
+  expired: boolean,
+  femminile = false,
+): string | null {
+  if (!date) return null
+  const verbo = expired
+    ? femminile
+      ? "scaduta il"
+      : "scaduto il"
+    : "scade il"
+  return `${verbo} ${formatDateShort(new Date(date))}`
+}
+
 export function AthletesTable({
   athletes,
   sort,
   sortHrefs,
   empty,
 }: AthletesTableProps) {
-  if (athletes.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed p-8 text-center">
-        <h3 className="text-sm font-medium">
-          {empty?.title ?? "Nessuna allieva trovata"}
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {empty?.hint ??
-            "Prova a modificare la ricerca o aggiungi la prima allieva."}
-        </p>
-      </div>
-    )
-  }
+  // ── Colonne ─────────────────────────────────────────────────────────────
+  // Priorità alta: nome, certificato e tessera, cioè chi è e se può entrare
+  // in sala. Età e genitori arrivano dove c'è spazio.
+  const columns: ListColumn<AthleteRow>[] = [
+    {
+      key: "nome",
+      header: (
+        <SortLink label="Nome" href={sortHrefs.name} active={sort === "name"} />
+      ),
+      width: "md:flex-1",
+      cell: (athlete) => (
+        <Link
+          href={`/admin/athletes/${athlete.id}`}
+          className="truncate font-medium hover:underline"
+        >
+          {listName(athlete)}
+        </Link>
+      ),
+    },
+    {
+      key: "eta",
+      header: "Età",
+      priority: "medium",
+      width: "md:w-16",
+      cell: (athlete) => {
+        const age = computeAge(athlete.dateOfBirth)
+        return <span className="text-sm">{age !== null ? age : "—"}</span>
+      },
+    },
+    {
+      key: "stato",
+      header: "Stato",
+      priority: "medium",
+      width: "md:w-24",
+      cell: (athlete) => (
+        <Badge variant={STATUS_VARIANTS[athlete.status]}>
+          {STATUS_LABELS[athlete.status]}
+        </Badge>
+      ),
+    },
+    {
+      key: "certificato",
+      header: (
+        <SortLink
+          label="Certificato"
+          href={sortHrefs.certificate}
+          active={sort === "certificate"}
+        />
+      ),
+      width: "md:w-44",
+      cell: (athlete) => (
+        <div className="flex flex-col items-start gap-1">
+          <CertStatusBadge status={athlete.certificate.status} />
+          {athlete.certificate.expiryDate ? (
+            <span className="text-xs text-muted-foreground">
+              {expiryLine(
+                athlete.certificate.expiryDate,
+                athlete.certificate.status === "expired",
+              )}
+            </span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "tessera",
+      header: (
+        <SortLink
+          label="Tessera"
+          href={sortHrefs.card}
+          active={sort === "card"}
+        />
+      ),
+      width: "md:w-44",
+      cell: (athlete) => (
+        <div className="flex flex-col items-start gap-1">
+          <CardStatusBadge status={athlete.card.status} />
+          {athlete.card.expiryDate ? (
+            <span className="text-xs text-muted-foreground">
+              {expiryLine(
+                athlete.card.expiryDate,
+                athlete.card.status === "expired",
+                true,
+              )}
+            </span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "genitori",
+      header: "Genitori",
+      priority: "low",
+      width: "md:w-20",
+      align: "center",
+      cell: (athlete) => (
+        <span className="text-sm">{athlete._count.parentRelations}</span>
+      ),
+    },
+  ]
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>
-              <SortLink
-                label="Nome"
-                href={sortHrefs.name}
-                active={sort === "name"}
-              />
-            </TableHead>
-            <TableHead className="hidden sm:table-cell">Età</TableHead>
-            <TableHead className="hidden md:table-cell">Stato</TableHead>
-            <TableHead>
-              <SortLink
-                label="Certificato"
-                href={sortHrefs.certificate}
-                active={sort === "certificate"}
-              />
-            </TableHead>
-            <TableHead className="hidden lg:table-cell">
-              <SortLink
-                label="Tessera"
-                href={sortHrefs.card}
-                active={sort === "card"}
-              />
-            </TableHead>
-            <TableHead className="hidden text-center sm:table-cell">
-              Genitori
-            </TableHead>
-            <TableHead className="w-[50px]" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {athletes.map((athlete) => {
-            const age = computeAge(athlete.dateOfBirth)
-            const { certificate } = athlete
-            const expired = certificate.status === "expired"
-            // Riga rossa dove il certificato blocca la lezione
-            const blocca =
-              statusTone({ kind: "certificate", status: certificate.status }) ===
-              "block"
-            return (
-            <TableRow
-              key={athlete.id}
-              className={cn(
-                "hover:bg-muted/50",
-                blocca && "bg-status-block-bg",
-              )}
-            >
-              <TableCell>
-                <Link
-                  href={`/admin/athletes/${athlete.id}`}
-                  className="block hover:underline"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium">
-                      {athlete.lastName} {athlete.firstName}
-                    </span>
-                    <span className="sm:hidden text-xs text-muted-foreground">
-                      {age !== null ? `${age} anni` : "—"} ·{" "}
-                      {STATUS_LABELS[athlete.status]}
-                    </span>
-                  </div>
-                </Link>
-              </TableCell>
-              <TableCell className="hidden sm:table-cell">
-                {age !== null ? age : "—"}
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                <Badge variant={STATUS_VARIANTS[athlete.status]}>
-                  {STATUS_LABELS[athlete.status]}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-col items-start gap-1">
-                  <CertStatusBadge status={certificate.status} />
-                  {certificate.expiryDate ? (
-                    <span className="hidden text-xs text-muted-foreground sm:inline">
-                      {expired ? "scaduto il" : "scade il"}{" "}
-                      {formatDateShort(new Date(certificate.expiryDate))}
-                    </span>
-                  ) : null}
-                </div>
-              </TableCell>
-              <TableCell className="hidden lg:table-cell">
-                <div className="flex flex-col items-start gap-1">
-                  <CardStatusBadge status={athlete.card.status} />
-                  {athlete.card.expiryDate ? (
-                    <span className="text-xs text-muted-foreground">
-                      {athlete.card.status === "expired"
-                        ? "scaduta il"
-                        : "scade il"}{" "}
-                      {formatDateShort(new Date(athlete.card.expiryDate))}
-                    </span>
-                  ) : null}
-                </div>
-              </TableCell>
-              <TableCell className="hidden text-center sm:table-cell">
-                {athlete._count.parentRelations}
-              </TableCell>
-              <TableCell>
-                <AthleteRowActions
-                  athlete={{
-                    id: athlete.id,
-                    firstName: athlete.firstName,
-                    lastName: athlete.lastName,
-                    dateOfBirth: athlete.dateOfBirth,
-                    gender: athlete.gender,
-                    email: athlete.email,
-                    phone: athlete.phone,
-                    linkedParents: athlete._count.parentRelations,
-                    fiscalCode: athlete.fiscalCode,
-                    placeOfBirth: athlete.placeOfBirth,
-                    provinceOfBirth: athlete.provinceOfBirth,
-                    residenceStreet: athlete.residenceStreet,
-                    residenceNumber: athlete.residenceNumber,
-                    residenceCity: athlete.residenceCity,
-                    residenceProvince: athlete.residenceProvince,
-                    residenceCap: athlete.residenceCap,
-                    instructorNotes: athlete.instructorNotes,
-                  }}
-                />
-              </TableCell>
-            </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
-    </div>
+    <ResponsiveList
+      label="Allieve"
+      items={athletes}
+      getId={(athlete) => athlete.id}
+      columns={columns}
+      empty={{
+        title: empty?.title ?? "Nessuna allieva trovata",
+        hint:
+          empty?.hint ??
+          "Prova a modificare la ricerca o aggiungi la prima allieva.",
+      }}
+      // Le due righe della card: può fare lezione (certificato e tessera) e
+      // se è in pari con i contributi. Sono le due domande per cui si apre
+      // l'elenco dal telefono; età, stato e genitori restano colonne.
+      cardLines={(athlete) => [
+        <span key="documenti" className="flex flex-wrap items-center gap-1.5">
+          <CertStatusBadge status={athlete.certificate.status} />
+          <CardStatusBadge status={athlete.card.status} />
+        </span>,
+        athlete.overdue.count > 0 ? (
+          <span key="contributi" className={TONE_TEXT.fix}>
+            {athlete.overdue.count === 1
+              ? "1 contributo in ritardo"
+              : `${athlete.overdue.count} contributi in ritardo`}{" "}
+            · <span className="font-mono">{formatEuro(athlete.overdue.amountCents)}</span>
+          </span>
+        ) : (
+          <span key="contributi">Contributi in regola</span>
+        ),
+      ]}
+      rowClassName={(athlete) =>
+        cn(
+          "hover:bg-muted/50",
+          // Riga rossa dove il certificato blocca la lezione
+          statusTone({
+            kind: "certificate",
+            status: athlete.certificate.status,
+          }) === "block" && "bg-status-block-bg",
+        )
+      }
+      actions={(athlete) => (
+        <AthleteRowActions
+          layout="responsive"
+          athlete={{
+            id: athlete.id,
+            firstName: athlete.firstName,
+            lastName: athlete.lastName,
+            dateOfBirth: athlete.dateOfBirth,
+            gender: athlete.gender,
+            email: athlete.email,
+            phone: athlete.phone,
+            linkedParents: athlete._count.parentRelations,
+            fiscalCode: athlete.fiscalCode,
+            placeOfBirth: athlete.placeOfBirth,
+            provinceOfBirth: athlete.provinceOfBirth,
+            residenceStreet: athlete.residenceStreet,
+            residenceNumber: athlete.residenceNumber,
+            residenceCity: athlete.residenceCity,
+            residenceProvince: athlete.residenceProvince,
+            residenceCap: athlete.residenceCap,
+            instructorNotes: athlete.instructorNotes,
+          }}
+        />
+      )}
+    />
   )
 }

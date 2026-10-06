@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table"
 import { paymentFeeTypeLabel } from "@/lib/payments/schedule-lines"
 import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
-import { formatDateLong, formatEur } from "@/lib/utils/format"
+import { formatDateLong, formatEuro } from "@/lib/utils/format"
 
 import type {
   CorrispettiviDayGroup,
@@ -85,7 +85,7 @@ export function CorrispettiviTable({
                       {PAYMENT_METHOD_LABELS[p.method]}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatEur(p.amountCents)}
+                      {formatEuro(p.amountCents)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -99,7 +99,7 @@ export function CorrispettiviTable({
                     Subtotale giornaliero
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold">
-                    {formatEur(day.subtotalCents)}
+                    {formatEuro(day.subtotalCents)}
                   </TableCell>
                 </TableRow>
               </Fragment>
@@ -115,7 +115,7 @@ export function CorrispettiviTable({
               Totale periodo
             </p>
             <p className="mt-1 font-mono text-2xl font-semibold">
-              {formatEur(totals.grandTotalCents)}
+              {formatEuro(totals.grandTotalCents)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               {totals.countItems}{" "}
@@ -141,7 +141,7 @@ export function CorrispettiviTable({
                     {PAYMENT_METHOD_LABELS[method]}
                   </span>
                   <span className="font-mono font-medium">
-                    {formatEur(entry.totalCents)}
+                    {formatEuro(entry.totalCents)}
                   </span>
                 </div>
               )
