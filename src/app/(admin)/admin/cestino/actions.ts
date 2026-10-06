@@ -533,7 +533,14 @@ export async function hardDeleteParent(
             }),
           ]
         : []),
-      prisma.consent.deleteMany({ where: { parentId: parent.id } }),
+      // I consensi firmati da lui per le figlie restano (sono la prova che
+      // il consenso c'era): perdono solo il firmatario. Spariscono solo
+      // quelli che riguardavano lui e nessun'allieva
+      prisma.consent.updateMany({
+        where: { parentId: parent.id, athleteId: { not: null } },
+        data: { parentId: null },
+      }),
+      prisma.consent.deleteMany({ where: { parentId: parent.id, athleteId: null } }),
       prisma.athleteParent.deleteMany({ where: { parentId: parent.id } }),
       prisma.parent.delete({ where: { id: parent.id } }),
     ])

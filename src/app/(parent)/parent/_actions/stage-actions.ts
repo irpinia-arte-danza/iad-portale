@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
 import { prisma } from "@/lib/prisma"
-import { athleteScopeWhere } from "@/lib/auth/portal-scope"
+import { personalDataScopeWhere } from "@/lib/auth/portal-visibility"
 import { requirePortalAccess } from "@/lib/auth/require-portal-access"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
@@ -37,13 +37,14 @@ export async function parentEnrollAthletesInStage(
     }
   }
 
-  // Si possono iscrivere solo le allieve del proprio ambito: le figlie
-  // collegate per un genitore, sé stessa per un'allieva maggiorenne
+  // Si possono iscrivere solo le allieve di cui si decidono le cose
+  // personali: le figlie minorenni per un genitore, sé stessa per
+  // un'allieva maggiorenne. Una maggiorenne la iscrive solo lei.
   const ownedAthletes = await prisma.athlete.findMany({
     where: {
       deletedAt: null,
       id: { in: parsed.data.athleteIds },
-      ...athleteScopeWhere(scope),
+      ...personalDataScopeWhere(scope),
     },
     select: { id: true },
   })
@@ -55,7 +56,7 @@ export async function parentEnrollAthletesInStage(
       error:
         scope.kind === "athlete"
           ? "Puoi iscrivere solo te stessa"
-          : "Una o più figlie non sono collegate al tuo profilo",
+          : "Puoi iscrivere solo le figlie minorenni collegate al tuo profilo: una maggiorenne si iscrive dalla sua area",
     }
   }
 

@@ -64,8 +64,15 @@ export async function loadReceiptForPdf(receiptId: string) {
           method: true,
           paymentDate: true,
           amountCents: true,
+          // Nel Cestino: la route risponde 410 come per le annullate
+          deletedAt: true,
           athlete: {
-            select: { firstName: true, lastName: true, fiscalCode: true },
+            select: {
+              firstName: true,
+              lastName: true,
+              fiscalCode: true,
+              deletedAt: true,
+            },
           },
         },
       },

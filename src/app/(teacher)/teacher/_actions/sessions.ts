@@ -6,6 +6,7 @@ import { AttendanceStatus, Prisma } from "@prisma/client"
 import { z } from "zod"
 
 import { prisma } from "@/lib/prisma"
+import { attendanceEditCutoff } from "@/lib/attendance/edit-window"
 import { requireTeacher } from "@/lib/auth/require-teacher"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
@@ -149,12 +150,22 @@ export async function saveAttendance(
     select: {
       id: true,
       status: true,
-      schedule: { select: { courseId: true } },
+      date: true,
+      schedule: { select: { courseId: true, course: { select: { deletedAt: true } } } },
     },
   })
 
-  if (!lesson) {
+  if (!lesson || lesson.schedule.course.deletedAt) {
     return { ok: false, error: "Lezione non trovata" }
+  }
+
+  // Le presenze si segnano in sala, al massimo con qualche giorno di
+  // ritardo: una lezione più vecchia di una settimana non si riscrive
+  if (lesson.date < attendanceEditCutoff(new Date())) {
+    return {
+      ok: false,
+      error: "Lezione di più di 7 giorni fa: le presenze non si modificano più",
+    }
   }
 
   // IDOR check: il corso della lezione deve essere assegnato al teacher

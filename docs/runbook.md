@@ -657,6 +657,12 @@ dell'associazione. Codice: `src/lib/receipts/receipt-pdf-store.ts`.
 ricevute annullate, e non impostare regole di pulizia automatica. L'app non ha
 codice che cancella o sovrascrive questi file.
 
+**Pagamento o allieva nel Cestino** (voluto): dall'area riservata la route
+`/ricevute/[id]` risponde **410** «Ricevuta non disponibile», come per le
+annullate; il file resta archiviato e l'admin lo apre ancora. Il Cestino non
+è una cancellazione, ma per la famiglia quel pagamento non deve più comparire
+finché la segreteria non lo ripristina.
+
 **Ricevute annullate**: il file archiviato resta quello emesso. L'admin che le
 apre riceve lo stesso file con la filigrana "ANNULLATA" e una fascia con data e
 motivo, aggiunte al volo e mai salvate. Il genitore non le può aprire.

@@ -104,6 +104,7 @@ export async function enrollAthleteCore(
       return { ok: false, error: "Scadenza iscrizioni superata" }
     }
   }
+  // Controllo rapido fuori transazione: quello che conta è dentro (sotto)
   if (stage._count.enrollments >= stage.capacity) {
     return { ok: false, error: "Posti esauriti" }
   }
@@ -129,8 +130,68 @@ export async function enrollAthleteCore(
 
   const dueDate = computeScheduleDueDate(stage.date, stage.registrationDeadline)
 
-  try {
-    const created = await prisma.$transaction(async (tx) => {
+  // Capienza e doppione si decidono DENTRO la transazione, serializable:
+  // due iscrizioni insieme sull'ultimo posto non possono passare entrambe.
+  // Se Postgres rifiuta la seconda per conflitto (P2034) si riprova da capo
+  // qualche volta; la rilettura trova il posto occupato e dice «esauriti».
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const created = await runEnrollment(stage, params, dueDate)
+      return { ok: true, enrollmentId: created.id }
+    } catch (error) {
+      if (error instanceof EnrollRefused) return { ok: false, error: error.message }
+      if (isSerializationConflict(error) && attempt < MAX_ENROLL_TRIES) continue
+      return { ok: false, error: mapPrismaError(error) }
+    }
+  }
+}
+
+// Un rifiuto deciso dentro la transazione (posti finiti, già iscritta): non
+// è un errore tecnico e non si riprova
+class EnrollRefused extends Error {}
+
+export const MAX_ENROLL_TRIES = 3
+
+// P2034: «Transaction failed due to a write conflict or a deadlock», è come
+// Prisma riporta il serialization_failure di Postgres
+export function isSerializationConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034"
+  )
+}
+
+type EnrollableStage = {
+  id: string
+  title: string
+  capacity: number
+  feeCents: number
+  academicYearId: string
+}
+
+async function runEnrollment(
+  stage: EnrollableStage,
+  params: EnrollAthleteCoreParams,
+  dueDate: Date,
+): Promise<{ id: string }> {
+  return prisma.$transaction(
+    async (tx) => {
+      const taken = await tx.stageEnrollment.count({
+        where: { stageId: params.stageId },
+      })
+      if (taken >= stage.capacity) throw new EnrollRefused("Posti esauriti")
+      const duplicate = await tx.stageEnrollment.findUnique({
+        where: {
+          stageId_athleteId: {
+            stageId: params.stageId,
+            athleteId: params.athleteId,
+          },
+        },
+        select: { id: true },
+      })
+      if (duplicate) {
+        throw new EnrollRefused("Allieva già iscritta a questo stage")
+      }
+
       const enrollment = await tx.stageEnrollment.create({
         data: {
           stageId: params.stageId,
@@ -172,10 +233,7 @@ export async function enrollAthleteCore(
       }
 
       return enrollment
-    })
-
-    return { ok: true, enrollmentId: created.id }
-  } catch (error) {
-    return { ok: false, error: mapPrismaError(error) }
-  }
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  )
 }

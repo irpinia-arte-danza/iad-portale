@@ -166,6 +166,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         backHref,
       })
     }
+    // Pagamento o allieva nel Cestino: per la famiglia la ricevuta non c'è
+    // più, come un'annullata (voluto: vedi runbook, «Ricevute — PDF
+    // archiviati»). L'admin la apre ancora, con la filigrana.
+    if (receipt.payment?.deletedAt || receipt.payment?.athlete.deletedAt) {
+      console.info(
+        "[receipt pdf] receipt of a trashed payment or athlete requested from portal",
+        logContext,
+      )
+      return messagePage({
+        status: 410,
+        title: "Ricevuta non disponibile",
+        message:
+          "Questa ricevuta non è più disponibile. Per chiarimenti contatta la segreteria.",
+        backHref,
+      })
+    }
     if (receipt.status !== ReceiptStatus.VALID) {
       console.info(
         "[receipt pdf] cancelled receipt requested from portal",
