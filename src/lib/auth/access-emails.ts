@@ -141,6 +141,59 @@ async function getBrandVars(): Promise<{ asd_nome: string; asd_email: string }> 
   }
 }
 
+// Le variabili dell'invito che non dipendono dal link: le stesse per
+// l'invio vero e per l'anteprima dell'invio di gruppo
+function accessInviteVars(
+  kind: AccessProfileKind,
+  recipientName: string,
+  appUrl: string,
+): Record<string, string> {
+  return {
+    destinatario_nome: recipientName,
+    area_nome:
+      kind === "PARENT"
+        ? "area genitori"
+        : kind === "TEACHER"
+          ? "area insegnanti"
+          : "area riservata",
+    descrizione_area:
+      kind === "PARENT"
+        ? "consultare contributi, ricevute, presenze e orari delle tue figlie"
+        : kind === "TEACHER"
+          ? "vedere le tue classi e segnare le presenze"
+          : "consultare i tuoi contributi, le ricevute, le presenze e gli orari",
+    link_recupero: `${appUrl}/password-dimenticata`,
+  }
+}
+
+export type AccessInvitePreview = { subject: string; text: string }
+
+const PREVIEW_NAME = "[nome e cognome]"
+const PREVIEW_LINK = "[link personale]"
+
+/**
+ * Il testo dell'invito come lo riceverà chi è selezionato, per l'anteprima
+ * dell'invio di gruppo. Passa dallo stesso modello e dalla stessa funzione
+ * dell'invio vero: nome e link sono segnaposto, perché il link è una
+ * credenziale e nasce solo al momento dell'invio. Non genera link, non
+ * scrive niente.
+ */
+export async function previewAccessInviteEmail(
+  kind: AccessProfileKind,
+): Promise<AccessInvitePreview> {
+  const appUrl = getAppUrl() ?? "https://area.irpiniaartedanza.it"
+  const rendered = await renderPersonalEmail(
+    ACCESS_TEMPLATE_SLUG,
+    {
+      ...accessInviteVars(kind, PREVIEW_NAME, appUrl),
+      link_accesso: PREVIEW_LINK,
+      ...(await getBrandVars()),
+    },
+    PREVIEW_LINK,
+  )
+  return { subject: rendered.subject, text: rendered.text }
+}
+
 type RenderedEmail = {
   templateSlug: string | null
   subject: string
@@ -661,21 +714,8 @@ async function sendAccessInviteUnsafe({
   const rendered = await renderPersonalEmail(
     ACCESS_TEMPLATE_SLUG,
     {
-      destinatario_nome: recipientName,
-      area_nome:
-        kind === "PARENT"
-          ? "area genitori"
-          : kind === "TEACHER"
-            ? "area insegnanti"
-            : "area riservata",
-      descrizione_area:
-        kind === "PARENT"
-          ? "consultare contributi, ricevute, presenze e orari delle tue figlie"
-          : kind === "TEACHER"
-            ? "vedere le tue classi e segnare le presenze"
-            : "consultare i tuoi contributi, le ricevute, le presenze e gli orari",
+      ...accessInviteVars(kind, recipientName, appUrl),
       link_accesso: confirmLink,
-      link_recupero: `${appUrl}/password-dimenticata`,
       ...(await getBrandVars()),
     },
     confirmLink,

@@ -2,22 +2,21 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Send, X } from "lucide-react"
+import { MessageCircle, Send, X } from "lucide-react"
 
 import {
   ResponsiveList,
   type ListColumn,
 } from "@/components/lists/responsive-list"
 import { Button } from "@/components/ui/button"
-import {
-  isInvitable,
-  type AccessStatus,
-} from "@/lib/auth/access-status-types"
+import type { AccessInvitePreview } from "@/lib/auth/access-emails"
+import { planAccessInvites } from "@/lib/auth/access-invite-plan"
+import type { AccessStatus } from "@/lib/auth/access-status-types"
 import { listName } from "@/lib/utils/person-name"
+import { whatsappHref } from "@/lib/utils/whatsapp"
 
 import { AccessStatusBadge } from "../../_components/access/access-status-badge"
 import { BulkAccessInviteDialog } from "../../_components/access/bulk-access-invite-dialog"
-import { SendAccessButton } from "../../_components/access/send-access-button"
 import { ParentRowActions } from "./parent-row-actions"
 
 type ParentRow = {
@@ -43,6 +42,8 @@ type ParentRow = {
 interface ParentsTableProps {
   parents: ParentRow[]
   accessStatuses: Record<string, AccessStatus>
+  // Il testo dell'invito, per l'anteprima dell'invio di gruppo
+  invitePreview: AccessInvitePreview
 }
 
 const FALLBACK_STATUS: AccessStatus = { kind: "NO_EMAIL" }
@@ -52,48 +53,77 @@ function figlieLabel(count: number): string {
   return count === 1 ? "1 allieva" : `${count} allieve`
 }
 
-export function ParentsTable({ parents, accessStatuses }: ParentsTableProps) {
+// Il telefono si tocca: da iPad prima andava ricopiato a mano. Numero in
+// Geist Mono, e WhatsApp apre la chat con quel numero.
+function PhoneCell({ phone }: { phone: string | null }) {
+  if (!phone) return <span className="text-sm text-muted-foreground">—</span>
+  const whatsapp = whatsappHref(phone)
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <a
+        href={`tel:${phone.replace(/\s+/g, "")}`}
+        className="inline-flex h-11 items-center truncate font-mono text-sm underline-offset-4 hover:underline"
+      >
+        {phone}
+      </a>
+      {whatsapp ? (
+        <Button asChild variant="outline" size="sm" className="h-11 shrink-0">
+          <a href={whatsapp} target="_blank" rel="noopener noreferrer">
+            <MessageCircle className="h-4 w-4" />
+            WhatsApp
+          </a>
+        </Button>
+      ) : null}
+    </span>
+  )
+}
+
+export function ParentsTable({
+  parents,
+  accessStatuses,
+  invitePreview,
+}: ParentsTableProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkRunKey, setBulkRunKey] = useState(0)
-  const [bulkTargets, setBulkTargets] = useState<{ id: string; name: string }[]>([])
 
   const statusOf = (id: string): AccessStatus =>
     accessStatuses[id] ?? FALLBACK_STATUS
 
-  // Selezionabili solo MAI INVITATO / INVITATO. Dopo un aggiornamento un
-  // genitore può non esserlo più (es. ha attivato l'accesso): la selezione
-  // effettiva ignora gli id non più validi.
-  const selectableIds = useMemo(
-    () =>
-      parents
-        .filter((p) => isInvitable(accessStatuses[p.id] ?? FALLBACK_STATUS))
-        .map((p) => p.id),
-    [parents, accessStatuses],
+  // Tutte le righe si selezionano, anche chi non può ricevere l'invito: chi
+  // resta fuori lo dice l'anteprima, col motivo. Prima le righe non
+  // invitabili non avevano la casella, e non si capiva perché.
+  const selectableIds = useMemo(() => parents.map((p) => p.id), [parents])
+  // Dopo un filtro o un aggiornamento una riga può non esserci più: la
+  // selezione che conta è quella delle righe a schermo
+  const selectedParents = useMemo(
+    () => parents.filter((p) => selected.has(p.id)),
+    [parents, selected],
   )
-  const effectiveSelected = useMemo(
-    () => selectableIds.filter((id) => selected.has(id)),
-    [selectableIds, selected],
+  // Nessuna regola nuova: decide isInvitable, come per il tasto di riga
+  const plan = useMemo(
+    () =>
+      planAccessInvites(
+        selectedParents.map((p) => ({
+          id: p.id,
+          name: listName(p),
+          status: accessStatuses[p.id] ?? FALLBACK_STATUS,
+        })),
+      ),
+    [selectedParents, accessStatuses],
   )
 
   function openBulk() {
-    const byId = new Map(parents.map((p) => [p.id, p]))
-    setBulkTargets(
-      effectiveSelected.flatMap((id) => {
-        const parent = byId.get(id)
-        return parent ? [{ id, name: listName(parent) }] : []
-      }),
-    )
     setBulkRunKey((key) => key + 1)
     setBulkOpen(true)
   }
 
-  const selectedCount = effectiveSelected.length
+  const selectedCount = selectedParents.length
 
   // ── Colonne ─────────────────────────────────────────────────────────────
-  // Alta: nome, allieve collegate e stato dell'accesso. Email e telefono
-  // arrivano da 1024, il tasto "Invia accesso" da 1280 (in card e su iPad
-  // sta nel menu delle azioni).
+  // Alta: nome, allieve collegate e stato dell'accesso. Telefono da 1024,
+  // email da 1280. "Invia accesso" di riga sta nel menu ⋯: l'invito si fa
+  // di gruppo, dalla selezione.
   const columns: ListColumn<ParentRow>[] = [
     {
       key: "nome",
@@ -111,7 +141,7 @@ export function ParentsTable({ parents, accessStatuses }: ParentsTableProps) {
     {
       key: "email",
       header: "Email",
-      priority: "medium",
+      priority: "low",
       width: "md:w-56",
       cell: (parent) => (
         <span className="truncate text-sm">{parent.email || "—"}</span>
@@ -120,13 +150,9 @@ export function ParentsTable({ parents, accessStatuses }: ParentsTableProps) {
     {
       key: "telefono",
       header: "Telefono",
-      priority: "low",
-      width: "md:w-36",
-      cell: (parent) => (
-        <span className="truncate font-mono text-sm">
-          {parent.phone || "—"}
-        </span>
-      ),
+      priority: "medium",
+      width: "md:w-64",
+      cell: (parent) => <PhoneCell phone={parent.phone} />,
     },
     {
       key: "allieve",
@@ -142,19 +168,6 @@ export function ParentsTable({ parents, accessStatuses }: ParentsTableProps) {
       header: "Accesso",
       width: "md:w-40",
       cell: (parent) => <AccessStatusBadge status={statusOf(parent.id)} />,
-    },
-    {
-      key: "invia",
-      header: <span className="sr-only">Invio accesso</span>,
-      priority: "low",
-      width: "md:w-36",
-      cell: (parent) => (
-        <SendAccessButton
-          kind="PARENT"
-          profileId={parent.id}
-          status={statusOf(parent.id)}
-        />
-      ),
     },
   ]
 
@@ -177,22 +190,19 @@ export function ParentsTable({ parents, accessStatuses }: ParentsTableProps) {
             const parent = parents.find((p) => p.id === id)
             return parent ? `Seleziona ${listName(parent)}` : "Seleziona"
           },
-          selectAllLabel:
-            "Seleziona tutti i genitori a cui si può inviare l'accesso",
+          selectAllLabel: "Seleziona tutti i genitori dell'elenco",
         }}
         // Le due righe della card: le figlie (è il motivo per cui un genitore
         // è in anagrafica) e lo stato dell'accesso all'area riservata
         cardLines={(parent) => [
-          <span key="figlie">
+          <span key="figlie" className="flex flex-wrap items-center gap-1.5">
             {figlieLabel(parent._count.athleteRelations)}
-            {parent.email ? ` · ${parent.email}` : " · senza email"}
-          </span>,
-          <span key="accesso" className="flex items-center gap-1.5">
             <AccessStatusBadge
               status={statusOf(parent.id)}
               showDetail={false}
             />
           </span>,
+          <PhoneCell key="telefono" phone={parent.phone} />,
         ]}
         actions={(parent) => (
           <ParentRowActions
@@ -203,18 +213,20 @@ export function ParentsTable({ parents, accessStatuses }: ParentsTableProps) {
         )}
       />
 
+      {/* Barra fissa in basso: è da qui che si invitano le famiglie, non
+          con decine di tocchi riga per riga. Niente parte da qui: si apre
+          l'anteprima. */}
       {selectedCount > 0 && (
         <div className="sticky bottom-4 z-10 mx-auto flex w-full max-w-2xl flex-wrap items-center justify-between gap-3 rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <span className="text-sm font-medium">
+          <span className="text-sm text-muted-foreground">
             {selectedCount}{" "}
-            {selectedCount === 1
-              ? "genitore selezionato"
-              : "genitori selezionati"}
+            {selectedCount === 1 ? "selezionato" : "selezionati"}
           </span>
           <div className="flex items-center gap-2">
             <Button className="h-11" onClick={openBulk}>
               <Send className="h-4 w-4" />
-              Invia accesso ai selezionati
+              Invia accesso a {selectedCount}{" "}
+              {selectedCount === 1 ? "genitore" : "genitori"}
             </Button>
             <Button
               variant="ghost"
@@ -232,7 +244,8 @@ export function ParentsTable({ parents, accessStatuses }: ParentsTableProps) {
         key={bulkRunKey}
         open={bulkOpen}
         onOpenChange={setBulkOpen}
-        targets={bulkTargets}
+        plan={plan}
+        preview={invitePreview}
         onFinished={() => setSelected(new Set())}
       />
     </>
