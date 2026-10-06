@@ -1,3 +1,5 @@
+import "server-only"
+
 import { createAdminClient } from "./admin-client"
 import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 

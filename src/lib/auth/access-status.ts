@@ -11,6 +11,7 @@ import {
   type AccessStatus,
 } from "./access-status-types"
 import { getAuthUsersByIds } from "./auth-users"
+import { requireAdmin } from "@/lib/auth/require-admin"
 
 type ProfileRef = {
   id: string
@@ -27,6 +28,8 @@ export async function getAccessStatuses(
   kind: AccessProfileKind,
   profiles: ProfileRef[],
 ): Promise<Record<string, AccessStatus>> {
+  await requireAdmin()
+
   if (profiles.length === 0) return {}
 
   const authUsers = await getAuthUsersByIds(
@@ -116,6 +119,8 @@ export async function getAccessStatus(
   kind: AccessProfileKind,
   profile: ProfileRef,
 ): Promise<AccessStatus> {
+  await requireAdmin()
+
   const statuses = await getAccessStatuses(kind, [profile])
   return statuses[profile.id] ?? { kind: "NO_EMAIL" }
 }

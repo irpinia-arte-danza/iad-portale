@@ -30,6 +30,14 @@ describe("query della ricerca", () => {
     })
   })
 
+  it("al massimo cinque parole e sessanta caratteri: il resto si scarta", () => {
+    expect(searchTerms("a b c d e f g")).toEqual(["a", "b", "c", "d", "e"])
+    const lunga = "x".repeat(70)
+    expect(searchTerms(lunga)).toEqual(["x".repeat(60)])
+    // Il taglio a 60 avviene prima di contare le parole
+    expect(searchTerms(`${"Rossi ".repeat(12)}Maria`)).toHaveLength(5)
+  })
+
   it("spazi doppi, a capo e spazi ai bordi non contano", () => {
     expect(searchTerms("  Rossi   Maria \n")).toEqual(["Rossi", "Maria"])
     expect(nameSearchWhere(" Rossi  Maria ")).toEqual({

@@ -18,15 +18,25 @@
 
 export const MIN_SEARCH_LENGTH = 2
 export const MAX_SEARCH_RESULTS = 8
+// Oltre questi limiti la ricerca non cambia risultato, cambia solo il costo
+// della query: ogni parola è un AND di due ILIKE
+export const MAX_SEARCH_LENGTH = 60
+export const MAX_SEARCH_TERMS = 5
 
 type Contains = { contains: string; mode: "insensitive" }
 export type NameSearchWhere = {
   AND: { OR: ({ firstName: Contains } | { lastName: Contains })[] }[]
 }
 
-// Le parole della ricerca: spazi doppi, a capo e spazi ai bordi non contano
+// Le parole della ricerca: spazi doppi, a capo e spazi ai bordi non contano.
+// Al massimo 60 caratteri e 5 parole: il resto si scarta
 export function searchTerms(input: string): string[] {
-  return input.trim().split(/\s+/).filter((term) => term.length > 0)
+  return input
+    .trim()
+    .slice(0, MAX_SEARCH_LENGTH)
+    .split(/\s+/)
+    .filter((term) => term.length > 0)
+    .slice(0, MAX_SEARCH_TERMS)
 }
 
 export function isSearchable(input: string): boolean {

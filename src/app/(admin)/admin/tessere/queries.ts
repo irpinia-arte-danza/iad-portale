@@ -53,6 +53,8 @@ const STATUS_PRIORITY: Record<CardStatus, number> = {
 // Anno sociale corrente: l'anno in cui è partito l'anno accademico in corso.
 // La stagione 2026/2027 è l'"Anno sociale 2026" che ENDAS stampa in tessera.
 export async function getCurrentSeasonYear(): Promise<number> {
+  await requireAdmin()
+
   const year = await prisma.academicYear.findFirst({
     where: { isCurrent: true },
     select: { startDate: true },
@@ -64,6 +66,8 @@ export async function getCurrentSeasonYear(): Promise<number> {
 // Le allieve contro cui si abbina una tessera letta dal PDF. Le ritirate
 // restano dentro: una tessera arretrata può riguardarle.
 export async function getMatchCandidates(): Promise<MatchCandidate[]> {
+  await requireAdmin()
+
   return prisma.athlete.findMany({
     where: { deletedAt: null },
     select: { id: true, firstName: true, lastName: true, dateOfBirth: true },
@@ -74,6 +78,8 @@ export async function getMatchCandidates(): Promise<MatchCandidate[]> {
 export async function getActiveCards(
   entity: AffiliationEntity,
 ): Promise<ExistingCard[]> {
+  await requireAdmin()
+
   const cards = await prisma.affiliation.findMany({
     where: { deletedAt: null, entity },
     select: {
