@@ -612,7 +612,10 @@ USING (
 - Link firmato: **5 minuti** (`SIGNED_URL_TTL_SECONDS` in
   `src/lib/supabase/signed-url.ts`, condivisa con le tessere), generato al
   clic su «Scarica» (`refreshMedicalCertSignedUrl`) e mai salvato in DB. La
-  colonna `file_url` resta ma non viene più né scritta né letta.
+  colonna `file_url` resta ma non viene più né scritta né letta: il percorso
+  del file è `file_path`, scritto a ogni caricamento; la migration
+  `20261008090200_backfill_file_path_from_file_url` lo ricava dal vecchio URL
+  firmato per le eventuali righe che avessero solo `file_url` (idempotente).
 - Hard delete allieva (Fase 1.C `/admin/cestino`) chiama
   `deleteAllMedicalCertFilesForAthlete` per cleanup `{athleteId}/*`.
 
