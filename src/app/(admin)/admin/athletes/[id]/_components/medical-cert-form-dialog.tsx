@@ -230,6 +230,12 @@ export function MedicalCertFormDialog({
               Scegli un file
             </Button>
           </div>
+          {/* Dal Mac il certificato arriva spesso come scansione: la via
+              più pulita è quella di sistema, poi si sceglie il PDF qui */}
+          <p className="text-xs text-muted-foreground">
+            Per una scansione pulita: app Anteprima → Scansiona documenti, poi
+            scegli qui il PDF
+          </p>
           {/* capture="environment": fotocamera posteriore, senza passare
               dalla galleria */}
           <input
