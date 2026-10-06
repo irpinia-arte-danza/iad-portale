@@ -303,68 +303,82 @@ export default async function ParentDashboardPage() {
                     )}
                   </div>
 
-                  {/* Presenze AA corrente */}
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Presenze
-                      {attendance.academicYearLabel
-                        ? ` ${attendance.academicYearLabel}`
-                        : ""}
-                    </h3>
-                    {(() => {
-                      const stats = attendance.byAthlete.get(athlete.id)
-                      if (!stats || stats.totalLessons === 0) {
-                        return (
-                          <p className="text-sm text-muted-foreground">
-                            Nessuna lezione registrata ancora.
-                          </p>
-                        )
-                      }
-                      return (
-                        <>
-                          <div className="grid grid-cols-3 gap-2 rounded-md border p-3">
-                            <div className="text-center">
-                              <div className="text-lg font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
-                                {stats.presentCount}
+                  {athlete.personalDataVisible ? (
+                    <>
+                      {/* Presenze AA corrente */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Presenze
+                          {attendance.academicYearLabel
+                            ? ` ${attendance.academicYearLabel}`
+                            : ""}
+                        </h3>
+                        {(() => {
+                          const stats = attendance.byAthlete.get(athlete.id)
+                          if (!stats || stats.totalLessons === 0) {
+                            return (
+                              <p className="text-sm text-muted-foreground">
+                                Nessuna lezione registrata ancora.
+                              </p>
+                            )
+                          }
+                          return (
+                            <>
+                              <div className="grid grid-cols-3 gap-2 rounded-md border p-3">
+                                <div className="text-center">
+                                  <div className="text-lg font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                                    {stats.presentCount}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Presenti
+                                  </div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-lg font-semibold tabular-nums text-red-700 dark:text-red-300">
+                                    {stats.absentCount}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Assenti
+                                  </div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-lg font-semibold tabular-nums text-amber-700 dark:text-amber-300">
+                                    {stats.justifiedCount}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Giustificate
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-xs text-muted-foreground">
-                                Presenti
-                              </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg font-semibold tabular-nums text-red-700 dark:text-red-300">
-                                {stats.absentCount}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Assenti
-                              </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg font-semibold tabular-nums text-amber-700 dark:text-amber-300">
-                                {stats.justifiedCount}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Giustificate
-                              </div>
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Frequenza:{" "}
-                            <strong className="tabular-nums">
-                              {stats.attendanceRate}%
-                            </strong>{" "}
-                            su {stats.totalLessons}{" "}
-                            {stats.totalLessons === 1 ? "lezione" : "lezioni"}
-                          </p>
-                        </>
-                      )
-                    })()}
-                  </div>
+                              <p className="text-xs text-muted-foreground">
+                                Frequenza:{" "}
+                                <strong className="tabular-nums">
+                                  {stats.attendanceRate}%
+                                </strong>{" "}
+                                su {stats.totalLessons}{" "}
+                                {stats.totalLessons === 1 ? "lezione" : "lezioni"}
+                              </p>
+                            </>
+                          )
+                        })()}
+                      </div>
 
-                  {/* Tessera dell'ente = copertura assicurativa */}
-                  <AthleteCardBlock
-                    card={athleteCards.get(athlete.id) ?? null}
-                  />
+                      {/* Tessera dell'ente = copertura assicurativa */}
+                      <AthleteCardBlock
+                        card={athleteCards.get(athlete.id) ?? null}
+                      />
+                    </>
+                  ) : (
+                    // Figlia maggiorenne: i suoi dati li vede lei. Qui
+                    // restano scadenze, pagamenti e le ricevute intestate a
+                    // chi guarda (vedi portal-visibility.ts)
+                    <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                      {athlete.firstName} è maggiorenne: presenze, certificato
+                      e tessera li vede lei dalla sua area riservata. Qui
+                      restano le scadenze, i pagamenti e le ricevute intestate
+                      a te.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             )
@@ -429,6 +443,11 @@ export default async function ParentDashboardPage() {
                         <Badge variant="destructive" className="mt-1">
                           Pagamento stornato
                         </Badge>
+                      ) : p.receiptHeldByOther ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Ricevuta intestata a un&apos;altra persona: la trova
+                          lei nella sua area riservata.
+                        </p>
                       ) : !p.receipt ? (
                         <p className="mt-1 text-xs text-muted-foreground">
                           Ricevuta non ancora emessa: sarà disponibile qui

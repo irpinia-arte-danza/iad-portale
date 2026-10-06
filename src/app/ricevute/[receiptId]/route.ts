@@ -4,6 +4,7 @@ import { ReceiptStatus, UserRole } from "@prisma/client"
 
 import { NO_ACCESS_ROUTE, resolveAccountState } from "@/lib/auth/account-state"
 import { athleteScopeWhere, portalScopeOf } from "@/lib/auth/portal-scope"
+import { canSeeReceipt } from "@/lib/auth/portal-visibility"
 import { prisma } from "@/lib/prisma"
 import { stampCancelledReceipt } from "@/lib/receipts/cancelled-stamp"
 import {
@@ -74,6 +75,8 @@ function pdfFailureMessage(code: string, isAdmin: boolean): {
 // - admin: qualsiasi ricevuta; se annullata, sopra il file originale si
 //   aggiunge al volo la filigrana "ANNULLATA" (il file archiviato non cambia)
 // - genitore: solo ricevute valide di allieve collegate al proprio profilo
+//   E intestate a lui (fra due genitori, ciascuno apre le sue)
+// - allieva con accesso proprio: tutte le ricevute valide che la riguardano
 // - altri ruoli: accesso negato
 // Si serve sempre il file archiviato all'emissione. Se non c'è ancora (archivio
 // non riuscito all'emissione) si genera, si archivia e si serve.
@@ -147,6 +150,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           scope.kind === "athlete"
             ? "Questa ricevuta non è intestata a te."
             : "Questa ricevuta non riguarda le allieve collegate al tuo account.",
+        backHref,
+      })
+    }
+    if (!canSeeReceipt(scope, receipt)) {
+      console.warn(
+        "[receipt pdf] access denied: receipt held by another payer",
+        logContext,
+      )
+      return messagePage({
+        status: 403,
+        title: "Accesso non consentito",
+        message:
+          "Questa ricevuta è intestata a un'altra persona: può aprirla solo chi l'ha ricevuta.",
         backHref,
       })
     }
