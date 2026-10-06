@@ -1,9 +1,14 @@
 import { notFound } from "next/navigation"
 
+import { athleteStatusStrip } from "@/lib/athletes/athlete-status"
+import { parseAthleteTab, type AthleteTabId } from "@/lib/athletes/athlete-tabs"
 import { athleteSetupChecklist } from "@/lib/athletes/setup-checklist"
 import { getAccessStatus } from "@/lib/auth/access-status"
 import { athleteAccessEligibility } from "@/lib/auth/athlete-access"
 import { prisma } from "@/lib/prisma"
+import { DAY_OF_WEEK_LABELS } from "@/lib/schemas/course-schedule"
+import { computeAge } from "@/lib/utils/date-helpers"
+import { formatDateShort } from "@/lib/utils/format"
 
 import { EmailLogTable } from "../../_components/email-log/table"
 import { getAthleteEmailLog } from "../../_components/email-log/queries"
@@ -14,13 +19,22 @@ import {
   listOpenSchedulesByAthlete,
 } from "../../payments/queries"
 import { AthleteAnagraficaDisplay } from "../_components/athlete-anagrafica-display"
-import { AthleteDetailHeader } from "../_components/athlete-detail-header"
+import { AthleteHeaderActions } from "../_components/athlete-header-actions"
 import { EnrollmentsSection } from "../_components/enrollments-section"
 import { GuardianListSection } from "../_components/guardian-list-section"
+import { ScheduleSettleProvider } from "../_components/schedule-settle-provider"
 import { SchedulesSection } from "../_components/schedules-section"
-import { getAthleteById, getAthleteForPDF } from "../queries"
+import {
+  getAthleteById,
+  getAthleteForPDF,
+  getAthleteLastPaymentMethod,
+  getAthleteRecentPayments,
+} from "../queries"
 import { AthleteAccessSection } from "./_components/athlete-access-section"
-import { AthletePDFButton } from "./_components/athlete-pdf-button"
+import { AthleteOverview } from "./_components/athlete-overview"
+import { AthletePayerRow } from "./_components/athlete-payer-row"
+import { AthleteTabs } from "./_components/athlete-tabs"
+import { AthleteStatusStrip } from "./_components/athlete-status-strip"
 import { EndasCardSection } from "./_components/endas-card-section"
 import { MedicalCertSection } from "./_components/medical-cert-section"
 import {
@@ -30,10 +44,18 @@ import {
 
 interface PageProps {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string }>
 }
 
-export default async function AthleteDetailPage({ params }: PageProps) {
-  const resolvedParams = await params
+export default async function AthleteDetailPage({
+  params,
+  searchParams,
+}: PageProps) {
+  const [resolvedParams, resolvedSearch] = await Promise.all([
+    params,
+    searchParams,
+  ])
+  const tab: AthleteTabId = parseAthleteTab(resolvedSearch.tab)
 
   const [
     athlete,
@@ -43,6 +65,8 @@ export default async function AthleteDetailPage({ params }: PageProps) {
     athletesForPaymentForm,
     emailLog,
     openSchedulesByAthlete,
+    lastMethod,
+    recentPayments,
   ] = await Promise.all([
     getAthleteById(resolvedParams.id),
     getAthleteForPDF(resolvedParams.id),
@@ -69,6 +93,8 @@ export default async function AthleteDetailPage({ params }: PageProps) {
     listAthletesWithRelations(),
     getAthleteEmailLog(resolvedParams.id),
     listOpenSchedulesByAthlete(resolvedParams.id),
+    getAthleteLastPaymentMethod(resolvedParams.id),
+    getAthleteRecentPayments(resolvedParams.id, 3),
   ])
 
   if (!athlete) {
@@ -111,6 +137,107 @@ export default async function AthleteDetailPage({ params }: PageProps) {
     { currentAcademicYear },
   )
 
+  // Sottotitolo: quanti anni, che corso fa, da quando è iscritta quest'anno
+  const currentEnrollments = athlete.enrollments.filter(
+    (e) => e.academicYearId === currentAcademicYear?.id && !e.withdrawalDate,
+  )
+  const age = computeAge(athlete.dateOfBirth)
+  const subtitle = [
+    age !== null ? `${age} anni` : null,
+    currentEnrollments.map((e) => e.course.name).join(" · ") || null,
+    currentEnrollments[0]
+      ? `iscritta il ${formatDateShort(currentEnrollments[0].enrollmentDate)}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+
+  // Tutte le rate dell'allieva: mensili dei corsi e contributo di iscrizione
+  const allSchedules = [
+    ...athlete.paymentSchedules,
+    ...athlete.enrollments.flatMap((e) => e.paymentSchedules),
+  ]
+  const status = athleteStatusStrip({
+    certificates: athlete.medicalCertificates,
+    cards: athlete.affiliations,
+    schedules: allSchedules,
+    currentAcademicYear,
+  })
+
+  // Chi paga: il pagante, poi il contatto, poi il primo collegato. Senza
+  // genitori, una maggiorenne paga per sé (vedi #35).
+  const payerRelation =
+    athlete.parentRelations.find((r) => r.isPrimaryPayer) ??
+    athlete.parentRelations.find((r) => r.isPrimaryContact) ??
+    athlete.parentRelations[0] ??
+    null
+  const isAdult = age !== null && age >= 18
+  const payer = payerRelation
+    ? {
+        name: `${payerRelation.parent.lastName} ${payerRelation.parent.firstName}`,
+        phone: payerRelation.parent.phone,
+        email: payerRelation.parent.email,
+        isAthlete: false,
+        parentId: payerRelation.parent.id,
+      }
+    : isAdult
+      ? {
+          name: fullName,
+          phone: athlete.phone,
+          email: athlete.email,
+          isAthlete: true,
+          parentId: null,
+        }
+      : null
+
+  const openSchedules = openSchedulesByAthlete[athlete.id] ?? []
+
+  // I due blocchi della colonna di destra della panoramica, costruiti qui
+  // perché i dati arrivano dal server
+  const checklistCard = (
+    <SetupChecklistCard
+      steps={setupSteps}
+      compact
+      athlete={athlete}
+      linkedParents={athlete.parentRelations.length}
+      course={{
+        activeCourses,
+        currentAcademicYear,
+        hasAssociationFee: athlete.paymentSchedules.some(
+          (s) => s.academicYearId === currentAcademicYear?.id,
+        ),
+        enrolledCourseIds: athlete.enrollments
+          .filter((e) => e.academicYearId === currentAcademicYear?.id)
+          .map((e) => e.courseId),
+      }}
+    />
+  )
+
+  const coursesOfTheYear =
+    currentEnrollments.length === 0 ? (
+      <p className="text-sm text-muted-foreground">
+        Nessuna iscrizione per l&apos;anno corrente.
+      </p>
+    ) : (
+      <ul className="space-y-2">
+        {currentEnrollments.map((e) => (
+          <li key={e.id} className="rounded-md border p-3">
+            <p className="text-sm font-medium">{e.course.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {e.course.schedules.length > 0
+                ? e.course.schedules
+                    .map(
+                      (sch) =>
+                        `${DAY_OF_WEEK_LABELS[sch.dayOfWeek] ?? "—"} ${sch.startTime}–${sch.endTime}${sch.location ? ` · ${sch.location}` : ""}`,
+                    )
+                    .join(" · ")
+                : "Orario non impostato"}
+            </p>
+          </li>
+        ))}
+      </ul>
+    )
+
   const accessStatus = canHaveOwnAccess
     ? await getAccessStatus("ATHLETE", {
         id: athlete.id,
@@ -120,95 +247,132 @@ export default async function AthleteDetailPage({ params }: PageProps) {
     : null
 
   return (
-    <>
+    // Il dialog di incasso sta qui, fuori da tutto: lo aprono l'intestazione
+    // e le righe delle rate, e non deve smontarsi quando la pagina cambia
+    <ScheduleSettleProvider
+      athletesForPaymentForm={athletesForPaymentForm}
+      openSchedulesByAthlete={openSchedulesByAthlete}
+    >
       <ResourceHeader
         breadcrumbs={[
           { label: "Allieve", href: "/admin/athletes" },
           { label: fullName },
         ]}
         title={fullName}
+        description={subtitle || undefined}
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            {athleteForPDF ? (
-              <AthletePDFButton
-                data={athleteForPDF.athlete}
-                brand={athleteForPDF.brand}
-              />
-            ) : null}
-            <AthleteDetailHeader
-              athlete={athlete}
-              linkedParents={athlete.parentRelations.length}
-            />
-          </div>
+          <AthleteHeaderActions
+            athlete={athlete}
+            linkedParents={athlete.parentRelations.length}
+            pdf={
+              athleteForPDF
+                ? { data: athleteForPDF.athlete, brand: athleteForPDF.brand }
+                : null
+            }
+            openSchedules={openSchedules.map((s) => ({
+              id: s.id,
+              feeType: s.feeType,
+              courseEnrollmentId: null,
+              courseName: s.description,
+              dueDate: s.dueDate,
+              amountCents: s.amountCents,
+            }))}
+            lastMethod={lastMethod}
+          />
         }
       />
       <ResourceContent>
         <div className="flex flex-col gap-6">
-          <SetupChecklistCard
-            steps={setupSteps}
-            athlete={athlete}
-            linkedParents={athlete.parentRelations.length}
-            course={{
-              activeCourses,
-              currentAcademicYear,
-              hasAssociationFee: athlete.paymentSchedules.some(
-                (s) => s.academicYearId === currentAcademicYear?.id,
+          <AthleteStatusStrip
+            athleteId={athlete.id}
+            certificate={status.certificate}
+            contributions={status.contributions}
+            card={status.card}
+          />
+          <AthletePayerRow athleteId={athlete.id} payer={payer} />
+
+          <AthleteTabs
+            value={tab}
+            panels={{
+              panoramica: (
+                <AthleteOverview
+                  athlete={{
+                    id: athlete.id,
+                    firstName: athlete.firstName,
+                    lastName: athlete.lastName,
+                  }}
+                  openSchedules={openSchedules}
+                  recentPayments={recentPayments}
+                  lastMethod={lastMethod}
+                  checklist={checklistCard}
+                  courses={coursesOfTheYear}
+                />
               ),
-              enrolledCourseIds: athlete.enrollments
-                .filter((e) => e.academicYearId === currentAcademicYear?.id)
-                .map((e) => e.courseId),
+              contributi: (
+                <SchedulesSection
+                  enrollments={athlete.enrollments}
+                  associationSchedules={athlete.paymentSchedules}
+                />
+              ),
+              corsi: (
+                <EnrollmentsSection
+                  athleteId={athlete.id}
+                  athleteFirstName={athlete.firstName}
+                  enrollments={athlete.enrollments}
+                  activeCourses={activeCourses}
+                  currentAcademicYear={currentAcademicYear}
+                  hasAssociationFee={athlete.paymentSchedules.some(
+                    (s) => s.academicYearId === currentAcademicYear?.id,
+                  )}
+                />
+              ),
+              documenti: (
+                <div className="flex flex-col gap-6">
+                  <MedicalCertSection
+                    athleteId={athlete.id}
+                    certificates={athlete.medicalCertificates}
+                  />
+                  <div id={CARD_SECTION_ID} className="scroll-mt-20">
+                    <EndasCardSection
+                      athleteId={athlete.id}
+                      entity="ENDAS"
+                      cards={athlete.affiliations.filter(
+                        (c) => c.entity === "ENDAS",
+                      )}
+                    />
+                  </div>
+                </div>
+              ),
+              anagrafica: (
+                <div className="flex flex-col gap-6">
+                  {/* Codice fiscale e residenza stanno qui, non in prima
+                      schermata: servono di rado e sono dati di una minore */}
+                  <AthleteAnagraficaDisplay athlete={athlete} />
+                  <GuardianListSection
+                    athleteId={athlete.id}
+                    parentRelations={athlete.parentRelations}
+                    dateOfBirth={athlete.dateOfBirth}
+                    hasOwnAccess={athlete.userId !== null}
+                  />
+                  {accessStatus ? (
+                    <AthleteAccessSection
+                      athleteId={athlete.id}
+                      status={accessStatus}
+                    />
+                  ) : null}
+                </div>
+              ),
+              email: (
+                <EmailLogTable
+                  title="Storico email"
+                  description="Tutte le email inviate relative a questa allieva, in ordine cronologico."
+                  logs={emailLog}
+                />
+              ),
             }}
-          />
-          <AthleteAnagraficaDisplay athlete={athlete} />
-          <MedicalCertSection
-            athleteId={athlete.id}
-            certificates={athlete.medicalCertificates}
-          />
-          <div id={CARD_SECTION_ID} className="scroll-mt-20">
-            <EndasCardSection
-              athleteId={athlete.id}
-              entity="ENDAS"
-              cards={athlete.affiliations.filter((c) => c.entity === "ENDAS")}
-            />
-          </div>
-          <GuardianListSection
-            athleteId={athlete.id}
-            parentRelations={athlete.parentRelations}
-            dateOfBirth={athlete.dateOfBirth}
-            hasOwnAccess={athlete.userId !== null}
-          />
-          {accessStatus ? (
-            <AthleteAccessSection
-              athleteId={athlete.id}
-              status={accessStatus}
-            />
-          ) : null}
-          <EnrollmentsSection
-            athleteId={athlete.id}
-            athleteFirstName={athlete.firstName}
-            enrollments={athlete.enrollments}
-            activeCourses={activeCourses}
-            currentAcademicYear={currentAcademicYear}
-            hasAssociationFee={athlete.paymentSchedules.some(
-              (s) => s.academicYearId === currentAcademicYear?.id,
-            )}
-          />
-          <SchedulesSection
-            athleteId={athlete.id}
-            athleteFirstName={athlete.firstName}
-            athleteLastName={athlete.lastName}
-            enrollments={athlete.enrollments}
-            associationSchedules={athlete.paymentSchedules}
-            athletesForPaymentForm={athletesForPaymentForm}
-            openSchedulesByAthlete={openSchedulesByAthlete}
-          />
-          <EmailLogTable
-            title="Storico email"
-            description="Tutte le email inviate relative a questa allieva, in ordine cronologico."
-            logs={emailLog}
           />
         </div>
       </ResourceContent>
-    </>
+    </ScheduleSettleProvider>
   )
 }

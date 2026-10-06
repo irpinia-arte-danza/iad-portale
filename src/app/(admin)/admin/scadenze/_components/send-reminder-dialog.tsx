@@ -1,7 +1,14 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useEffect, useState, useTransition } from "react"
-import { AlertTriangle, Loader2, Mail, Send } from "lucide-react"
+import {
+  AlertTriangle,
+  Loader2,
+  Mail,
+  MessageCircle,
+  Send,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -22,14 +29,20 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Textarea } from "@/components/ui/textarea"
+import { whatsappHref } from "@/lib/utils/whatsapp"
+import { cn } from "@/lib/utils"
 
 import {
   listReminderTemplates,
   previewReminder,
+  recordWhatsappReminder,
   sendReminderBatch,
   type ReminderPreview,
   type ReminderTemplateOption,
 } from "../actions"
+
+type Channel = "WHATSAPP" | "EMAIL"
 
 const CATEGORY_LABEL: Record<string, string> = {
   SOLLECITO: "Sollecito",
@@ -40,6 +53,9 @@ interface SendReminderDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   scheduleIds: string[]
+  // Quante famiglie riceveranno il messaggio: con il raggruppamento per
+  // pagante le email sono una per famiglia, non una per rata
+  payerCount?: number
   defaultTemplateSlug?: string
   onSent?: () => void
 }
@@ -48,9 +64,11 @@ export function SendReminderDialog({
   open,
   onOpenChange,
   scheduleIds,
+  payerCount,
   defaultTemplateSlug,
   onSent,
 }: SendReminderDialogProps) {
+  const router = useRouter()
   const [templates, setTemplates] = useState<ReminderTemplateOption[] | null>(
     null,
   )
@@ -60,6 +78,10 @@ export function SendReminderDialog({
   const [isLoadingTemplates, startLoadingTemplates] = useTransition()
   const [isLoadingPreview, startLoadingPreview] = useTransition()
   const [isSending, startSending] = useTransition()
+  const [channel, setChannel] = useState<Channel>("WHATSAPP")
+  // Il testo per WhatsApp è modificabile: il modello è un punto di partenza,
+  // non una gabbia
+  const [whatsappText, setWhatsappText] = useState("")
 
   useEffect(() => {
     if (!open) {
@@ -96,6 +118,10 @@ export function SendReminderDialog({
       try {
         const p = await previewReminder(firstId, templateSlug)
         setPreview(p)
+        setWhatsappText(p.whatsappText)
+        // Canale predefinito: WhatsApp se c'è il numero. È il canale che
+        // Giuseppina usa già con le famiglie.
+        setChannel(p.recipientPhone ? "WHATSAPP" : "EMAIL")
       } catch (err) {
         setPreview(null)
         setPreviewError(
@@ -144,23 +170,83 @@ export function SendReminderDialog({
 
   const templatesEmpty = templates !== null && templates.length === 0
   const count = scheduleIds.length
+  const families = payerCount ?? count
+  // WhatsApp si manda a una famiglia per volta: il gruppo è solo per email
+  const isBulk = count > 1
+  const phone = preview?.recipientPhone ?? null
+  const waHref = whatsappHref(phone, whatsappText)
+  const activeChannel: Channel = isBulk ? "EMAIL" : channel
+
+  function openWhatsapp() {
+    const scheduleId = scheduleIds[0]
+    if (!scheduleId) return
+    // La traccia parte qui e non aspetta: il link si apre comunque, e la
+    // riga si aggiorna quando il server ha registrato
+    void recordWhatsappReminder(scheduleId).then((result) => {
+      if (result.ok) router.refresh()
+    })
+    onSent?.()
+    onOpenChange(false)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Invia sollecito
+            {activeChannel === "WHATSAPP" ? (
+              <MessageCircle className="h-5 w-5" />
+            ) : (
+              <Mail className="h-5 w-5" />
+            )}
+            Sollecita
           </DialogTitle>
           <DialogDescription>
-            {count === 1
-              ? "Verrà inviata 1 email al genitore collegato."
-              : `Verranno inviate fino a ${count} email ai genitori collegati.`}
+            {isBulk
+              ? `Una email per famiglia, con l'elenco delle rate: ${families} ${families === 1 ? "famiglia" : "famiglie"} per ${count} scadenze.`
+              : activeChannel === "WHATSAPP"
+                ? "Si apre WhatsApp con il messaggio già scritto: l'invio lo fai tu."
+                : "Verrà inviata 1 email al contatto della famiglia."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {!isBulk ? (
+            <div
+              role="group"
+              aria-label="Come mandare il sollecito"
+              className="grid grid-cols-2 gap-2"
+            >
+              <Button
+                type="button"
+                variant={activeChannel === "WHATSAPP" ? "default" : "outline"}
+                aria-pressed={activeChannel === "WHATSAPP"}
+                className="h-11"
+                disabled={!phone}
+                title={phone ? undefined : "Nessun telefono in anagrafica"}
+                onClick={() => setChannel("WHATSAPP")}
+              >
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp
+              </Button>
+              <Button
+                type="button"
+                variant={activeChannel === "EMAIL" ? "default" : "outline"}
+                aria-pressed={activeChannel === "EMAIL"}
+                className="h-11"
+                disabled={!preview?.recipientEmail}
+                title={
+                  preview?.recipientEmail
+                    ? undefined
+                    : "Nessuna email in anagrafica"
+                }
+                onClick={() => setChannel("EMAIL")}
+              >
+                <Mail className="h-4 w-4" />
+                Email
+              </Button>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="template-select">Template</Label>
             {isLoadingTemplates && templates === null ? (
@@ -194,7 +280,7 @@ export function SendReminderDialog({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className={cn("space-y-2", activeChannel !== "EMAIL" && "hidden")}>
             <Label>Anteprima (primo destinatario)</Label>
             {isLoadingPreview ? (
               <div className="space-y-2 rounded-md border p-4">
@@ -244,6 +330,25 @@ export function SendReminderDialog({
               </div>
             )}
           </div>
+
+          {activeChannel === "WHATSAPP" ? (
+            <div className="space-y-2">
+              <Label htmlFor="whatsapp-text">
+                Messaggio per {preview?.recipientName ?? "la famiglia"}
+              </Label>
+              <Textarea
+                id="whatsapp-text"
+                value={whatsappText}
+                onChange={(e) => setWhatsappText(e.target.value)}
+                rows={10}
+                className="font-sans text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Puoi modificarlo prima di aprire WhatsApp. Il gestionale non
+                manda niente: registra solo che il messaggio è uscito da qui.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>
@@ -254,23 +359,37 @@ export function SendReminderDialog({
           >
             Annulla
           </Button>
-          <Button
-            onClick={handleSend}
-            disabled={
-              isSending ||
-              !templateSlug ||
-              templatesEmpty ||
-              count === 0 ||
-              !!previewError
-            }
-          >
-            {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            {count === 1 ? "Invia email" : `Invia ${count} email`}
-          </Button>
+          {activeChannel === "WHATSAPP" ? (
+            <Button asChild disabled={!waHref}>
+              <a
+                href={waHref ?? "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={openWhatsapp}
+              >
+                <MessageCircle className="h-4 w-4" />
+                Apri WhatsApp
+              </a>
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSend}
+              disabled={
+                isSending ||
+                !templateSlug ||
+                templatesEmpty ||
+                count === 0 ||
+                !!previewError
+              }
+            >
+              {isSending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              {families === 1 ? "Invia email" : `Invia ${families} email`}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

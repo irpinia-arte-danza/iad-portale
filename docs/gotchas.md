@@ -9,6 +9,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
 - [Shadcn / Tailwind](#shadcn--tailwind)
   - §17.1 shadcn css rewrite
   - §17.8 Sidebar tooltip
+  - §17.42 `sidebar.tsx` è modificato a mano: `shadcn add sidebar` lo sovrascrive
 - [Prisma / Schema](#prisma--schema)
   - §17.2 Prisma version pinning
   - §17.3 Prisma CLI env loading
@@ -36,6 +37,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.10 Vercel env var `TZ` reserved
   - §17.15 `tsc --noEmit` non replica `next build`
   - §17.16 Vercel build cache + Prisma Client stale
+  - §17.41 `outputFileTracingExcludes`: cosa serve davvero a Prisma a runtime
 - [PDF / Export](#pdf--export)
   - §17.20 `@react-pdf/renderer` richiede `next/dynamic` con `ssr:false`
   - §17.21 Helper CSV/XLSX/PDF: builder Buffer-based separato da download
@@ -63,6 +65,15 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
 **§17.1 shadcn 4.3.0**: il comando `npx shadcn@latest add` riscrive `src/app/globals.css` senza chiedere conferma, sostituendo il pattern corretto `var(--font-geist-sans)` con stringhe hardcoded (`"Geist", "Geist Fallback", ...`) e duplicando i fallback. Verificare SEMPRE `git diff src/app/globals.css` dopo ogni `shadcn add` PRIMA di committare. Se il pattern è alterato, ripristinare manualmente le righe `--font-sans` e `--font-mono`. Lo stesso vale per `shadcn init` che auto-committa senza chiedere — usare `git reset --soft origin/main` + ricommit manuale con messaggio conventional.
 
 **§17.8 Shadcn Sidebar richiede TooltipProvider globale**: shadcn `<Sidebar>` usa internamente `<Tooltip>` per i menu item in modalità `collapsible="icon"` (vedi `SidebarMenuButton` in `src/components/ui/sidebar.tsx`). Richiede quindi `<TooltipProvider>` mounted in un ancestor (tipicamente root layout). Sintomo se mancante: Runtime Error `"Tooltip must be used within TooltipProvider"`, cascade su ThemeProvider/altri provider (React error boundary pulls everything down). Fix: `import { TooltipProvider } from "@/components/ui/tooltip"` in `src/app/layout.tsx`, wrap `{children}` dentro `ThemeProvider`. Scoperto: 20 aprile 2026, Sprint 0 Fase 3D.2.
+
+**§17.42 `src/components/ui/sidebar.tsx` non è più il file di shadcn: `shadcn add sidebar` lo sovrascriverebbe**: nella PR #36 il componente è stato modificato a mano in tre punti, e sono modifiche che il CLI non ha modo di conservare:
+1. `useIsMobile` → `useIsBelowLg` in `SidebarProvider` (soglia 1024 invece di 768);
+2. nel ramo desktop di `Sidebar`, `md:block` → `lg:block` sul wrapper;
+3. sempre lì, `md:flex` → `lg:flex` sul contenitore fisso.
+
+Motivo: fra 768 e 1023 px la barra restava fissa a 250 px e al contenuto ne avanzavano ~500 — su iPad verticale (820 px) in Allieve sparivano "Aggiungi allieva" e il filtro, in Scadenze le colonne di destra. Le prime due righe decidono quando compare lo Sheet, le altre due quando il CSS mostra la barra: vanno cambiate insieme, altrimenti la barra ricompare via CSS anche con l'hook giusto.
+
+Se un domani serve rifare `npx shadcn@latest add sidebar`, dopo il comando va controllato `git diff src/components/ui/sidebar.tsx` e vanno rimesse le tre righe (lo stesso vale per `button.tsx`, che il CLI chiede di sovrascrivere quando si aggiunge un componente che lo usa: rispondere **no**). Vedi anche §17.1 per `globals.css`.
 
 ---
 
@@ -227,6 +238,20 @@ L'upper bound diventa la fine della giornata locale → oggi passa sempre, doman
 Scoperto: Sprint 1.C, 21 aprile 2026, sui deploy Vercel falliti commit `157823e` + `3d5d5b8`.
 
 **§17.16 Vercel build cache + Prisma Client stale**: Vercel restore `node_modules` cache della build precedente → se hai modificato `schema.prisma` tra commit, il Prisma Client in `node_modules/.prisma/client` è stale e TypeScript vede type definitions obsolete (es. `email: string` invece di `email: string | null` dopo relax nullable). Errore "Property X is missing" o "Type X is not assignable" in build Vercel mentre locale passa. Fix: aggiungi `"postinstall": "prisma generate"` a `package.json` scripts. Ogni `npm install` (anche cache hit) rigenera Prisma Client. Overhead ~10s, elimina categoria di bug. Scoperto: Sprint 1.C, 21 aprile 2026, commit fix `0e1ed24`.
+
+**§17.41 `outputFileTracingExcludes` per Prisma — cosa il client apre davvero a runtime**: `@prisma/client` è nella lista dei pacchetti esterni di default di Next, quindi il tracer ne copia l'albero intero in **ogni** funzione: ~78 MB, di cui ~58 mai aperti. `next.config.ts` li esclude. Perché è sicuro, verificato leggendo il pacchetto:
+
+- `node_modules/.prisma/client/index.js` (il client generato dal nostro schema) richiede **un solo** runtime: `@prisma/client/runtime/library.js`;
+- `library.js` carica il motore nativo `libquery_engine-<piattaforma>.node`, che sta in `.prisma/client`;
+- i `*wasm-base64*` (motori e compilatori WebAssembly dei cinque database supportati, in doppia copia `.js`/`.mjs`) non sono nominati da nessun file del runtime: l'unico che li cita è `generator-build/index.js`, cioè `prisma generate`, che gira in build e non in funzione;
+- `binary.*`, `edge*`, `wasm-*-edge`, `react-native.*`, `index-browser*` sono i runtime per il motore "binary", per edge, per React Native e per il browser: nessuno dei quattro è il nostro.
+
+Regole:
+- **non escludere mai** `runtime/library.js` né `libquery_engine-*`, e scrivere i pattern **senza nominare la piattaforma** (in locale il motore è `darwin-arm64`, su Vercel `rhel-openssl-3.0.x`);
+- se un domani si passa ai **driver adapter** o al runtime **edge**, le esclusioni vanno tolte. Il guasto sarebbe rumoroso e immediato (`module not found` su qualunque query), non silenzioso;
+- `previewFeatures = ["driverAdapters"]` era dichiarato e non usato: è stato tolto, ma **non cambia l'output** — Prisma 6.19 genera `query_engine_bg.wasm` comunque. A toglierlo dal bundle è l'esclusione, non lo schema.
+
+Limite noto: la traccia del proxy (`.next/server/middleware.js.nft.json`) viene scritta **fuori** dal passaggio che applica queste esclusioni, quindi nessuna chiave la intercetta (provate `**/*`, `*`, `middleware`, `proxy`, `/middleware`, `/proxy` su Next 16.2.4) e resta a ~80 MB. Come verificare dopo ogni modifica: `rm -rf .next && npm run build`, poi rileggere i `.nft.json` e controllare che nessuna funzione contenga i file esclusi e che tutte contengano ancora il motore nativo e `library.js`. Prova definitiva: nascondere i file esclusi dal disco e far girare i flussi veri (ricevuta, anteprima, timbro, lettura PDF, query) — se qualcuno li aprisse, si romperebbe. Scoperto: audit dimensione funzioni, 5 ottobre 2026.
 
 ---
 

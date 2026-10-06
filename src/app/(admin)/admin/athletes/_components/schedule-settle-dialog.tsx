@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { FeeType } from "@prisma/client"
+import type { FeeType, PaymentMethod } from "@prisma/client"
 
 import {
   Dialog,
@@ -28,6 +28,10 @@ export type SettleSchedule = {
   courseName: string
   dueDate: Date
   amountCents: number
+  // Rate da spuntare all'apertura. Assente = solo questa, com'è sempre stato
+  // dalla riga di una scadenza. Vuota = nessuna, e la scelta la fa chi
+  // incassa (è il caso di "Incassa" in testa alla scheda).
+  selection?: { id: string; amountCents: number }[]
 }
 
 // Da montare una sola volta per sezione (ScheduleSettleProvider), mai dentro
@@ -39,6 +43,9 @@ interface ScheduleSettleDialogProps {
   athleteId: string
   athleteFirstName: string
   athleteLastName: string
+  // Ultimo metodo usato dalla famiglia: una casella in meno da toccare allo
+  // sportello. Assente nella scheda allieva, che resta com'era.
+  defaultMethod?: PaymentMethod | null
   athletesForPaymentForm: AthleteWithFormRelations[]
   openSchedulesByAthlete: Record<string, OpenScheduleOption[]>
   onSuccess?: () => void
@@ -57,14 +64,25 @@ function formatDate(date: Date): string {
 function paymentDefaults(
   schedule: SettleSchedule,
   athleteId: string,
+  defaultMethod?: PaymentMethod | null,
 ): Partial<PaymentCreateValues> {
+  const selection =
+    schedule.selection ??
+    (schedule.id
+      ? [{ id: schedule.id, amountCents: schedule.amountCents }]
+      : [])
+  const totalCents = selection.reduce((sum, s) => sum + s.amountCents, 0)
+
   return {
     athleteId,
-    paymentScheduleIds: [schedule.id],
-    scheduleAmountsEur: { [schedule.id]: schedule.amountCents / 100 },
+    paymentScheduleIds: selection.map((s) => s.id),
+    scheduleAmountsEur: Object.fromEntries(
+      selection.map((s) => [s.id, s.amountCents / 100]),
+    ),
     feeType: schedule.feeType,
-    amountEur: schedule.amountCents / 100,
+    amountEur: totalCents / 100,
     paymentDate: new Date(),
+    ...(defaultMethod ? { method: defaultMethod } : {}),
   }
 }
 
@@ -75,6 +93,7 @@ export function ScheduleSettleDialog({
   athleteId,
   athleteFirstName,
   athleteLastName,
+  defaultMethod,
   athletesForPaymentForm,
   openSchedulesByAthlete,
   onSuccess,
@@ -113,18 +132,25 @@ export function ScheduleSettleDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>Salda scadenza</DialogTitle>
+              <DialogTitle>
+                {schedule.selection && schedule.selection.length !== 1
+                  ? "Registra pagamento"
+                  : "Salda scadenza"}
+              </DialogTitle>
               <DialogDescription>
-                {athleteLastName} {athleteFirstName} — {schedule.courseName} —
-                scadenza {formatDate(schedule.dueDate)}. Puoi spuntare altre
-                scadenze aperte per incassarle insieme, con una sola ricevuta.
+                {athleteLastName} {athleteFirstName}
+                {schedule.selection && schedule.selection.length === 0
+                  ? ". Spunta le scadenze da incassare, oppure registra un pagamento libero."
+                  : schedule.selection && schedule.selection.length > 1
+                    ? `. ${schedule.selection.length} scadenze già spuntate: una sola ricevuta.`
+                    : ` — ${schedule.courseName} — scadenza ${formatDate(schedule.dueDate)}. Puoi spuntare altre scadenze aperte per incassarle insieme, con una sola ricevuta.`}
               </DialogDescription>
             </DialogHeader>
 
             <PaymentForm
               athletes={athletesForPaymentForm}
               openSchedulesByAthlete={openSchedulesByAthlete}
-              defaultValues={paymentDefaults(schedule, athleteId)}
+              defaultValues={paymentDefaults(schedule, athleteId, defaultMethod)}
               onSuccess={(paymentId) => {
                 setRegistered(true)
                 onSuccess?.()

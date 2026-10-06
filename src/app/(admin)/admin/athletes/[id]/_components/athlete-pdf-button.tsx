@@ -43,9 +43,19 @@ function buildFilename(data: AthleteForPDF): string {
 interface AthletePDFButtonProps {
   data: AthleteForPDF
   brand: BrandForPDF | null
+  // Dentro il menu ⋯ il tasto si traveste da voce di menu
+  variant?: "outline" | "ghost"
+  className?: string
+  label?: string
 }
 
-export function AthletePDFButton({ data, brand }: AthletePDFButtonProps) {
+export function AthletePDFButton({
+  data,
+  brand,
+  variant = "outline",
+  className,
+  label = "Esporta PDF",
+}: AthletePDFButtonProps) {
   return (
     <PDFDownloadLink
       document={<AthleteCardPDF data={data} brand={brand} />}
@@ -54,8 +64,9 @@ export function AthletePDFButton({ data, brand }: AthletePDFButtonProps) {
       {({ loading, error }) => (
         <Button
           type="button"
-          variant="outline"
+          variant={variant}
           size="sm"
+          className={className}
           disabled={loading || Boolean(error)}
         >
           {loading ? (
@@ -63,7 +74,7 @@ export function AthletePDFButton({ data, brand }: AthletePDFButtonProps) {
           ) : (
             <FileDown className="h-4 w-4" />
           )}
-          {loading ? "Generazione…" : "Esporta PDF"}
+          {loading ? "Generazione…" : label}
         </Button>
       )}
     </PDFDownloadLink>
