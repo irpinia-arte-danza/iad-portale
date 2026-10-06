@@ -4,13 +4,6 @@ import { useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { statusTone, TONE_BADGE } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 
@@ -31,15 +24,11 @@ const ORDER: ReceiptDeliveryFilter[] = [
 ]
 
 interface ReceiptsFiltersProps {
-  years: number[]
-  year: number
   stato: ReceiptDeliveryFilter
   counts: Record<ReceiptDeliveryFilter, number>
 }
 
 export function ReceiptsFilters({
-  years,
-  year,
   stato,
   counts,
 }: ReceiptsFiltersProps) {
@@ -59,26 +48,8 @@ export function ReceiptsFilters({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        {/* Etichetta davanti: "2026" da solo non diceva di che cosa */}
-        <span className="text-sm text-muted-foreground">Anno fiscale</span>
-        <Select
-          value={String(year)}
-          onValueChange={(v) => updateParam("year", v)}
-        >
-          <SelectTrigger className="h-11 w-[120px] font-mono">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {years.map((y) => (
-              <SelectItem key={y} value={String(y)} className="font-mono">
-                {y}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
+      {/* L'anno fiscale sta accanto al titolo (YearSelector): qui restano
+          solo gli stati di consegna */}
       <div role="group" aria-label="Filtra le ricevute" className="flex flex-wrap gap-2">
         {ORDER.map((value) => {
           const active = value === stato

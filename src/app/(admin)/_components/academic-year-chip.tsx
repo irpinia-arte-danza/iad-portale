@@ -1,5 +1,10 @@
+"use client"
+
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { AlertTriangle, Calendar } from "lucide-react"
+
+import { showsAcademicYearChip } from "@/lib/years/year-context"
 
 type Props = {
   // Label dell'anno con isCurrent = true, null se nessuno lo è
@@ -9,7 +14,15 @@ type Props = {
 // Chip dell'anno accademico nell'header: dice su quale anno sta lavorando il
 // portale, niente di più. NON è un selettore: il cambio d'anno avviene da
 // Anni accademici, dove si vede cosa comporta.
+//
+// Nelle pagine ad anno fiscale (Ricevute, Bilancio, Corrispettivi, Export)
+// non compare: lì l'anno che conta è un altro, e lo dice il selettore
+// accanto al titolo. Due anni diversi sulla stessa schermata, senza
+// spiegazione, erano il problema.
 export function AcademicYearChip({ label }: Props) {
+  const pathname = usePathname()
+  if (!showsAcademicYearChip(pathname)) return null
+
   if (!label) {
     return (
       <Link

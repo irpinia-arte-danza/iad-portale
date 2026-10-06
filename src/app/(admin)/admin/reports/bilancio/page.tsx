@@ -1,4 +1,8 @@
+import { YearNotice } from "@/components/year-notice"
+import { YearSelector } from "@/components/year-selector"
 import { bilancioPresetRange } from "@/lib/bilancio/periods"
+import { prisma } from "@/lib/prisma"
+import { fiscalYearOfRange } from "@/lib/years/year-context"
 import { todayDateOnly } from "@/lib/utils/date-only"
 import { toDateInputValue } from "@/lib/utils/format"
 
@@ -63,7 +67,26 @@ export default async function BilancioPage({ searchParams }: PageProps) {
     true,
   )
 
-  const result = await getBilancio({ from, to })
+  const [result, fiscalYears] = await Promise.all([
+    getBilancio({ from, to }),
+    prisma.fiscalYear.findMany({
+      select: { year: true },
+      orderBy: { year: "desc" },
+    }),
+  ])
+
+  // L'anno fiscale del periodo scelto: il Bilancio ragiona per periodo, e
+  // scegliere un anno vuol dire scegliere il suo 1° gennaio – 31 dicembre.
+  // Un periodo a cavallo di due anni non ha un anno solo da mostrare.
+  const currentFiscalYear = Number(todayIso.slice(0, 4))
+  const selectedFiscalYear = fiscalYearOfRange({ from: fromIso, to: toIso })
+  const yearValues = [
+    ...new Set([
+      currentFiscalYear,
+      ...fiscalYears.map((f) => f.year),
+      ...(selectedFiscalYear !== null ? [selectedFiscalYear] : []),
+    ]),
+  ].sort((a, b) => b - a)
 
   return (
     <>
@@ -71,6 +94,29 @@ export default async function BilancioPage({ searchParams }: PageProps) {
         breadcrumbs={[{ label: "Bilancio" }]}
         title="Bilancio"
         description="Entrate, uscite e avanzo di gestione del periodo."
+        titleAddon={
+          <YearSelector
+            kind="fiscal"
+            value={
+              selectedFiscalYear !== null ? String(selectedFiscalYear) : null
+            }
+            options={yearValues.map((y) => ({
+              value: String(y),
+              label: String(y),
+            }))}
+            apply={{ mode: "calendar-range" }}
+            currentValue={String(currentFiscalYear)}
+          />
+        }
+        notice={
+          <YearNotice
+            selected={
+              selectedFiscalYear !== null ? String(selectedFiscalYear) : null
+            }
+            current={String(currentFiscalYear)}
+            backHref="/admin/reports/bilancio"
+          />
+        }
       />
       <ResourceContent>
         <div className="flex flex-col gap-6">

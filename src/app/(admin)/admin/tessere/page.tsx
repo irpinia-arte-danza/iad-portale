@@ -37,7 +37,9 @@ export default async function TesserePage() {
       <ResourceHeader
         breadcrumbs={[{ label: `Tessere ${ENTITY}` }]}
         title={`Tessere ${ENTITY}`}
-        description="La tessera dell'ente è anche la copertura assicurativa dell'allieva. Qui si prepara l'elenco per il referente e si caricano i PDF che torna indietro."
+        // Il terzo calendario del portale, detto per esteso: non è l'anno
+        // accademico del chip in alto né l'anno fiscale delle ricevute
+        description={`Anno sociale ${ENTITY}: gennaio–dicembre ${seasonYear}`}
       />
       <ResourceContent>
         <div className="flex flex-col gap-6">
