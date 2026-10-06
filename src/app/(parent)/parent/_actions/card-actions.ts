@@ -1,15 +1,16 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { athleteScopeWhere } from "@/lib/auth/portal-scope"
+import { personalDataScopeWhere } from "@/lib/auth/portal-visibility"
 import { requirePortalAccess } from "@/lib/auth/require-portal-access"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
 import { getAffiliationCardSignedUrl } from "@/lib/supabase/storage-affiliation-card"
 
 // Link al PDF della tessera per la famiglia. L'ambito si riapplica qui: si
-// scarica solo la tessera di un'allieva che l'account può vedere, e l'id della
-// tessera da solo non basta ad aprirla.
+// scarica solo la tessera di un'allieva di cui l'account vede i dati
+// personali (una figlia minorenne, o sé stessa), e l'id della tessera da solo
+// non basta ad aprirla.
 export async function getPortalCardUrl(
   cardId: string,
 ): Promise<ActionResult<{ signedUrl: string }>> {
@@ -22,7 +23,7 @@ export async function getPortalCardUrl(
     where: {
       id: idParsed.data,
       deletedAt: null,
-      athlete: { deletedAt: null, ...athleteScopeWhere(scope) },
+      athlete: { deletedAt: null, ...personalDataScopeWhere(scope) },
     },
     select: { filePath: true },
   })

@@ -280,6 +280,7 @@ export async function getTodoCounters(): Promise<TodoCounters> {
     allieveSenzaGenitore: steps.guardian,
     allieveSenzaCorso: steps.course,
     allieveSenzaEmail: steps.email,
+    allieveSenzaPrivacy: steps.privacy,
     certificatiScaduti: certificati.expired,
     certificatiInScadenza: certificati.expiring,
     certificatiAssenti: certificati.missing,

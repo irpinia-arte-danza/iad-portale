@@ -25,6 +25,7 @@ export type SetupStepId =
   | "course"
   | "certificate"
   | "card"
+  | "privacy"
 
 export type SetupStep = {
   id: SetupStepId
@@ -54,6 +55,10 @@ export type ChecklistCard = {
   createdAt: Date
 }
 
+export type ChecklistConsent = {
+  type: string
+}
+
 export type ChecklistAthlete = {
   status: "TRIAL" | "ACTIVE" | "SUSPENDED" | "WITHDRAWN"
   dateOfBirth: Date
@@ -66,7 +71,12 @@ export type ChecklistAthlete = {
   certificates: ChecklistCertificate[]
   // Tessere non cestinate
   cards: ChecklistCard[]
+  // Consensi registrati e non cestinati
+  consents: ChecklistConsent[]
 }
+
+// Il consenso che conta per il passo Privacy: l'informativa firmata
+export const PRIVACY_CONSENT_TYPE = "GDPR"
 
 export type ChecklistContext = {
   // null a luglio e agosto, o se nessun anno è impostato come corrente: i
@@ -131,7 +141,19 @@ export function athleteSetupChecklist(
     }
   }
 
-  // 4. Certificato — corrente = scadenza più lontana, come in lista allieve
+  // 4. Privacy — l'informativa firmata, una volta: non dipende dall'anno.
+  // Ambra e non rosso: la lezione si fa, ma la firma va registrata
+  if (!athlete.consents.some((c) => c.type === PRIVACY_CONSENT_TYPE)) {
+    steps.push({
+      id: "privacy",
+      label: "Registra il consenso privacy",
+      reason:
+        "Non risulta firmata l'informativa privacy: registra la firma del modulo cartaceo in Documenti › Consensi.",
+      short: "Informativa privacy non firmata",
+    })
+  }
+
+  // 5. Certificato — corrente = scadenza più lontana, come in lista allieve
   const certificate = [...athlete.certificates].sort(compareCurrentFirst)[0]
   const certStatus = classifyCert(certificate?.expiryDate ?? null, at)
   if (certStatus === "missing" || certStatus === "expired") {
@@ -146,7 +168,7 @@ export function athleteSetupChecklist(
     })
   }
 
-  // 5. Tessera — la tessera arriva dall'ente, non si fa sul momento: il passo
+  // 6. Tessera — la tessera arriva dall'ente, non si fa sul momento: il passo
   // dice la stessa cosa che dice l'elenco da mandare al referente, cioè che
   // per quell'anno sociale non risulta tesserata
   if (year) {

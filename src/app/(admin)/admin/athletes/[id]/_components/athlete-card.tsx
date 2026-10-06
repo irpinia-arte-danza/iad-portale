@@ -39,10 +39,12 @@ import { AthleteTabs } from "./athlete-tabs"
 import { AthleteStatusStrip } from "./athlete-status-strip"
 import { fullName } from "@/lib/utils/person-name"
 
+import { ConsentsSection } from "./consents-section"
 import { EndasCardSection } from "./endas-card-section"
 import { MedicalCertSection } from "./medical-cert-section"
 import {
   CARD_SECTION_ID,
+  CONSENTS_SECTION_ID,
   SetupChecklistCard,
 } from "./setup-checklist-card"
 
@@ -150,6 +152,9 @@ export async function AthleteCard({ athleteId, tab: rawTab, variant }: AthleteCa
         expiryDate: c.expiryDate,
         createdAt: c.createdAt,
       })),
+      consents: athlete.consents
+        .filter((c) => c.deletedAt === null)
+        .map((c) => ({ type: c.type })),
     },
     { currentAcademicYear },
   )
@@ -353,6 +358,19 @@ export async function AthleteCard({ athleteId, tab: rawTab, variant }: AthleteCa
                       cards={athlete.affiliations.filter(
                         (c) => c.entity === "ENDAS",
                       )}
+                    />
+                  </div>
+                  <div id={CONSENTS_SECTION_ID} className="scroll-mt-20">
+                    <ConsentsSection
+                      athleteId={athlete.id}
+                      athleteFirstName={athlete.firstName}
+                      isAdult={isAdult}
+                      consents={athlete.consents}
+                      parents={athlete.parentRelations.map((r) => ({
+                        id: r.parent.id,
+                        firstName: r.parent.firstName,
+                        lastName: r.parent.lastName,
+                      }))}
                     />
                   </div>
                 </div>

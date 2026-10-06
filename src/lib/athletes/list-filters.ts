@@ -22,6 +22,7 @@ export const ATHLETE_STEP_FILTERS = {
   "senza-corso": "course",
   "senza-email": "email",
   "senza-certificato": "certificate",
+  "senza-privacy": "privacy",
 } as const satisfies Record<string, SetupStepId>
 
 // Il filtro che non è un passo dell'anagrafica: viene dalle rate, con lo
@@ -64,6 +65,7 @@ export const ATHLETE_FILTER_LABELS: Record<AthleteListFilter, string> = {
   "senza-corso": "Senza corso quest'anno",
   "senza-email": "Maggiorenni senza email",
   "senza-certificato": "Senza certificato",
+  "senza-privacy": "Senza consenso privacy",
   [OVERDUE_FILTER]: "In ritardo",
 }
 

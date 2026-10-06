@@ -126,7 +126,7 @@ export async function createMedicalCertificate(
         )
         await prisma.medicalCertificate.update({
           where: { id: cert.id },
-          data: { filePath: uploaded.filePath, fileUrl: uploaded.signedUrl },
+          data: { filePath: uploaded.filePath },
         })
       } catch (uploadError) {
         // Rollback DB record se upload fallisce
@@ -190,7 +190,6 @@ export async function updateMedicalCertificate(
     }
 
     let filePath = existing.filePath
-    let fileUrl: string | null | undefined = undefined
     if (file) {
       // Cancella vecchio file se presente, prima di upload nuovo (rotation)
       if (existing.filePath) {
@@ -202,7 +201,6 @@ export async function updateMedicalCertificate(
         file,
       )
       filePath = uploaded.filePath
-      fileUrl = uploaded.signedUrl
     }
 
     await prisma.medicalCertificate.update({
@@ -216,7 +214,7 @@ export async function updateMedicalCertificate(
             ? parsed.doctorName
             : null,
         notes: parsed.notes && parsed.notes !== "" ? parsed.notes : null,
-        ...(file ? { filePath, fileUrl } : {}),
+        ...(file ? { filePath } : {}),
       },
     })
 
@@ -283,8 +281,9 @@ export async function softDeleteMedicalCertificate(
   }
 }
 
-// Refresh signed URL on demand. Usato dal bottone "Scarica certificato"
-// quando il URL salvato in DB è scaduto (TTL 24h).
+// Il link al file, generato al clic su "Scarica": vive cinque minuti
+// (SIGNED_URL_TTL_SECONDS) e non si salva da nessuna parte. Il nome resta
+// quello di quando il link si "rinfrescava" rispetto a una copia in DB.
 export async function refreshMedicalCertSignedUrl(
   certId: string,
 ): Promise<ActionResult<{ signedUrl: string }>> {
@@ -310,12 +309,6 @@ export async function refreshMedicalCertSignedUrl(
   if (!url) {
     return { ok: false, error: "Impossibile generare URL firmato" }
   }
-
-  // Aggiorna anche il fileUrl in DB per coerenza letture successive
-  await prisma.medicalCertificate.update({
-    where: { id: cert.id },
-    data: { fileUrl: url },
-  })
 
   return { ok: true, data: { signedUrl: url } }
 }

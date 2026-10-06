@@ -54,6 +54,11 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "**/*": PRISMA_UNUSED_RUNTIMES,
   },
+  // L'informativa privacy è un file Markdown letto da disco: deve finire nel
+  // bundle della pagina anche se il tracer non segue la lettura
+  outputFileTracingIncludes: {
+    "/privacy": ["./content/privacy.md"],
+  },
   images: {
     remotePatterns: supabaseHost
       ? [

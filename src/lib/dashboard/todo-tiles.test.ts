@@ -18,6 +18,7 @@ const ZERO: TodoCounters = {
   allieveSenzaGenitore: 0,
   allieveSenzaCorso: 0,
   allieveSenzaEmail: 0,
+  allieveSenzaPrivacy: 0,
   certificatiScaduti: 0,
   certificatiInScadenza: 0,
   certificatiAssenti: 0,
@@ -33,6 +34,7 @@ const TUTTI: Partial<TodoCounters> = {
   allieveSenzaGenitore: 8,
   allieveSenzaCorso: 1,
   allieveSenzaEmail: 3,
+  allieveSenzaPrivacy: 5,
   certificatiScaduti: 2,
   certificatiInScadenza: 4,
   certificatiAssenti: 50,
@@ -62,6 +64,7 @@ describe("todoTiles", () => {
       "ricevute-da-consegnare",
       "allieve-senza-corso",
       "allieve-senza-email",
+      "allieve-senza-privacy",
       "genitori-senza-accesso",
       "certificati-in-scadenza",
     ])
@@ -161,6 +164,7 @@ describe("todoSections", () => {
       "ricevute-da-consegnare",
       "allieve-senza-corso",
       "allieve-senza-email",
+      "allieve-senza-privacy",
       "genitori-senza-accesso",
       "certificati-in-scadenza",
     ])

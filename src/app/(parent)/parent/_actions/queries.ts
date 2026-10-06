@@ -5,6 +5,11 @@ import {
   athleteScopeWhere,
   type PortalScope,
 } from "@/lib/auth/portal-scope"
+import {
+  canSeePersonalData,
+  canSeeReceipt,
+  personalDataScopeWhere,
+} from "@/lib/auth/portal-visibility"
 import { prisma } from "@/lib/prisma"
 import {
   SCHEDULE_LINE_SELECT,
@@ -19,6 +24,11 @@ import { withActiveCourseOrStageScheduleFilter } from "@/lib/queries/active-sche
 // applicativo (defense in depth oltre alle policy DB Supabase). I caller
 // passano lo scope ottenuto da requirePortalAccess(): le figlie collegate
 // per un genitore, sé stessa per un'allieva maggiorenne.
+//
+// I dati personali (presenze, tessera, orari suoi) passano da un filtro più
+// stretto, personalDataScopeWhere: di una figlia maggiorenne il genitore
+// vede solo le cose di pagamento. Le ricevute le vede chi ne è intestatario
+// (canSeeReceipt). Regole in src/lib/auth/portal-visibility.ts.
 // ─────────────────────────────────────────────────────────────────────────
 
 // Chi sta guardando: serve al saluto in dashboard. Stessa forma per
@@ -59,6 +69,7 @@ export async function getMyAthletes(scope: PortalScope) {
       lastName: true,
       status: true,
       photoUrl: true,
+      dateOfBirth: true,
       enrollments: {
         where: {
           withdrawalDate: null,
@@ -100,12 +111,16 @@ export async function getMyAthletes(scope: PortalScope) {
 
   return athletes.map((a) => {
     const relation = relationByAthlete.get(a.id) ?? null
+    // Di una figlia maggiorenne restano nome e cose di pagamento: la foto
+    // no, e la pagina non mostra presenze né tessera
+    const personalDataVisible = canSeePersonalData(scope, a)
     return {
       id: a.id,
       firstName: a.firstName,
       lastName: a.lastName,
       status: a.status,
-      photoUrl: a.photoUrl,
+      photoUrl: personalDataVisible ? a.photoUrl : null,
+      personalDataVisible,
       relationship: relation?.relationship ?? null,
       isPrimaryPayer: relation?.isPrimaryPayer ?? false,
       enrollments: a.enrollments.map((e) => ({
@@ -120,15 +135,16 @@ export async function getMyAthletes(scope: PortalScope) {
 
 export type MyAthlete = Awaited<ReturnType<typeof getMyAthletes>>[number]
 
-// Tessera dell'ente corrente per ogni allieva dell'ambito. È anche la
-// copertura assicurativa: la famiglia ha diritto di vederla e di scaricarla.
-// Il PDF contiene solo i dati dell'allieva, non quelli di chi paga, quindi
-// fra genitori separati non fa passare niente che l'altro non abbia già.
+// Tessera dell'ente corrente per ogni allieva di cui si vedono i dati
+// personali. È anche la copertura assicurativa: la famiglia di una minorenne
+// ha diritto di vederla e di scaricarla. Il PDF contiene solo i dati
+// dell'allieva, non quelli di chi paga, quindi fra genitori separati non fa
+// passare niente che l'altro non abbia già. Di una maggiorenne la vede lei.
 export async function getMyAthleteCards(scope: PortalScope) {
   const cards = await prisma.affiliation.findMany({
     where: {
       deletedAt: null,
-      athlete: { deletedAt: null, ...athleteScopeWhere(scope) },
+      athlete: { deletedAt: null, ...personalDataScopeWhere(scope) },
     },
     orderBy: CURRENT_CARD_ORDER,
     select: {
@@ -333,7 +349,7 @@ export async function getMyPayments(scope: PortalScope) {
       },
       status: true,
       receipt: {
-        select: { id: true, receiptNumber: true, status: true },
+        select: { id: true, receiptNumber: true, status: true, payerId: true },
       },
       // Scadenze coperte: più d'una → righe nello storico
       paymentSchedules: { select: SCHEDULE_LINE_SELECT },
@@ -341,39 +357,48 @@ export async function getMyPayments(scope: PortalScope) {
     orderBy: { paymentDate: "desc" },
   })
 
-  return payments.map((p) => ({
-    id: p.id,
-    feeType: p.feeType,
-    amountCents: p.amountCents,
-    method: p.method,
-    paymentDate: p.paymentDate,
-    periodStart: p.periodStart,
-    periodEnd: p.periodEnd,
-    status: p.status,
-    athleteId: p.athlete.id,
-    athleteName: `${p.athlete.firstName} ${p.athlete.lastName}`,
-    athleteArchived: p.athlete.deletedAt !== null,
-    // "Contributo di iscrizione + Contributo mensile" se copre più scadenze
-    feeLabel: paymentFeeTypeLabel(p),
-    lines:
-      p.paymentSchedules.length >= 2
-        ? [...p.paymentSchedules].sort(compareScheduleLines).map((s) => ({
-            description: describeSchedule(s),
-            amountCents: s.amountCents,
-          }))
-        : [],
+  return payments.map((p) => {
     // Scaricabile solo una ricevuta emessa dall'admin e ancora valida
-    receipt:
-      p.status === "PAID" && p.receipt?.status === "VALID"
-        ? { id: p.receipt.id, receiptNumber: p.receipt.receiptNumber }
+    const validReceipt =
+      p.status === "PAID" && p.receipt?.status === "VALID" ? p.receipt : null
+    const mine = validReceipt !== null && canSeeReceipt(scope, validReceipt)
+    return {
+      id: p.id,
+      feeType: p.feeType,
+      amountCents: p.amountCents,
+      method: p.method,
+      paymentDate: p.paymentDate,
+      periodStart: p.periodStart,
+      periodEnd: p.periodEnd,
+      status: p.status,
+      athleteId: p.athlete.id,
+      athleteName: `${p.athlete.firstName} ${p.athlete.lastName}`,
+      athleteArchived: p.athlete.deletedAt !== null,
+      // "Contributo di iscrizione + Contributo mensile" se copre più scadenze
+      feeLabel: paymentFeeTypeLabel(p),
+      lines:
+        p.paymentSchedules.length >= 2
+          ? [...p.paymentSchedules].sort(compareScheduleLines).map((s) => ({
+              description: describeSchedule(s),
+              amountCents: s.amountCents,
+            }))
+          : [],
+      // … e intestata a chi guarda: l'altro genitore vede il pagamento, non
+      // la ricevuta
+      receipt: mine
+        ? { id: validReceipt.id, receiptNumber: validReceipt.receiptNumber }
         : null,
-  }))
+      // Emessa ma intestata a un'altra persona: si dice che c'è, non a chi
+      receiptHeldByOther: validReceipt !== null && !mine,
+    }
+  })
 }
 
 export type MyPayment = Awaited<ReturnType<typeof getMyPayments>>[number]
 
 export async function getMyAthleteSchedules(scope: PortalScope) {
-  // Orari corsi delle figlie del genitore (validi alla data corrente)
+  // Orari dei corsi delle allieve di cui si vedono i dati personali (validi
+  // alla data corrente). L'orario generale resta per tutti.
   const today = new Date()
   const schedules = await prisma.courseSchedule.findMany({
     where: {
@@ -387,7 +412,7 @@ export async function getMyAthleteSchedules(scope: PortalScope) {
             academicYear: { isCurrent: true },
             athlete: {
               deletedAt: null,
-              ...athleteScopeWhere(scope),
+              ...personalDataScopeWhere(scope),
             },
           },
         },
@@ -482,7 +507,8 @@ export type AttendanceStats = {
 
 // Stats presenze per allieva nell'AA corrente. Mappa athleteId → stats.
 // Allieve senza alcuna presenza registrata NON appaiono nella mappa
-// (caller mostra empty state). Sprint 4.A.1.
+// (caller mostra empty state). Sprint 4.A.1. Solo le allieve di cui si
+// vedono i dati personali: di una figlia maggiorenne niente.
 export async function getMyAttendanceStats(scope: PortalScope): Promise<{
   byAthlete: Map<string, AttendanceStats>
   academicYearLabel: string | null
@@ -502,7 +528,7 @@ export async function getMyAttendanceStats(scope: PortalScope): Promise<{
     where: {
       athlete: {
         deletedAt: null,
-        ...athleteScopeWhere(scope),
+        ...personalDataScopeWhere(scope),
       },
       lesson: { academicYearId: currentYear.id },
     },

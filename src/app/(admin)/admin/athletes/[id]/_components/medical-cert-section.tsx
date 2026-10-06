@@ -60,7 +60,6 @@ type CertItem = {
   expiryDate: Date
   doctorName: string | null
   notes: string | null
-  fileUrl: string | null
   filePath: string | null
   createdAt: Date
 }
@@ -105,12 +104,13 @@ export function MedicalCertSection({
     setFormOpen(true)
   }
 
-  async function onDownload(certId: string, fallbackUrl: string | null) {
+  // Il link nasce qui, al clic, e vive cinque minuti: nessuna copia salvata
+  // da usare come ripiego
+  async function onDownload(certId: string) {
     setDownloadingId(certId)
     try {
       const result = await refreshMedicalCertSignedUrl(certId)
-      const url = result.ok ? result.data?.signedUrl : null
-      const target = url ?? fallbackUrl
+      const target = result.ok ? result.data?.signedUrl : null
       if (!target) {
         toast.error(result.ok ? "URL non disponibile" : result.error)
         return
@@ -270,7 +270,7 @@ function CertCard({
 }: {
   cert: CertItem
   isLatest: boolean
-  onDownload: (certId: string, fallbackUrl: string | null) => Promise<void>
+  onDownload: (certId: string) => Promise<void>
   downloading: boolean
   onDelete: () => void
   onEdit?: () => void
@@ -319,7 +319,7 @@ function CertCard({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => onDownload(cert.id, cert.fileUrl)}
+              onClick={() => onDownload(cert.id)}
               disabled={downloading}
             >
               {downloading ? (

@@ -51,6 +51,7 @@ function athlete(over: Partial<ChecklistAthlete> = {}): ChecklistAthlete {
         createdAt: new Date("2026-09-14T00:00:00.000Z"),
       },
     ],
+    consents: [{ type: "GDPR" }],
     ...over,
   }
 }
@@ -87,6 +88,11 @@ const POPULATION: { name: string; athlete: ChecklistAthlete }[] = [
         },
       ],
     }),
+  },
+  {
+    // Il chip «Senza consenso privacy»: nessuna informativa firmata
+    name: "senza consenso privacy",
+    athlete: athlete({ consents: [] }),
   },
   {
     name: "iscritta solo l'anno scorso",
@@ -137,7 +143,7 @@ function steps(a: ChecklistAthlete): AthleteListFilterStep[] {
 }
 
 function countsByStep(): Record<AthleteListFilterStep, number> {
-  return { guardian: 0, email: 0, course: 0, certificate: 0 }
+  return { guardian: 0, email: 0, course: 0, certificate: 0, privacy: 0 }
 }
 
 describe("filtri dell'elenco allieve", () => {
@@ -159,6 +165,7 @@ describe("filtri dell'elenco allieve", () => {
       course: 2,
       // Una sola senza certificato valido: quella a cui l'abbiamo togliuto
       certificate: 1,
+      privacy: 1,
     })
   })
 

@@ -1,9 +1,15 @@
 import "server-only"
 
+import { CURRENT_CERTIFICATE_ORDER } from "@/lib/medical-certificates/certificate-status"
 import { prisma } from "@/lib/prisma"
 
 // Tutte le query sono filtrate per teacherId tramite TeacherCourse M2M.
 // Insegnante vede SOLO i corsi assegnati (no fee, no finanze, no altri corsi).
+//
+// E nessun dato dei genitori: all'insegnante servono le allieve in sala, non
+// chi le accompagna. Fino a ieri la pagina del corso selezionava nome e
+// telefono del genitore principale e li mostrava con un tasto «chiama»; i
+// recapiti delle famiglie restano alla segreteria.
 
 export async function getTeacherProfile(teacherId: string) {
   return prisma.teacher.findUnique({
@@ -230,3 +236,44 @@ export async function getRecentAttendanceStats(teacherId: string) {
 export type AttendanceStats = Awaited<
   ReturnType<typeof getRecentAttendanceStats>
 >
+
+// Le allieve di un corso assegnato all'insegnante, per la pagina del corso:
+// nome, data di nascita e la scadenza del certificato corrente. Chi la chiama
+// ha già verificato che il corso sia suo. Niente genitori, niente recapiti.
+export async function getCourseRoster(courseId: string) {
+  return prisma.courseEnrollment.findMany({
+    where: {
+      courseId,
+      withdrawalDate: null,
+      deletedAt: null,
+      academicYear: { isCurrent: true },
+      athlete: { deletedAt: null },
+    },
+    select: {
+      athlete: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          dateOfBirth: true,
+          // Certificato corrente: quelli nel Cestino non contano. Solo la
+          // scadenza: il file e il medico non riguardano la sala
+          medicalCertificates: {
+            where: { deletedAt: null },
+            orderBy: CURRENT_CERTIFICATE_ORDER,
+            take: 1,
+            select: { expiryDate: true },
+          },
+        },
+      },
+    },
+    orderBy: [
+      { athlete: { lastName: "asc" } },
+      { athlete: { firstName: "asc" } },
+    ],
+  })
+}
+
+export type CourseRosterRow = Awaited<
+  ReturnType<typeof getCourseRoster>
+>[number]

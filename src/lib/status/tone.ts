@@ -64,7 +64,8 @@ export function statusTone(status: DomainStatus): StatusTone {
       return status.invited ? "neutral" : "fix"
 
     case "setupStep":
-      // I passi della scheda: quelli che bloccano sono gli stessi di sopra
+      // I passi della scheda: quelli che bloccano sono gli stessi di sopra.
+      // Privacy, email e corso sono ambra: da sistemare, la lezione si fa
       return status.step === "certificate" || status.step === "card"
         ? "block"
         : status.step === "guardian"

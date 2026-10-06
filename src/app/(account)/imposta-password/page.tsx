@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { PrivacyLink } from "@/components/privacy-link"
 import { NO_ACCESS_ROUTE } from "@/lib/auth/account-state"
 import { getCurrentAccount } from "@/lib/auth/current-account"
 
@@ -52,6 +53,9 @@ export default async function SetPasswordPage({ searchParams }: PageProps) {
             <SetPasswordForm />
           </CardContent>
         </Card>
+        <footer className="mt-2 text-center">
+          <PrivacyLink />
+        </footer>
       </div>
     </main>
   )

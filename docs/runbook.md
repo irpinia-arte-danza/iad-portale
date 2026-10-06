@@ -609,7 +609,13 @@ USING (
 - Il bucket deve essere **privato** (no public read).
 - File path convention: `{athleteId}/{certId}.{ext}` (vedi
   `src/lib/supabase/storage-medical-cert.ts`).
-- Signed URL TTL: 24h, refresh on demand via `refreshMedicalCertSignedUrl`.
+- Link firmato: **5 minuti** (`SIGNED_URL_TTL_SECONDS` in
+  `src/lib/supabase/signed-url.ts`, condivisa con le tessere), generato al
+  clic su «Scarica» (`refreshMedicalCertSignedUrl`) e mai salvato in DB. La
+  colonna `file_url` resta ma non viene più né scritta né letta: il percorso
+  del file è `file_path`, scritto a ogni caricamento; la migration
+  `20261008090200_backfill_file_path_from_file_url` lo ricava dal vecchio URL
+  firmato per le eventuali righe che avessero solo `file_url` (idempotente).
 - Hard delete allieva (Fase 1.C `/admin/cestino`) chiama
   `deleteAllMedicalCertFilesForAthlete` per cleanup `{athleteId}/*`.
 
@@ -684,6 +690,162 @@ all'originale: annotarlo.
 
 **Verifica**: Vercel Dashboard → Project → Settings → Cron Jobs → log
 ultime 10 esecuzioni.
+
+---
+
+## Richieste GDPR — accesso, export, cancellazione
+
+Un genitore (o un'allieva maggiorenne) può chiedere di vedere, ricevere o
+cancellare i propri dati e quelli dei figli minorenni (artt. 15-17 GDPR). La
+risposta va data **entro 30 giorni** dalla richiesta (art. 12.3; prorogabili
+di 60 avvisando la persona, solo per richieste complesse). L'informativa
+pubblicata a `/privacy` (testo in `content/privacy.md`) dice alle famiglie di
+scrivere a `info@irpiniaartedanza.it`.
+
+### Chi fa cosa
+
+| Passo | Chi | Quando |
+|---|---|---|
+| Riceve la richiesta, verifica l'identità (rispondendo all'email con cui la persona è registrata, o di persona), segna la data | Giuseppina | giorno 0 |
+| Export: prepara il fascicolo (sotto) | Giuseppina per la parte dal portale; Brain Digital per le estrazioni dal database e dai bucket | entro 15 giorni |
+| Cancellazione: decide cosa si può cancellare e cosa va conservato (sotto), esegue il Cestino | Giuseppina | entro 15 giorni |
+| Cancellazione definitiva dal database e dai bucket | Brain Digital, su richiesta scritta di Giuseppina | entro 25 giorni |
+| Risponde alla persona con il fascicolo o con l'elenco di cosa è stato cancellato e cosa no, e perché | Giuseppina | entro 30 giorni |
+
+Ogni passo lascia traccia: l'email di richiesta e la risposta restano nella
+casella `info@`; le operazioni nel portale finiscono in `audit_logs`.
+
+### Dove stanno i dati di una persona
+
+**Allieva** (`athletes.id`):
+
+| Dove | Cosa |
+|---|---|
+| `athletes` | anagrafica, codice fiscale, residenza, foto (`photo_url`), stato |
+| `athlete_parents` | legame con i genitori, chi paga |
+| `course_enrollments`, `payment_schedules` | iscrizioni ai corsi e rate (dovute, pagate, non dovute) |
+| `attendances` (via `lessons`) | presenze e assenze |
+| `payments`, `receipts` | pagamenti e ricevute (la ricevuta porta nome e CF del pagante e dell'allieva, congelati) |
+| `medical_certificates` | tipo, date, medico, `file_path` → bucket **`medical-certificates`** (`{athleteId}/…`) |
+| `affiliations` | tesseramenti Endas/CSEN, `file_path` → bucket **`affiliation-cards`** (`{athleteId}/…`) |
+| `consents` | informativa privacy e liberatorie foto/video (chi ha firmato, quando, note) |
+| `stage_enrollments`, `showcase_participations`, `costume_assignments` | stage, saggio, costumi |
+| `documents`, `insurances`, `athlete_status_history` | eventuali scansioni e storico stato |
+| `email_logs` (`athlete_id`) | email mandate alla famiglia per lei: destinatario, oggetto, corpo, esito |
+| `audit_logs` (`entity_id` = l'allieva o i suoi documenti) | chi ha fatto cosa sulla sua scheda |
+| bucket **`receipts`** | i PDF delle ricevute che la riguardano (`<anno>/<numero>.pdf`) |
+
+**Genitore** (`parents.id`): `parents` (anagrafica, CF, recapiti),
+`athlete_parents`, `receipts.payer_id` (ricevute intestate a lui),
+`consents.parent_id` (consensi firmati da lui), `email_logs.parent_id`,
+`reminder_configs` (se ha un override dei solleciti), `users` + `auth.users`
+(l'accesso all'area riservata: email, data degli accessi), `audit_logs`.
+
+**Scheda PDF**: dalla scheda allieva, «Scheda PDF» produce il riepilogo
+leggibile (anagrafica, genitori, iscrizioni, rate dovute, pagamenti). È il
+pezzo del fascicolo che la famiglia legge; il resto sono estrazioni.
+
+### Export (diritto di accesso e portabilità)
+
+Il fascicolo da consegnare, in un archivio cifrato con password comunicata a
+voce o per altro canale:
+
+1. **Scheda PDF** dell'allieva (dal portale, Giuseppina).
+2. **Ricevute PDF** intestate alla persona: dall'elenco Ricevute, oppure dal
+   bucket `receipts` (Brain Digital).
+3. **Certificati medici e tessere**: i file dei bucket `medical-certificates` e
+   `affiliation-cards` nella cartella `{athleteId}/` (Brain Digital, dalla
+   dashboard Supabase o con `supabase storage` CLI).
+4. **Estrazione dal database** in CSV o JSON delle righe delle tabelle sopra,
+   filtrate per `athlete_id` / `parent_id` (Brain Digital). Per esempio:
+
+```sql
+-- sostituire <athleteId>; una query per tabella, esportata in CSV
+select * from athletes where id = '<athleteId>';
+select * from athlete_parents where athlete_id = '<athleteId>';
+select * from course_enrollments where athlete_id = '<athleteId>';
+select ps.* from payment_schedules ps
+  left join course_enrollments ce on ce.id = ps.course_enrollment_id
+  where ps.athlete_id = '<athleteId>' or ce.athlete_id = '<athleteId>';
+select a.* from attendances a where a.athlete_id = '<athleteId>';
+select * from payments where athlete_id = '<athleteId>';
+select r.* from receipts r join payments p on p.id = r.payment_id
+  where p.athlete_id = '<athleteId>';
+select * from medical_certificates where athlete_id = '<athleteId>';
+select * from affiliations where athlete_id = '<athleteId>';
+select * from consents where athlete_id = '<athleteId>';
+select id, template_slug, recipient_email, subject, status, sent_at
+  from email_logs where athlete_id = '<athleteId>';
+```
+
+Per un genitore: `parents`, `athlete_parents`, `receipts where payer_id`,
+`consents where parent_id`, `email_logs where parent_id`, `users` (solo email,
+ruolo, date). **Mai** esportare righe di altre persone (l'altro genitore, altre
+allieve) né le password in forma hash di `auth.users`.
+
+Le estrazioni dal database di produzione le fa Brain Digital, in sola lettura,
+e cancella le copie locali appena consegnato il fascicolo.
+
+### Cancellazione (diritto all'oblio): cosa si può e cosa no
+
+**Si conserva per obbligo di legge, anche se la persona chiede la
+cancellazione** (art. 17.3.b GDPR; art. 2220 c.c. e normativa fiscale,
+**10 anni** dall'emissione o dall'ultimo anno di iscrizione):
+
+- `payments`, `receipts` e i **PDF del bucket `receipts`**: non si cancellano
+  mai, nemmeno di ricevute annullate (vedi «Ricevute — PDF archiviati»);
+- il nome e il codice fiscale del pagante e dell'allieva **congelati sulla
+  ricevuta** (`receipts.payer_name`, `payer_fiscal_code`, `athlete_name`,
+  `athlete_fiscal_code`): fanno parte del documento fiscale;
+- `payment_schedules` pagate, in quanto collegate ai pagamenti;
+- `consents`: la prova che un consenso c'era (e quando è stato revocato) va
+  tenuta finché può servire a dimostrare la liceità del trattamento;
+- `audit_logs`: registro di controllo, non si modifica.
+
+Il codice applica già il blocco: `hardDeleteAthlete` e `hardDeleteParent`
+(`src/app/(admin)/admin/cestino/actions.ts`) **rifiutano** la cancellazione
+definitiva se esistono pagamenti collegati, e **nessun tasto del portale le
+chiama**: si eseguono a mano, da Brain Digital, solo per una richiesta GDPR.
+
+**Si può cancellare** (o rendere anonimo), quando il rapporto è finito:
+
+- dall'anagrafica: foto, residenza, recapiti, codice fiscale dell'allieva
+  **se non compare su nessuna ricevuta**; altrimenti si tolgono gli altri
+  campi e il CF resta solo sulle ricevute;
+- certificati medici (righe e file nel bucket `medical-certificates`): sono il
+  dato più delicato e, finito il rapporto, non servono più. Si cancellano
+  **subito** su richiesta, e comunque al termine dell'anno sportivo successivo
+  alla scadenza;
+- tessere (righe e file del bucket `affiliation-cards`), presenze, iscrizioni
+  non pagate, stage e saggio, scansioni (`documents`);
+- `email_logs`: il corpo delle email (`body_html`, `body_text`) si può
+  azzerare lasciando destinatario, oggetto ed esito;
+- l'accesso all'area riservata: disattivare l'utente (`users.is_active`) e
+  cancellarlo da `auth.users` (dashboard Supabase → Authentication).
+
+**Procedura**:
+
+1. Giuseppina sposta allieva e genitore nel **Cestino** (questo disattiva già
+   l'accesso dell'utente collegato) e annota la richiesta.
+2. Brain Digital, con la richiesta scritta di Giuseppina:
+   - verifica cosa va conservato con `select count(*) from payments where
+     athlete_id = …` e `… from receipts where payer_id = …`;
+   - se **non ci sono pagamenti**: esegue `hardDeleteAthlete` /
+     `hardDeleteParent` (cancellano righe e file dei bucket dei certificati e
+     delle tessere) e l'utente in `auth.users`;
+   - se **ci sono pagamenti**: cancella solo ciò che si può (elenco sopra) e
+     rende anonima l'anagrafica (nome e CF restano sulle ricevute, non
+     altrove), lasciando la riga in `athletes` / `parents` con
+     `deleted_at` valorizzato perché i pagamenti puntino ancora a qualcosa;
+   - segna l'operazione in `audit_logs` (`action = HARD_DELETE_*` o
+     `UPDATE` con `changes` che dice cosa è stato anonimizzato).
+3. Giuseppina risponde alla persona elencando cosa è stato cancellato e cosa
+   resta, con il motivo (obbligo fiscale decennale) e la data in cui scadrà.
+
+**Attenzione ai backup**: i backup notturni cifrati conservano i dati per la
+loro durata (vedi «Backup notturno»). Non si modificano: nella risposta alla
+persona si dice che i dati restano nelle copie di sicurezza, non consultabili
+nell'uso ordinario, fino alla loro rotazione.
 
 ---
 
