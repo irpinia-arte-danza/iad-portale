@@ -3,7 +3,9 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { X } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -13,12 +15,14 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
 import { LogoutButton } from "@/components/auth/logout-button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import type { NavCounters } from "@/lib/dashboard/todo-tiles"
 import { cn } from "@/lib/utils"
 
 import { ADMIN_NAV, isNavItemActive } from "./admin-nav"
@@ -32,7 +36,15 @@ type AdminSidebarProps = {
     logoDarkUrl: string | null
     asdName: string | null
   }
+  // Lavoro in sospeso accanto alle voci: gli stessi numeri dei riquadri
+  // della dashboard
+  counters: NavCounters
 }
+
+const COUNTER_TONE = {
+  red: "bg-red-500/15 text-red-700 dark:text-red-300",
+  amber: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+} as const
 
 
 export function AdminSidebar({
@@ -40,10 +52,11 @@ export function AdminSidebar({
   lastName,
   email,
   brand,
+  counters,
 }: AdminSidebarProps) {
   const pathname = usePathname()
-  // Sotto il breakpoint la sidebar è un Sheet sopra la pagina: toccata una
-  // voce va chiuso, altrimenti copre quello che si è appena aperto
+  // Sotto i 1024 la sidebar è un Sheet sopra la pagina: toccata una voce va
+  // chiuso, altrimenti copre quello che si è appena aperto
   const { isMobile, setOpenMobile } = useSidebar()
   const displayName =
     [firstName, lastName].filter(Boolean).join(" ") || "Admin"
@@ -54,6 +67,20 @@ export function AdminSidebar({
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
+        {/* Nel drawer il tasto di chiusura è l'unica via d'uscita oltre al
+            tocco fuori: 44 px, in cima, prima delle voci */}
+        {isMobile ? (
+          <div className="flex justify-end px-2 pt-1">
+            <Button
+              variant="ghost"
+              className="h-11 px-3"
+              onClick={() => setOpenMobile(false)}
+            >
+              <X className="h-5 w-5" />
+              Chiudi
+            </Button>
+          </div>
+        ) : null}
         <div className="flex flex-col items-start gap-1 px-2 py-1">
           {lightLogo ? (
             <>
@@ -102,12 +129,18 @@ export function AdminSidebar({
               <SidebarMenu>
                 {group.items.map((item) => {
                   const Icon = item.icon
+                  const counter = counters[item.href]
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
                         asChild
                         isActive={isNavItemActive(item, pathname)}
-                        tooltip={item.label}
+                        tooltip={
+                          counter
+                            ? `${item.label} — ${counter.count}`
+                            : item.label
+                        }
+                        className={cn(isMobile && "h-11")}
                       >
                         <Link
                           href={item.href}
@@ -119,6 +152,13 @@ export function AdminSidebar({
                           <span>{item.label}</span>
                         </Link>
                       </SidebarMenuButton>
+                      {counter ? (
+                        <SidebarMenuBadge
+                          className={cn("font-mono", COUNTER_TONE[counter.tone])}
+                        >
+                          {counter.count}
+                        </SidebarMenuBadge>
+                      ) : null}
                     </SidebarMenuItem>
                   )
                 })}

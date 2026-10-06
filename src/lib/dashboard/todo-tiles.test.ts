@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest"
 
-import { todoGroups, todoTiles, type TodoCounters } from "./todo-tiles"
+import { ADMIN_NAV_ITEMS } from "@/app/(admin)/_components/admin-nav"
+
+import {
+  navCounters,
+  todoGroups,
+  todoTiles,
+  type TodoCounters,
+} from "./todo-tiles"
 
 const ZERO: TodoCounters = {
   scadenzeInRitardo: { count: 0, amountCents: 0 },
@@ -160,5 +167,81 @@ describe("todoGroups", () => {
 
   it("niente riquadri, niente gruppi", () => {
     expect(todoGroups([])).toEqual([])
+  })
+})
+
+describe("navCounters", () => {
+  const INPUT = {
+    scadenzeInRitardo: { count: 0, amountCents: 0 },
+    certificatiScaduti: 0,
+    certificatiAssenti: 0,
+    tessereDaFare: { count: 0, seasonYear: 2026 },
+  }
+
+  it("niente da fare, nessun badge nel menu", () => {
+    expect(navCounters(INPUT)).toEqual({})
+  })
+
+  it("le voci a zero non portano badge", () => {
+    const counters = navCounters({
+      ...INPUT,
+      scadenzeInRitardo: { count: 28, amountCents: 103500 },
+    })
+    expect(Object.keys(counters)).toEqual(["/admin/scadenze"])
+    expect(counters["/admin/scadenze"]).toEqual({ count: 28, tone: "amber" })
+  })
+
+  it("certificati = scaduti + assenti, ed è l'unico rosso", () => {
+    const counters = navCounters({
+      ...INPUT,
+      scadenzeInRitardo: { count: 2, amountCents: 100 },
+      certificatiScaduti: 3,
+      certificatiAssenti: 56,
+      tessereDaFare: { count: 1, seasonYear: 2026 },
+    })
+    expect(counters["/admin/medical-certificates"]).toEqual({
+      count: 59,
+      tone: "red",
+    })
+    const rossi = Object.entries(counters)
+      .filter(([, c]) => c.tone === "red")
+      .map(([href]) => href)
+    expect(rossi).toEqual(["/admin/medical-certificates"])
+  })
+
+  it("gli stessi numeri dei riquadri della dashboard", () => {
+    // Stesso input dei riquadri: quello che il menu mostra è un
+    // sottoinsieme, mai un conteggio diverso
+    const todo: TodoCounters = {
+      ...ZERO,
+      scadenzeInRitardo: { count: 28, amountCents: 103500 },
+      certificatiScaduti: 3,
+      certificatiAssenti: 56,
+      tessereDaFare: { count: 1, seasonYear: 2026 },
+    }
+    const tiles = todoTiles(todo)
+    const menu = navCounters(todo)
+
+    const tileCount = (id: string) =>
+      tiles.find((t) => t.id === id)?.count ?? 0
+
+    expect(menu["/admin/scadenze"].count).toBe(tileCount("scadenze-in-ritardo"))
+    expect(menu["/admin/medical-certificates"].count).toBe(
+      tileCount("certificati-scaduti") + tileCount("certificati-assenti"),
+    )
+    expect(menu["/admin/tessere"].count).toBe(tileCount("tessere-da-fare"))
+  })
+
+  it("ogni chiave è l'href di una voce del menu", () => {
+    const counters = navCounters({
+      scadenzeInRitardo: { count: 1, amountCents: 1 },
+      certificatiScaduti: 1,
+      certificatiAssenti: 0,
+      tessereDaFare: { count: 1, seasonYear: 2026 },
+    })
+    const hrefs = ADMIN_NAV_ITEMS.map((i) => i.href)
+    for (const key of Object.keys(counters)) {
+      expect(hrefs, key).toContain(key)
+    }
   })
 })

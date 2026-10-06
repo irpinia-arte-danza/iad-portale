@@ -1,7 +1,9 @@
 "use client"
 
+import { usePathname, useRouter } from "next/navigation"
 import { useState } from "react"
 import { Plus } from "lucide-react"
+import type { PaymentMethod } from "@prisma/client"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -21,13 +23,25 @@ import { PaymentForm } from "./payment-form"
 interface PaymentCreateDialogProps {
   athletes: AthleteWithFormRelations[]
   openSchedulesByAthlete: Record<string, OpenScheduleOption[]>
+  // Incasso che arriva dalla ricerca: allieva già scelta, data di oggi e
+  // ultimo metodo usato dalla famiglia. Il dialog è sempre questo, non uno
+  // nuovo.
+  preselect?: {
+    athleteId: string
+    method: PaymentMethod | null
+  } | null
 }
 
 export function PaymentCreateDialog({
   athletes,
   openSchedulesByAthlete,
+  preselect,
 }: PaymentCreateDialogProps) {
-  const [open, setOpen] = useState(false)
+  const router = useRouter()
+  const pathname = usePathname()
+  // Con l'allieva già scelta il dialog è il motivo per cui si è arrivati
+  // qui: si apre da solo
+  const [open, setOpen] = useState(Boolean(preselect))
   const [registered, setRegistered] = useState(false)
   const receipt = useReceiptIssue()
 
@@ -37,6 +51,9 @@ export function PaymentCreateDialog({
     if (!next) {
       setRegistered(false)
       receipt.reset()
+      // Via il parametro dall'indirizzo: un refresh non deve riaprire
+      // l'incasso di prima
+      if (preselect) router.replace(pathname)
     }
   }
 
@@ -77,6 +94,15 @@ export function PaymentCreateDialog({
               </DialogDescription>
             </DialogHeader>
             <PaymentForm
+              key={preselect?.athleteId ?? "nuovo"}
+              defaultValues={
+                preselect
+                  ? {
+                      athleteId: preselect.athleteId,
+                      ...(preselect.method ? { method: preselect.method } : {}),
+                    }
+                  : undefined
+              }
               athletes={athletes}
               openSchedulesByAthlete={openSchedulesByAthlete}
               onSuccess={(paymentId) => {

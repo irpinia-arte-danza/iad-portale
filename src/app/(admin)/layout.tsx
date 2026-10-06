@@ -10,7 +10,11 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 
+import { getNavCounters } from "./admin/dashboard/queries"
+
 import { AcademicYearChip } from "./_components/academic-year-chip"
+import { AdminMenuButton } from "./_components/admin-menu-button"
+import { AdminSearch } from "./_components/admin-search"
 import { AdminSidebar } from "./_components/admin-sidebar"
 
 export default async function AdminLayout({
@@ -20,7 +24,7 @@ export default async function AdminLayout({
 }) {
   const { userId } = await requireAdmin()
 
-  const [cookieStore, user, brand, currentYear] = await Promise.all([
+  const [cookieStore, user, brand, currentYear, counters] = await Promise.all([
     cookies(),
     prisma.user.findUnique({
       where: { id: userId },
@@ -42,6 +46,9 @@ export default async function AdminLayout({
       where: { isCurrent: true },
       select: { label: true },
     }),
+    // Lavoro in sospeso accanto alle voci: si ricalcola a ogni navigazione,
+    // perché il menu è l'unico posto sempre a portata di mano
+    getNavCounters(),
   ])
 
   // SidebarProvider scrive già il cookie quando la sidebar si apre o si
@@ -63,13 +70,15 @@ export default async function AdminLayout({
           logoDarkUrl: brand?.logoDarkUrl ?? null,
           asdName: brand?.asdName ?? null,
         }}
+        counters={counters}
       />
       <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger />
-          <span className="truncate text-sm font-medium">
-            IAD Portale — Admin
-          </span>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 lg:h-14">
+          <AdminMenuButton />
+          <SidebarTrigger className="hidden lg:flex" />
+          {/* Al posto del titolo: su una barra da 500 px "IAD Portale —
+              Admin" diceva a Giuseppina una cosa che sapeva già */}
+          <AdminSearch />
           <div className="ml-auto">
             <AcademicYearChip label={currentYear?.label ?? null} />
           </div>
