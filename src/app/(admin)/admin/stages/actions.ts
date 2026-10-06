@@ -10,6 +10,7 @@ import {
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { STAGE_INVITE_TEMPLATE_SLUG } from "@/lib/resend/template-usage"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { renderTemplate } from "@/lib/resend/render-template"
@@ -648,7 +649,7 @@ export async function sendStageInvites(
     }
 
     try {
-      const rendered = await renderTemplate("stage-invite", vars)
+      const rendered = await renderTemplate(STAGE_INVITE_TEMPLATE_SLUG, vars)
       sendable.push({
         athleteId: athlete.id,
         parentId: recipient.parentId,

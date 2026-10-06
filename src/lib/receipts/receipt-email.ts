@@ -66,7 +66,7 @@ export function sendButtonLabel(state: ReceiptEmailState): string {
   return wasSent(state) ? "Invia di nuovo" : "Invia per email"
 }
 
-export const RECEIPT_EMAIL_TEMPLATE_SLUG = "ricevuta-emessa"
+export { RECEIPT_EMAIL_TEMPLATE_SLUG } from "@/lib/resend/template-usage"
 
 // Limite Resend: 40 MB per email dopo la codifica base64, che gonfia il file
 // di circa un terzo. Una ricevuta pesa ~5 KB, quindi il caso non si presenta;

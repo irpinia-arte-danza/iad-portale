@@ -15,10 +15,3 @@ import { formatEuro } from "@/lib/utils/format"
 export function formatEuroPdf(cents: number): string {
   return formatEuro(cents).replace(/ /g, " ")
 }
-
-/** Come formatEuroPdf, con il segno davanti anche sui negativi */
-export function formatSignedEuroPdf(cents: number): string {
-  return cents < 0
-    ? `-${formatEuroPdf(Math.abs(cents))}`
-    : formatEuroPdf(cents)
-}

@@ -110,7 +110,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: null,
     atBottom: true,
     items: [
-      { href: "/admin/email-templates", label: "Modelli email", icon: MailPlus },
+      { href: "/admin/email-templates", label: "Testi delle email", icon: MailPlus },
       {
         href: "/admin/academic-years",
         label: "Anni accademici",

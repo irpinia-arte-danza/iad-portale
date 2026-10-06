@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma"
-import { Badge } from "@/components/ui/badge"
 
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
@@ -55,19 +54,16 @@ export default async function CoursesPage({ searchParams }: PageProps) {
       />
       <ResourceContent>
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CoursesStatusTabs current={status} counts={counts} />
-            {currentAcademicYear && (
-              <Badge variant="outline" className="font-mono text-xs">
-                AA {currentAcademicYear.label}
-              </Badge>
-            )}
-          </div>
+          {/* L'anno accademico sta già nell'intestazione di ogni pagina: qui
+              sotto era lo stesso chip una seconda volta */}
+          <CoursesStatusTabs current={status} counts={counts} />
           <CoursesSearch defaultValue={search} />
           <CoursesTable courses={items} teachers={teachers} />
-          <p className="text-xs text-muted-foreground">
-            {totalCount} {totalCount === 1 ? "corso" : "corsi"} totali
-          </p>
+          {totalCount > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {totalCount} {totalCount === 1 ? "corso" : "corsi"} totali
+            </p>
+          ) : null}
         </div>
       </ResourceContent>
     </>

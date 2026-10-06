@@ -79,7 +79,7 @@ export function ReminderTab({
     startTransition(async () => {
       const res = await updateReminderConfig(values)
       if (res.ok) {
-        toast.success("Configurazione reminder aggiornata")
+        toast.success("Promemoria aggiornati")
         form.reset(values)
         refresh()
       } else {

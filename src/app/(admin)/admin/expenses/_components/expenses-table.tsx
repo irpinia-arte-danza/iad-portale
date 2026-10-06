@@ -14,6 +14,7 @@ import {
 import {
   EXPENSE_TYPE_LABELS,
 } from "@/lib/schemas/expense"
+import { COMPENSATION_BADGE_CLASS } from "@/lib/expenses/labels"
 import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 
 import type { ExpenseListItem } from "../queries"
@@ -54,7 +55,9 @@ export function ExpensesTable({ expenses }: ExpensesTableProps) {
             <TableRow>
               <TableHead>Data</TableHead>
               <TableHead>Tipo spesa</TableHead>
-              <TableHead className="hidden sm:table-cell">Fornitore</TableHead>
+              <TableHead className="hidden sm:table-cell">
+                Fornitore / percettore
+              </TableHead>
               <TableHead className="hidden lg:table-cell">Causale</TableHead>
               <TableHead className="text-right">Importo</TableHead>
               <TableHead className="hidden md:table-cell">Metodo</TableHead>
@@ -72,9 +75,18 @@ export function ExpensesTable({ expenses }: ExpensesTableProps) {
                   {DATE_SHORT.format(e.expenseDate)}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="secondary">
-                    {EXPENSE_TYPE_LABELS[e.type]}
-                  </Badge>
+                  {e.type === "COMPENSATION" ? (
+                    <Badge
+                      variant="outline"
+                      className={COMPENSATION_BADGE_CLASS}
+                    >
+                      {EXPENSE_TYPE_LABELS[e.type]}
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">
+                      {EXPENSE_TYPE_LABELS[e.type]}
+                    </Badge>
+                  )}
                 </TableCell>
                 <TableCell className="hidden sm:table-cell text-sm">
                   {e.recipient ?? "—"}

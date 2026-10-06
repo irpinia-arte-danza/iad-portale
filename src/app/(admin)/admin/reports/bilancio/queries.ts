@@ -17,7 +17,6 @@ export type BilancioTotals = {
   entrateCents: number
   usciteCents: number
   netCents: number
-  marginPercent: number
   countEntrate: number
   countUscite: number
 }
@@ -186,14 +185,12 @@ export async function getBilancio(
     .sort((a, b) => b.totalCents - a.totalCents)
 
   const netCents = entrateCents - usciteCents
-  const marginPercent = entrateCents > 0 ? netCents / entrateCents : 0
 
   return {
     totals: {
       entrateCents,
       usciteCents,
       netCents,
-      marginPercent,
       countEntrate: payments.length,
       countUscite: expenses.length,
     },

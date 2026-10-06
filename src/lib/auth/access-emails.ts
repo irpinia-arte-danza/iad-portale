@@ -4,6 +4,10 @@ import { EmailStatus, EmailTrigger, Prisma, UserRole } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { sendEmail } from "@/lib/resend/send-email"
+import {
+  ACCESS_TEMPLATE_SLUG,
+  PASSWORD_RESET_TEMPLATE_SLUG,
+} from "@/lib/resend/template-usage"
 import { substituteVariables } from "@/lib/resend/template-vars"
 import { createAdminClient } from "@/lib/supabase/admin-client"
 
@@ -37,8 +41,11 @@ import {
 // link resta quella di "Email OTP Expiration" in Supabase.
 // ─────────────────────────────────────────────────────────────────────────
 
-export const ACCESS_TEMPLATE_SLUG = "accesso-portale"
-export const PASSWORD_RESET_TEMPLATE_SLUG = "recupero-password"
+// Gli slug vivono con l'elenco "dove viene usato ogni testo": un posto solo
+export {
+  ACCESS_TEMPLATE_SLUG,
+  PASSWORD_RESET_TEMPLATE_SLUG,
+} from "@/lib/resend/template-usage"
 
 const REDACTED_LINK = "[link personale non salvato]"
 const PASSWORD_RESET_MAX_PER_HOUR = 3

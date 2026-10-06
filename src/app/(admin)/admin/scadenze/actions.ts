@@ -12,6 +12,7 @@ import {
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { REMINDER_TEMPLATE_CATEGORIES } from "@/lib/resend/template-usage"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { academicYearSlashLabel } from "@/lib/fees/association-fee"
@@ -199,7 +200,7 @@ export async function listReminderTemplates(): Promise<ReminderTemplateOption[]>
   const templates = await prisma.emailTemplate.findMany({
     where: {
       isActive: true,
-      category: { in: [EmailCategory.SOLLECITO, EmailCategory.PROMEMORIA] },
+      category: { in: REMINDER_TEMPLATE_CATEGORIES },
     },
     orderBy: [{ category: "asc" }, { name: "asc" }],
     select: {
