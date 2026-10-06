@@ -22,7 +22,7 @@ import {
   scheduleAdminHref,
 } from "@/lib/payments/schedule-lines"
 import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
-import { formatDateShort } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 
 import { ReceiptEmailActions } from "../../receipts/_components/receipt-email-actions"
 import { ReceiptIssueDialog } from "../../receipts/_components/receipt-issue-dialog"
@@ -36,10 +36,6 @@ interface PaymentDetailSheetProps {
   onOpenChange: (open: boolean) => void
 }
 
-const CURRENCY = new Intl.NumberFormat("it-IT", {
-  style: "currency",
-  currency: "EUR",
-})
 
 const DATE_LONG = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
@@ -189,7 +185,7 @@ function PaymentDetailBody({
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground">Importo</p>
         <p className="font-mono text-2xl font-semibold">
-          {CURRENCY.format(payment.amountCents / 100)}
+          {formatEuro(payment.amountCents)}
         </p>
       </div>
 
@@ -328,7 +324,7 @@ function PaymentDetailBody({
                     {describeScheduleAdmin(schedule)}
                   </Link>
                   <span className="shrink-0 font-mono">
-                    {CURRENCY.format(schedule.amountCents / 100)}
+                    {formatEuro(schedule.amountCents)}
                   </span>
                 </li>
               ))}

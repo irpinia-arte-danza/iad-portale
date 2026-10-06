@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { listName } from "@/lib/utils/person-name"
 
 type RecentAthlete = {
   id: string
@@ -89,7 +90,7 @@ export function RecentActivity({ athletes, parents }: RecentActivityProps) {
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <span className="font-medium truncate">
-                        {a.lastName} {a.firstName}
+                        {listName(a)}
                       </span>
                       <Badge
                         variant={STATUS_VARIANTS[a.status]}
@@ -133,7 +134,7 @@ export function RecentActivity({ athletes, parents }: RecentActivityProps) {
                   <div className="flex items-center justify-between gap-2 text-sm">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <span className="font-medium truncate">
-                        {p.lastName} {p.firstName}
+                        {listName(p)}
                       </span>
                       {p._count.athleteRelations > 0 && (
                         <span className="text-xs text-muted-foreground shrink-0">

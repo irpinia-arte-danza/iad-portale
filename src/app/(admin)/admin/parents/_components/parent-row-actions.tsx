@@ -1,17 +1,14 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { MoreHorizontal, Pencil, RefreshCw, Send, Trash2 } from "lucide-react"
+import { Pencil, RefreshCw, Send, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
-import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  RowActionsRenderer,
+  type RowAction,
+  type RowActionsLayout,
+} from "@/components/lists/row-actions"
 import {
   Dialog,
   DialogContent,
@@ -55,9 +52,14 @@ interface ParentRowActionsProps {
     residenceCap: string | null
   }
   accessStatus?: AccessStatus
+  layout?: RowActionsLayout
 }
 
-export function ParentRowActions({ parent, accessStatus }: ParentRowActionsProps) {
+export function ParentRowActions({
+  parent,
+  accessStatus,
+  layout,
+}: ParentRowActionsProps) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -77,51 +79,43 @@ export function ParentRowActions({ parent, accessStatus }: ParentRowActionsProps
 
   const showAccessItem = accessStatus && accessStatus.kind !== "ACTIVE"
 
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Azioni"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4" />
-            Modifica
-          </DropdownMenuItem>
-          {showAccessItem ? (
-            <DropdownMenuItem
-              disabled={accessStatus.kind === "NO_EMAIL" || pendingId === parent.id}
-              onClick={() => send(parent.id)}
-            >
-              {accessStatus.kind === "INVITED" ? (
-                <RefreshCw className="h-4 w-4" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              {accessStatus.kind === "NO_EMAIL"
+  const actions: RowAction[] = [
+    {
+      key: "edit",
+      label: "Modifica",
+      icon: Pencil,
+      onSelect: () => setEditOpen(true),
+    },
+    ...(showAccessItem
+      ? [
+          {
+            key: "access",
+            label:
+              accessStatus.kind === "NO_EMAIL"
                 ? "Invia accesso (manca l'email)"
                 : accessStatus.kind === "INVITED"
                   ? "Reinvia accesso"
-                  : "Invia accesso"}
-            </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setDeleteOpen(true)}
-            variant="destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-            Elimina
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+                  : "Invia accesso",
+            icon: accessStatus.kind === "INVITED" ? RefreshCw : Send,
+            disabled:
+              accessStatus.kind === "NO_EMAIL" || pendingId === parent.id,
+            onSelect: () => send(parent.id),
+          } satisfies RowAction,
+        ]
+      : []),
+    {
+      key: "delete",
+      label: "Elimina",
+      icon: Trash2,
+      destructive: true,
+      separatorBefore: true,
+      onSelect: () => setDeleteOpen(true),
+    },
+  ]
+
+  return (
+    <>
+      <RowActionsRenderer actions={actions} layout={layout} />
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-md">

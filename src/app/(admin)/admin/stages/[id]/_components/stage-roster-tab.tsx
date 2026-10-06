@@ -32,16 +32,13 @@ import {
 import { enrollAthletesBulk, unenrollAthlete } from "../../actions"
 import type { StageWithDetails } from "../../queries"
 
+import { formatEuro } from "@/lib/utils/format"
 const DATE_IT = new Intl.DateTimeFormat("it-IT", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
 })
 
-const CURRENCY_IT = new Intl.NumberFormat("it-IT", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
 
 type EnrollableAthlete = { id: string; firstName: string; lastName: string }
 
@@ -260,10 +257,8 @@ export function StageRosterTab({
                           : "—"}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
-                        €{" "}
-                        {CURRENCY_IT.format(
-                          (e.paymentSchedule?.amountCents ?? stage.feeCents) /
-                            100,
+                        {formatEuro(
+                          e.paymentSchedule?.amountCents ?? stage.feeCents,
                         )}
                       </TableCell>
                       <TableCell className="text-right">

@@ -31,7 +31,7 @@ import {
   scheduleAmountSchema,
   type ScheduleAmountValues,
 } from "@/lib/schemas/payment-schedule"
-import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 
 import { updateScheduleAmount } from "../schedules-actions"
 
@@ -90,7 +90,7 @@ export function ScheduleAmountDialog({
       const result = await updateScheduleAmount(schedule.id, values)
       if (result.ok) {
         toast.success(
-          `Importo aggiornato a ${formatEur(result.data?.amountCents ?? 0)}`,
+          `Importo aggiornato a ${formatEuro(result.data?.amountCents ?? 0)}`,
         )
         onOpenChange(false)
         form.reset()
@@ -109,12 +109,12 @@ export function ScheduleAmountDialog({
           <AlertDialogDescription>
             {schedule.courseName} · scadenza{" "}
             {formatDateShort(new Date(schedule.dueDate))} · ora{" "}
-            {formatEur(schedule.amountCents)}
+            {formatEuro(schedule.amountCents)}
             {disallineata && reference ? (
               <>
                 {" "}
                 — la {reference.label} è{" "}
-                {formatEur(reference.amountCents)}.
+                {formatEuro(reference.amountCents)}.
               </>
             ) : null}
           </AlertDialogDescription>
@@ -135,7 +135,7 @@ export function ScheduleAmountDialog({
                 className="w-full min-h-11"
               >
                 <RotateCcw className="h-4 w-4" />
-                Riporta a {formatEur(reference.amountCents)}
+                Riporta a {formatEuro(reference.amountCents)}
               </Button>
             ) : null}
 

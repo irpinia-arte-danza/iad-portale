@@ -23,6 +23,7 @@ import { AmountOffReference } from "@/components/payments/amount-off-reference"
 
 import { ScheduleRowActions } from "./schedule-row-actions"
 
+import { formatEuro } from "@/lib/utils/format"
 type FlattenedSchedule = AthletePaymentSchedule & {
   courseName: string
   // null per la quota associativa, che non è legata a un corso
@@ -46,13 +47,6 @@ function formatDate(date: Date): string {
     month: "short",
     year: "numeric",
   })
-}
-
-function formatEur(cents: number): string {
-  return new Intl.NumberFormat("it-IT", {
-    style: "currency",
-    currency: "EUR",
-  }).format(cents / 100)
 }
 
 function flatten(
@@ -178,7 +172,7 @@ function ScheduleRow({ schedule }: { schedule: FlattenedSchedule }) {
           {schedule.courseName}
         </span>
         <span className="font-mono text-sm">
-          {formatEur(schedule.amountCents)}
+          {formatEuro(schedule.amountCents)}
         </span>
         <AmountOffReference
           amountCents={schedule.amountCents}

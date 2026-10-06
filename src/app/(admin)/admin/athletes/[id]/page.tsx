@@ -35,6 +35,8 @@ import { AthleteOverview } from "./_components/athlete-overview"
 import { AthletePayerRow } from "./_components/athlete-payer-row"
 import { AthleteTabs } from "./_components/athlete-tabs"
 import { AthleteStatusStrip } from "./_components/athlete-status-strip"
+import { fullName } from "@/lib/utils/person-name"
+
 import { EndasCardSection } from "./_components/endas-card-section"
 import { MedicalCertSection } from "./_components/medical-cert-section"
 import {
@@ -101,7 +103,9 @@ export default async function AthleteDetailPage({
     notFound()
   }
 
-  const fullName = `${athlete.lastName} ${athlete.firstName}`
+  // Nome Cognome: nel titolo di una scheda si sta guardando una persona,
+  // non la si sta cercando in un elenco ordinato per cognome
+  const nome = fullName(athlete)
 
   // Stessa regola che applica il motore dell'invito: la sezione compare solo
   // dove l'accesso si può davvero dare
@@ -182,7 +186,7 @@ export default async function AthleteDetailPage({
       }
     : isAdult
       ? {
-          name: fullName,
+          name: nome,
           phone: athlete.phone,
           email: athlete.email,
           isAthlete: true,
@@ -256,9 +260,9 @@ export default async function AthleteDetailPage({
       <ResourceHeader
         breadcrumbs={[
           { label: "Allieve", href: "/admin/athletes" },
-          { label: fullName },
+          { label: nome },
         ]}
-        title={fullName}
+        title={nome}
         description={subtitle || undefined}
         action={
           <AthleteHeaderActions

@@ -39,7 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { dateOnly } from "@/lib/utils/date-only"
-import { formatDateShort } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 
 import { setCurrentAcademicYear } from "../actions"
 import { AcademicYearFormDialog } from "./academic-year-form-dialog"
@@ -64,10 +64,6 @@ type Props = {
   years: AYRow[]
 }
 
-const euroFormatter = new Intl.NumberFormat("it-IT", {
-  style: "currency",
-  currency: "EUR",
-})
 
 function deriveSuggestion(years: AYRow[]) {
   const current = years.find((y) => y.isCurrent)
@@ -205,7 +201,7 @@ export function AcademicYearsClient({ years }: Props) {
                     {formatDateShort(y.endDate)}
                   </TableCell>
                   <TableCell className="hidden md:table-cell font-mono text-sm">
-                    {euroFormatter.format(y.associationFeeCents / 100)}
+                    {formatEuro(y.associationFeeCents)}
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-center">
                     {y._count.enrollments}

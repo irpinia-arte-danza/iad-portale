@@ -24,7 +24,7 @@ import { associationFeeDescription } from "@/lib/fees/association-fee-label"
 import { dueLabel } from "@/lib/scadenze/due-label"
 import { TONE_BADGE } from "@/lib/status/tone"
 import { reminderSummaryLabel } from "@/lib/scadenze/reminder-trace"
-import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
 import type { ScadenzaWithDetails } from "../queries"
@@ -146,7 +146,7 @@ export function ScadenzaRow({
 
       <div className="[grid-area:importo] md:text-right">
         <p className="font-mono text-sm font-medium">
-          {formatEur(s.amountCents)}
+          {formatEuro(s.amountCents)}
         </p>
         <AmountOffReference
           amountCents={s.amountCents}
@@ -196,12 +196,8 @@ export function ScadenzaRow({
             Le due azioni che contano restano fuori dal menu. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-11 w-11 md:h-9 md:w-9"
-              aria-label="Altre azioni"
-            >
+            {/* La misura la decide la variante: 44 col dito, 32 col mouse */}
+            <Button variant="ghost" size="icon" aria-label="Altre azioni">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>

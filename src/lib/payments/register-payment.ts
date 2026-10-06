@@ -15,7 +15,7 @@ import { cancelReceiptForPayment } from "@/lib/receipts/issue-receipt"
 import { feeTypeToReceiptCategory } from "@/lib/receipts/numbering"
 import type { PaymentCreateValues } from "@/lib/schemas/payment"
 import { toDateOnly } from "@/lib/utils/date-only"
-import { formatEur } from "@/lib/utils/format"
+import { formatEuro } from "@/lib/utils/format"
 
 import {
   amountDifferences,
@@ -236,7 +236,7 @@ export async function registerPaymentCore(
       : openRows.reduce((sum, r) => sum + r.collectedCents, 0)
   if (amountCents !== inputCents) {
     warnings.push(
-      `Importo registrato ${formatEur(amountCents)} invece di ${formatEur(inputCents)}`,
+      `Importo registrato ${formatEuro(amountCents)} invece di ${formatEuro(inputCents)}`,
     )
   }
   // La scadenza vale quanto incassato, nei due versi

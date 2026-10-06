@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card"
 import { COURSE_TYPE_LABELS } from "@/lib/schemas/course"
 
+import { formatEuro } from "@/lib/utils/format"
 type CourseType = keyof typeof COURSE_TYPE_LABELS
 
 interface CourseInfoDisplayProps {
@@ -29,12 +30,6 @@ interface CourseInfoDisplayProps {
   currentAcademicYearLabel: string | null
 }
 
-const euroFormatter = new Intl.NumberFormat("it-IT", {
-  style: "currency",
-  currency: "EUR",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
 
 function formatAgeRange(min: number | null, max: number | null): string {
   if (min === null && max === null) return "—"
@@ -89,7 +84,7 @@ export function CourseInfoDisplay({
           <div>
             <dt className="text-xs text-muted-foreground">Contributo mensile</dt>
             <dd className="font-mono">
-              {euroFormatter.format(course.monthlyFeeCents / 100)}
+              {formatEuro(course.monthlyFeeCents)}
             </dd>
           </div>
           {course.trimesterFeeCents !== null && (
@@ -98,7 +93,7 @@ export function CourseInfoDisplay({
                 Contributo trimestrale
               </dt>
               <dd className="font-mono">
-                {euroFormatter.format(course.trimesterFeeCents / 100)}
+                {formatEuro(course.trimesterFeeCents)}
               </dd>
             </div>
           )}

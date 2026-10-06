@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { formatDateShort } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 import {
   MEDICAL_CERT_TYPE_LABELS,
   normalizeCertType,
@@ -201,10 +201,6 @@ type Props = {
   costumes: CostumeRow[]
 }
 
-const euroFormatter = new Intl.NumberFormat("it-IT", {
-  style: "currency",
-  currency: "EUR",
-})
 
 function daysAgo(date: Date | null): string {
   if (!date) return "—"
@@ -402,12 +398,12 @@ export function CestinoClient({
               id: e.id,
               cells: [
                 e.type,
-                euroFormatter.format(e.amountCents / 100),
+                formatEuro(e.amountCents),
                 formatDateShort(new Date(e.expenseDate)),
                 e.description ?? "—",
                 daysAgo(e.deletedAt),
               ],
-              label: `${e.type} · ${euroFormatter.format(e.amountCents / 100)} · ${formatDateShort(new Date(e.expenseDate))}`,
+              label: `${e.type} · ${formatEuro(e.amountCents)} · ${formatDateShort(new Date(e.expenseDate))}`,
               kind: "expense" as const,
               confirmExpected: new Date(e.expenseDate)
                 .toISOString()
@@ -521,7 +517,7 @@ export function CestinoClient({
                 c.name,
                 c.showcase.title +
                   (c.showcase.deletedAt ? " (cestinato)" : ""),
-                euroFormatter.format(c.costCents / 100),
+                formatEuro(c.costCents),
                 daysAgo(c.deletedAt),
               ],
               label: c.name,

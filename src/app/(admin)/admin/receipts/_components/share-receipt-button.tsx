@@ -162,7 +162,7 @@ export function ShareReceiptButton({
         type="button"
         variant="ghost"
         size="icon"
-        className={className ?? "h-9 w-9"}
+        className={className}
         onPointerDown={prefetch}
         onClick={handleClick}
         disabled={busy}

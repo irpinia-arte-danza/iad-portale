@@ -1,23 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import {
-  FileText,
-  MoreHorizontal,
-  Pencil,
-  Printer,
-  RotateCcw,
-  Trash2,
-} from "lucide-react"
+import { FileText, Pencil, Printer, RotateCcw, Trash2 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  RowActionsRenderer,
+  type RowAction,
+  type RowActionsLayout,
+} from "@/components/lists/row-actions"
 import { receiptPdfHref } from "@/lib/receipts/types"
 import type { PaymentStatus, ReceiptStatus } from "@prisma/client"
 
@@ -41,9 +31,13 @@ interface PaymentRowActionsProps {
     // Scadenze chiuse dal pagamento: lo storno le riapre tutte
     scheduleDescriptions: string[]
   }
+  layout?: RowActionsLayout
 }
 
-export function PaymentRowActions({ payment }: PaymentRowActionsProps) {
+export function PaymentRowActions({
+  payment,
+  layout,
+}: PaymentRowActionsProps) {
   const [editOpen, setEditOpen] = useState(false)
   const [reverseOpen, setReverseOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -53,70 +47,68 @@ export function PaymentRowActions({ payment }: PaymentRowActionsProps) {
   const receipt = payment.receipt
   const receiptCancelled = receipt?.status === "CANCELLED"
 
+  const actions: RowAction[] = [
+    ...(receipt
+      ? [
+          {
+            key: "receipt",
+            label: receiptCancelled
+              ? "Apri ricevuta annullata"
+              : `Ristampa ricevuta n. ${receipt.receiptNumber}`,
+            icon: Printer,
+            href: receiptPdfHref(receipt.id),
+            external: true,
+          } satisfies RowAction,
+        ]
+      : !isReversed
+        ? [
+            {
+              key: "issue",
+              label: "Emetti ricevuta",
+              icon: FileText,
+              onSelect: () => receiptFlow.begin(payment.id),
+            } satisfies RowAction,
+          ]
+        : []),
+    {
+      key: "notes",
+      label: "Modifica note",
+      icon: Pencil,
+      separatorBefore: true,
+      onSelect: () => setEditOpen(true),
+    },
+    ...(!isReversed
+      ? [
+          {
+            key: "reverse",
+            label: "Storna pagamento",
+            icon: RotateCcw,
+            destructive: true,
+            onSelect: () => setReverseOpen(true),
+          } satisfies RowAction,
+        ]
+      : []),
+    receipt
+      ? {
+          key: "delete",
+          label: "Elimina (ricevuta emessa: usa Storna)",
+          icon: Trash2,
+          disabled: true,
+          separatorBefore: true,
+        }
+      : {
+          key: "delete",
+          label: "Elimina",
+          icon: Trash2,
+          destructive: true,
+          separatorBefore: true,
+          onSelect: () => setDeleteOpen(true),
+        },
+  ]
+
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Azioni"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {receipt ? (
-            <DropdownMenuItem asChild>
-              <a
-                href={receiptPdfHref(receipt.id)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Printer className="h-4 w-4" />
-                {receiptCancelled
-                  ? "Apri ricevuta annullata"
-                  : `Ristampa ricevuta n. ${receipt.receiptNumber}`}
-              </a>
-            </DropdownMenuItem>
-          ) : !isReversed ? (
-            <DropdownMenuItem onClick={() => receiptFlow.begin(payment.id)}>
-              <FileText className="h-4 w-4" />
-              Emetti ricevuta
-            </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4" />
-            Modifica note
-          </DropdownMenuItem>
-          {!isReversed && (
-            <DropdownMenuItem
-              onClick={() => setReverseOpen(true)}
-              variant="destructive"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Storna pagamento
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
-          {receipt ? (
-            <DropdownMenuItem disabled>
-              <Trash2 className="h-4 w-4" />
-              Elimina (ricevuta emessa: usa Storna)
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem
-              onClick={() => setDeleteOpen(true)}
-              variant="destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-              Elimina
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <RowActionsRenderer actions={actions} layout={layout} />
 
       <PaymentEditDialog
         open={editOpen}

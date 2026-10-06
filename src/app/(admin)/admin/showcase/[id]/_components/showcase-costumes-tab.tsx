@@ -70,11 +70,8 @@ import {
 } from "../../costume-actions"
 import type { CostumeWithAssignments, ShowcaseWithDetails } from "../../queries"
 
-const EUR = new Intl.NumberFormat("it-IT", {
-  style: "currency",
-  currency: "EUR",
-})
 
+import { formatEuro } from "@/lib/utils/format"
 type Props = {
   showcaseId: string
   costumes: CostumeWithAssignments[]
@@ -308,7 +305,7 @@ function CostumeCard({
         <div className="flex items-center gap-3">
           <div className="text-right">
             <div className="font-mono text-sm font-medium">
-              {EUR.format(costume.costCents / 100)}
+              {formatEuro(costume.costCents)}
             </div>
             <div className="text-xs text-muted-foreground">
               {assignmentCount > 0
@@ -710,7 +707,7 @@ function AssignDialog({
                 {" "}
                 Verrà generata una scadenza pagamento da{" "}
                 <span className="font-medium">
-                  {EUR.format(costume.costCents / 100)}
+                  {formatEuro(costume.costCents)}
                 </span>
                 .
               </>

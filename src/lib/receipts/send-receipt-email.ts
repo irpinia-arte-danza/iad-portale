@@ -5,7 +5,7 @@ import { AuditAction, EmailStatus, EmailTrigger } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { renderTemplate } from "@/lib/resend/render-template"
 import { sendEmail } from "@/lib/resend/send-email"
-import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 
 import {
   attachmentTooLarge,
@@ -117,7 +117,7 @@ export async function sendReceiptEmailCore(params: {
       allieva_nome: athleteName,
       numero_ricevuta: receipt.receiptNumber,
       data_ricevuta: formatDateShort(receipt.issueDate),
-      importo: formatEur(receipt.amountCents ?? receipt.payment?.amountCents ?? 0),
+      importo: formatEuro(receipt.amountCents ?? receipt.payment?.amountCents ?? 0),
     })
   } catch (error) {
     console.error("[receipt email] template error", { receiptId: receipt.id }, error)

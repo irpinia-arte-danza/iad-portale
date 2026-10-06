@@ -38,6 +38,25 @@ export const FEE_TYPE_LABELS: Record<FeeType, string> = {
   OTHER: "Altro",
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Etichette corte per i chip degli elenchi.
+//
+// "Contributo di iscrizione + Contributo mensile" è giusto in una ricevuta,
+// ma dentro un chip di tabella diventa un muro di testo tagliato a metà. Qui
+// la versione breve, con la parola intera sempre leggibile nel `title`.
+// ─────────────────────────────────────────────────────────────────────────
+export const FEE_TYPE_SHORT_LABELS: Record<FeeType, string> = {
+  ASSOCIATION: "Iscrizione",
+  MONTHLY: "Mensile",
+  TRIMESTER: "Trimestrale",
+  STAGE: "Stage",
+  SHOWCASE_1: "Saggio acconto",
+  SHOWCASE_2: "Saggio saldo",
+  COSTUME: "Costume",
+  TRIAL_LESSON: "Prova",
+  OTHER: "Altro",
+}
+
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   CASH: "Contanti",
   TRANSFER: "Bonifico",

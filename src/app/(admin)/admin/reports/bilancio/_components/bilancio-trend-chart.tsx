@@ -12,7 +12,7 @@ import {
 } from "recharts"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatEur } from "@/lib/utils/format"
+import { formatEuro } from "@/lib/utils/format"
 
 import type { BilancioMonthlyPoint } from "../queries"
 
@@ -70,7 +70,7 @@ export function BilancioTrendChart({ data }: BilancioTrendChartProps) {
                 />
                 <Tooltip
                   formatter={(value) =>
-                    formatEur(typeof value === "number" ? value : 0)
+                    formatEuro(typeof value === "number" ? value : 0)
                   }
                   contentStyle={{
                     background: "var(--popover)",

@@ -1,7 +1,10 @@
 import type { FeeType, Prisma } from "@prisma/client"
 
 import { associationFeeDescription } from "@/lib/fees/association-fee-label"
-import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
+import {
+  FEE_TYPE_LABELS,
+  FEE_TYPE_SHORT_LABELS,
+} from "@/lib/schemas/payment"
 import { formatMeseIt } from "@/lib/utils/format"
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -197,11 +200,30 @@ export function accountingLines(
   return [{ feeType: payment.feeType, amountCents: payment.amountCents }]
 }
 
-// "Contributo di iscrizione + Contributo mensile"
-export function paymentFeeTypeLabel(payment: PaymentForAccounting): string {
+function paymentFeeTypes(payment: PaymentForAccounting): FeeType[] {
   const types = [...new Set(accountingLines(payment).map((l) => l.feeType))]
   types.sort((a, b) => FEE_TYPE_ORDER.indexOf(a) - FEE_TYPE_ORDER.indexOf(b))
-  return types.map((t) => FEE_TYPE_LABELS[t]).join(" + ")
+  return types
+}
+
+// "Contributo di iscrizione + Contributo mensile": per il `title` del chip,
+// per la ricevuta e per gli export
+export function paymentFeeTypeLabel(payment: PaymentForAccounting): string {
+  return paymentFeeTypes(payment)
+    .map((t) => FEE_TYPE_LABELS[t])
+    .join(" + ")
+}
+
+// "Iscrizione + mensile": quello che sta dentro un chip di elenco. Dal
+// secondo tipo in poi minuscolo, come si scriverebbe parlando.
+export function paymentFeeTypeShortLabel(
+  payment: PaymentForAccounting,
+): string {
+  const [first, ...rest] = paymentFeeTypes(payment).map(
+    (t) => FEE_TYPE_SHORT_LABELS[t],
+  )
+  if (first === undefined) return ""
+  return [first, ...rest.map((label) => label.toLowerCase())].join(" + ")
 }
 
 // Quota "di listino" di una scadenza: il valore giusto a cui può tornare.

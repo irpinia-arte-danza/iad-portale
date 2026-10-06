@@ -11,6 +11,7 @@ import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 import { pdfStyles } from "../styles"
 import { IADHeaderMark } from "./iad-header"
 
+import { formatEuroPdf } from "@/lib/pdf/format"
 type Props = {
   data: AthleteForPDF
   brand?: BrandForPDF | null
@@ -32,13 +33,6 @@ function formatDateTimeIt(date: Date): string {
   const hh = String(date.getHours()).padStart(2, "0")
   const mi = String(date.getMinutes()).padStart(2, "0")
   return `${dd}/${mm}/${yyyy} ${hh}:${mi}`
-}
-
-function formatEurFromCents(cents: number): string {
-  return `€ ${(cents / 100)
-    .toFixed(2)
-    .replace(".", ",")
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`
 }
 
 function relationshipLabel(value: string): string {
@@ -286,7 +280,7 @@ export function AthleteCardPDF({ data, brand }: Props) {
                       { width: "18%", textAlign: "right" },
                     ]}
                   >
-                    {formatEurFromCents(p.amountCents)}
+                    {formatEuroPdf(p.amountCents)}
                   </Text>
                 </View>
               ))}
@@ -304,7 +298,7 @@ export function AthleteCardPDF({ data, brand }: Props) {
                     },
                   ]}
                 >
-                  {formatEurFromCents(totalPaidCents)}
+                  {formatEuroPdf(totalPaidCents)}
                 </Text>
               </View>
             </View>
@@ -356,7 +350,7 @@ export function AthleteCardPDF({ data, brand }: Props) {
                         { width: "15%", textAlign: "right" },
                       ]}
                     >
-                      {formatEurFromCents(schedule.amountCents)}
+                      {formatEuroPdf(schedule.amountCents)}
                     </Text>
                   </View>
                 )
@@ -375,7 +369,7 @@ export function AthleteCardPDF({ data, brand }: Props) {
                     },
                   ]}
                 >
-                  {formatEurFromCents(totalDueCents)}
+                  {formatEuroPdf(totalDueCents)}
                 </Text>
               </View>
             </View>

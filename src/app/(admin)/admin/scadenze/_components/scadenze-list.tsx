@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useOpenScheduleSettle } from "@/app/(admin)/admin/athletes/_components/schedule-settle-provider"
 import { ScheduleAmountDialog } from "@/app/(admin)/admin/athletes/_components/schedule-amount-dialog"
 import { countPayers, selectionLabel } from "@/lib/scadenze/payer-grouping"
-import { formatEur } from "@/lib/utils/format"
+import { formatEuro } from "@/lib/utils/format"
 import { generateCSV } from "@/lib/utils/csv"
 
 import { getScadenzeCSVData } from "../actions"
@@ -173,7 +173,7 @@ export function ScadenzeList({ scadenze }: ScadenzeListProps) {
               {selectionLabel(payerItems(selectedRows))}
             </span>
             <span className="font-mono text-xs text-muted-foreground">
-              {formatEur(selectedTotal)} totale
+              {formatEuro(selectedTotal)} totale
             </span>
           </div>
           <div className="flex items-center gap-2">

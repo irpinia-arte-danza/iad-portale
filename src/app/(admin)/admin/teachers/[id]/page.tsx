@@ -20,6 +20,7 @@ import { getTeacherById } from "../queries"
 import { AccessStatusCard } from "../../_components/access/access-status-card"
 import { getAccessStatus } from "@/lib/auth/access-status"
 
+import { fullName } from "@/lib/utils/person-name"
 interface PageProps {
   params: Promise<{ id: string }>
 }
@@ -33,7 +34,9 @@ export default async function TeacherDetailPage({ params }: PageProps) {
   }
 
   const accessStatus = await getAccessStatus("TEACHER", teacher)
-  const fullName = `${teacher.lastName} ${teacher.firstName}`
+  // Nome Cognome: nel titolo di una scheda si sta guardando una persona,
+  // non la si sta cercando in un elenco ordinato per cognome
+  const nome = fullName(teacher)
 
   // Sprint 5: M2M via teacherCourses (con isPrimary). Lista deduplicata
   // unendo legacy teacher.courses (per backward compat su record che il
@@ -59,9 +62,9 @@ export default async function TeacherDetailPage({ params }: PageProps) {
       <ResourceHeader
         breadcrumbs={[
           { label: "Insegnanti", href: "/admin/teachers" },
-          { label: fullName },
+          { label: nome },
         ]}
-        title={fullName}
+        title={nome}
         action={<TeacherDetailHeader teacher={teacher} />}
       />
       <ResourceContent>

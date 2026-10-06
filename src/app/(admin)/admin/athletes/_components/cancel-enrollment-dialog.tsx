@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { formatEur } from "@/lib/utils/format"
+import { formatEuro } from "@/lib/utils/format"
 
 import {
   cancelEnrollment,
@@ -100,7 +100,7 @@ export function CancelEnrollmentDialog({
                             preview.removableCount === 1
                               ? "rata non pagata"
                               : "rate non pagate"
-                          }, per ${formatEur(preview.removableCents)}.`}
+                          }, per ${formatEuro(preview.removableCents)}.`}
                     </li>
                     {preview.associationFee ? (
                       <li>
@@ -109,7 +109,7 @@ export function CancelEnrollmentDialog({
                           contributo di iscrizione{" "}
                           {preview.associationFee.label}
                         </strong>{" "}
-                        ({formatEur(preview.associationFee.amountCents)}): era
+                        ({formatEuro(preview.associationFee.amountCents)}): era
                         l&apos;ultima iscrizione dell&apos;anno.
                       </li>
                     ) : null}

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { isTraceablePaymentMethod } from "@/lib/payments/traceability"
 import { receiptPreviewPdfHref } from "@/lib/receipts/types"
 import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
-import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 
 import { ReceiptEmailActions } from "./receipt-email-actions"
 import type { ReceiptIssueState } from "./use-receipt-issue"
@@ -142,7 +142,7 @@ export function ReceiptIssuePanel({
             <span>
               {preview.athleteName} ·{" "}
               <span className="font-mono tabular-nums">
-                {formatEur(preview.amountCents)}
+                {formatEuro(preview.amountCents)}
               </span>{" "}
               · intestata a {preview.payer.name}
             </span>

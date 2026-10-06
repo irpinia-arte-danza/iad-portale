@@ -1,4 +1,4 @@
-import { formatEur } from "@/lib/utils/format"
+import { formatEuro } from "@/lib/utils/format"
 
 // ─────────────────────────────────────────────────────────────────────────
 // Importo incassato per ciascuna scadenza di un pagamento.
@@ -92,9 +92,9 @@ function overCapError(
   const cap = collectionCapCents(schedule)
   const limite =
     cap > schedule.amountCents
-      ? `la quota del corso (${formatEur(cap)})`
-      : `l'importo della scadenza (${formatEur(cap)})`
-  return `«${schedule.description}»: ${formatEur(collectedCents)} supera ${limite}. Se è denaro di un altro contributo, registralo a parte.`
+      ? `la quota del corso (${formatEuro(cap)})`
+      : `l'importo della scadenza (${formatEuro(cap)})`
+  return `«${schedule.description}»: ${formatEuro(collectedCents)} supera ${limite}. Se è denaro di un altro contributo, registralo a parte.`
 }
 
 export function planCollection(params: {
@@ -136,7 +136,7 @@ export function planCollection(params: {
   if (sum !== totalCents) {
     return {
       ok: false,
-      error: `L'importo totale (${formatEur(totalCents)}) deve essere la somma delle scadenze (${formatEur(sum)}).`,
+      error: `L'importo totale (${formatEuro(totalCents)}) deve essere la somma delle scadenze (${formatEuro(sum)}).`,
     }
   }
   return { ok: true, rows, totalCents }

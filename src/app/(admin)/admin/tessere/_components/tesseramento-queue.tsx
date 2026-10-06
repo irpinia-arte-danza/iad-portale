@@ -9,6 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
+import { listName } from "@/lib/utils/person-name"
+
 import type { TesseramentoRow } from "../queries"
 import { TesseramentoExportButton } from "./tesseramento-export-button"
 
@@ -77,7 +79,7 @@ export function TesseramentoQueue({
               {incomplete.map((row) => (
                 <li key={row.id} className="text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">
-                    {row.lastName} {row.firstName}
+                    {listName(row)}
                   </span>{" "}
                   — manca {row.missing.join(", ")}
                 </li>

@@ -31,6 +31,7 @@ import {
 } from "@/lib/schemas/stage"
 import { toDateOnly, toDateOnlyOrNull } from "@/lib/utils/date-only"
 
+import { formatEuro } from "@/lib/utils/format"
 const STAGES_PATH = "/admin/stages"
 const DASHBOARD_PATH = "/admin/dashboard"
 
@@ -500,10 +501,6 @@ const DATE_IT = new Intl.DateTimeFormat("it-IT", {
   year: "numeric",
 })
 
-const CURRENCY_IT = new Intl.NumberFormat("it-IT", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
 
 export type StageInviteResult = {
   totalEligible: number
@@ -643,7 +640,7 @@ export async function sendStageInvites(
       stage_data: DATE_IT.format(stage.date),
       stage_orario_inizio: stage.startTime,
       stage_luogo: stage.location ?? "—",
-      stage_quota: `€ ${CURRENCY_IT.format(stage.feeCents / 100)}`,
+      stage_quota: formatEuro(stage.feeCents),
       stage_scadenza: stage.registrationDeadline
         ? DATE_IT.format(stage.registrationDeadline)
         : DATE_IT.format(stage.date),

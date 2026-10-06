@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
-import { formatEur, formatPercent } from "@/lib/utils/format"
+import { formatEuro, formatPercent } from "@/lib/utils/format"
 
 import type { BilancioFeeTypeEntry } from "../queries"
 
@@ -73,7 +73,7 @@ export function BilancioEntrateSection({
                   </Pie>
                   <Tooltip
                     formatter={(value) =>
-                      formatEur(typeof value === "number" ? value : 0)
+                      formatEuro(typeof value === "number" ? value : 0)
                     }
                     labelFormatter={() => ""}
                     contentStyle={{
@@ -113,7 +113,7 @@ export function BilancioEntrateSection({
                         {entry.count}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatEur(entry.totalCents)}
+                        {formatEuro(entry.totalCents)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-muted-foreground">
                         {formatPercent(entry.share)}
@@ -124,7 +124,7 @@ export function BilancioEntrateSection({
                     <TableCell className="font-semibold">Totale</TableCell>
                     <TableCell />
                     <TableCell className="text-right font-mono font-semibold">
-                      {formatEur(totalCents)}
+                      {formatEuro(totalCents)}
                     </TableCell>
                     <TableCell />
                   </TableRow>

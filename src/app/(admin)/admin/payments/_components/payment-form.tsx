@@ -22,7 +22,7 @@ import {
   paymentCreateSchema,
   type PaymentCreateValues,
 } from "@/lib/schemas/payment"
-import { formatDateShort, formatEur } from "@/lib/utils/format"
+import { formatDateShort, formatEuro } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -387,7 +387,7 @@ export function PaymentForm({
                             <span className="text-xs text-muted-foreground">
                               invece di{" "}
                               <span className="font-mono tabular-nums">
-                                {formatEur(option.amountCents)}
+                                {formatEuro(option.amountCents)}
                               </span>
                             </span>
                           ) : null}
@@ -396,7 +396,7 @@ export function PaymentForm({
                             <span className="max-w-[16rem] text-right text-xs text-status-fix">
                               La quota del corso è{" "}
                               <span className="font-mono tabular-nums">
-                                {formatEur(option.referenceAmountCents)}
+                                {formatEuro(option.referenceAmountCents)}
                               </span>
                               : puoi incassarla per intero e la scadenza torna
                               a quella cifra.
@@ -405,7 +405,7 @@ export function PaymentForm({
                         </span>
                       ) : (
                         <span className="shrink-0 font-mono text-sm tabular-nums">
-                          {formatEur(option.amountCents)}
+                          {formatEuro(option.amountCents)}
                         </span>
                       )}
                     </li>
@@ -427,7 +427,7 @@ export function PaymentForm({
                     : `${selectedOptions.length} scadenze selezionate`}
                 </span>
                 <span className="font-mono font-semibold tabular-nums">
-                  {formatEur(selectedTotalCents)}
+                  {formatEuro(selectedTotalCents)}
                 </span>
               </div>
             ) : null}
@@ -547,7 +547,7 @@ export function PaymentForm({
                   <p className="text-xs text-destructive">
                     Supera l&apos;importo della scadenza (
                     <span className="font-mono tabular-nums">
-                      {formatEur(single.amountCents)}
+                      {formatEuro(single.amountCents)}
                     </span>
                     ): se è denaro di un altro contributo, registralo a parte.
                   </p>
@@ -659,11 +659,11 @@ export function PaymentForm({
                 <li key={r.id}>
                   <strong>{r.description}</strong>: era a{" "}
                   <span className="font-mono tabular-nums">
-                    {formatEur(r.fromCents)}
+                    {formatEuro(r.fromCents)}
                   </span>
                   . Registrando torna a{" "}
                   <span className="font-mono tabular-nums">
-                    {formatEur(r.toCents)}
+                    {formatEuro(r.toCents)}
                   </span>{" "}
                   e risulta <strong>pagata</strong>.
                 </li>
@@ -689,11 +689,11 @@ export function PaymentForm({
                 <li key={r.id}>
                   <strong>{r.description}</strong>: passa da{" "}
                   <span className="font-mono tabular-nums">
-                    {formatEur(r.fromCents)}
+                    {formatEuro(r.fromCents)}
                   </span>{" "}
                   a{" "}
                   <span className="font-mono tabular-nums">
-                    {formatEur(r.toCents)}
+                    {formatEuro(r.toCents)}
                   </span>{" "}
                   e risulta <strong>pagata</strong>, senza residuo.
                 </li>

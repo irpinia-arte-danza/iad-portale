@@ -7,6 +7,7 @@ import {
   describeSchedule,
   describeScheduleAdmin,
   paymentFeeTypeLabel,
+  paymentFeeTypeShortLabel,
   scheduleCourseName,
   scheduleReferenceCents,
   type ScheduleLine,
@@ -148,16 +149,41 @@ describe("describeScheduleAdmin — dicitura per il gestionale", () => {
 })
 
 describe("paymentFeeTypeLabel", () => {
+  const ISCRIZIONE_PIU_MENSILE = {
+    feeType: "ASSOCIATION" as const,
+    amountCents: 7500,
+    paymentSchedules: [
+      { feeType: "MONTHLY" as const, amountCents: 4500 },
+      { feeType: "ASSOCIATION" as const, amountCents: 3000 },
+    ],
+  }
+
   it("unisce le causali coperte da un pagamento su più scadenze", () => {
-    const label = paymentFeeTypeLabel({
-      feeType: "ASSOCIATION",
-      amountCents: 7500,
-      paymentSchedules: [
-        { feeType: "MONTHLY", amountCents: 4500 },
-        { feeType: "ASSOCIATION", amountCents: 3000 },
-      ],
-    })
-    expect(label).toBe("Contributo di iscrizione + Contributo mensile")
+    expect(paymentFeeTypeLabel(ISCRIZIONE_PIU_MENSILE)).toBe(
+      "Contributo di iscrizione + Contributo mensile",
+    )
+  })
+
+  it("la versione corta è quella che sta dentro un chip", () => {
+    expect(paymentFeeTypeShortLabel(ISCRIZIONE_PIU_MENSILE)).toBe(
+      "Iscrizione + mensile",
+    )
+  })
+
+  it("un tipo solo: nessun «+», e la prima lettera resta maiuscola", () => {
+    const solaMensile = {
+      feeType: "MONTHLY" as const,
+      amountCents: 4500,
+      paymentSchedules: [{ feeType: "MONTHLY" as const, amountCents: 4500 }],
+    }
+    expect(paymentFeeTypeShortLabel(solaMensile)).toBe("Mensile")
+    expect(paymentFeeTypeLabel(solaMensile)).toBe("Contributo mensile")
+  })
+
+  it("la versione corta è più corta: è l'unico motivo per cui esiste", () => {
+    expect(
+      paymentFeeTypeShortLabel(ISCRIZIONE_PIU_MENSILE).length,
+    ).toBeLessThan(paymentFeeTypeLabel(ISCRIZIONE_PIU_MENSILE).length)
   })
 })
 

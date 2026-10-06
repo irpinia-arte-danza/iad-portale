@@ -1,7 +1,7 @@
 import { AlertTriangle } from "lucide-react"
 
 import { isAmountOffReference } from "@/lib/payments/reduced-collection"
-import { formatEur } from "@/lib/utils/format"
+import { formatEuro } from "@/lib/utils/format"
 
 type Props = {
   amountCents: number
@@ -38,10 +38,10 @@ export function AmountOffReference({
         "inline-flex items-center gap-1 text-xs text-status-fix" +
         (className ? ` ${className}` : "")
       }
-      title={`La quota del corso è ${formatEur(referenceAmountCents ?? 0)}. Correggi con «Modifica importo».`}
+      title={`La quota del corso è ${formatEuro(referenceAmountCents ?? 0)}. Correggi con «Modifica importo».`}
     >
       <AlertTriangle className="h-3 w-3 shrink-0" />
-      quota {formatEur(referenceAmountCents ?? 0)}
+      quota {formatEuro(referenceAmountCents ?? 0)}
     </span>
   )
 }
