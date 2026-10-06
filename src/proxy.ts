@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server"
 
-import { resolveAccountState } from "@/lib/auth/account-state"
+import { NO_ACCESS_ROUTE, resolveAccountState } from "@/lib/auth/account-state"
 import { getDashboardPath } from "@/lib/auth/dashboard-path"
+// Aree per ruolo e matcher: in src/lib/auth/proxy-matcher.ts, con i test
+import { areaOf, wrongAreaRedirect } from "@/lib/auth/proxy-matcher"
 // Le pagine pubbliche (login, privacy, …) stanno in un modulo a parte, con
 // il loro test
 import { isPublicPath } from "@/lib/auth/public-paths"
@@ -38,18 +40,41 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
+  // Step 4: dentro /admin, /teacher, /parent il ruolo deve essere quello
+  // dell'area. Le pagine e le query lo controllano comunque (requireAdmin &
+  // co.), ma così un genitore che chiede /admin viene rimandato alla sua
+  // dashboard prima che una pagina parta. Una query Prisma per richiesta
+  // nelle aree riservate, la stessa che fanno già layout e pagine.
+  if (user && areaOf(pathname)) {
+    const account = await resolveAccountState(user.id)
+    const url = request.nextUrl.clone()
+    if (account.state === "blocked") {
+      url.pathname = NO_ACCESS_ROUTE
+      url.search = ""
+      return NextResponse.redirect(url)
+    }
+    const target = wrongAreaRedirect(pathname, account.role)
+    if (target) {
+      url.pathname = target
+      url.search = ""
+      return NextResponse.redirect(url)
+    }
+  }
+
   return supabaseResponse
 }
 
 export const config = {
   matcher: [
     /*
-     * Match all request paths except:
-     * - _next/* (all Next.js internals: static, image, chunks, etc.)
-     * - api/* (future API routes)
-     * - Root files: favicon.ico, robots.txt, sitemap.xml
-     * - Any path containing a dot (file with extension, not a route)
+     * Tutte le richieste tranne:
+     * - _next/* (interni di Next: static, image, chunks…)
+     * - api/* (cron e webhook hanno la loro autorizzazione)
+     * - i file statici con le estensioni note (favicon, robots, immagini,
+     *   font…). Non «qualsiasi percorso con un punto»: /admin/stages/abc.
+     *   deve passare dal proxy. Copia identica in
+     *   src/lib/auth/proxy-matcher.ts (PROXY_MATCHER), con il test.
      */
-    "/((?!_next|api|favicon\\.ico|robots\\.txt|sitemap\\.xml|.*\\..*).*)",
+    "/((?!_next|api|.*\\.(?:ico|png|svg|jpg|jpeg|webp|css|js|txt|xml|woff2)$).*)",
   ],
 }
