@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { EmailHtmlPreview } from "@/components/email-html-preview"
 
 import type { EmailLogRow } from "./queries"
 
@@ -40,11 +41,12 @@ export function EmailLogPreviewDialog({ log, open, onOpenChange }: Props) {
         </DialogHeader>
 
         {log ? (
-          <div
-            className="prose prose-sm dark:prose-invert max-w-none rounded-md border bg-background p-4 max-h-[60vh] overflow-y-auto"
-            // Body HTML is the snapshot of what was sent — already rendered with
-            // variables replaced. Safe to render inline.
-            dangerouslySetInnerHTML={{ __html: log.bodyHtml }}
+          // Il corpo è l'HTML spedito, con i valori già sostituiti: si legge
+          // dentro un iframe isolato, non nella pagina del portale
+          <EmailHtmlPreview
+            title={`Email: ${log.subject}`}
+            html={log.bodyHtml}
+            className="block h-[60vh] w-full rounded-md border bg-white"
           />
         ) : null}
 

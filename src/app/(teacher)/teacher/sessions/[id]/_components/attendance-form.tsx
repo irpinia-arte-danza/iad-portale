@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 import type { AttendanceStatus } from "@prisma/client"
 
 import { saveAttendance } from "../../../_actions/sessions"
+import { logError } from "@/lib/logging/log-error"
 
 type Item = {
   athleteId: string
@@ -146,7 +147,7 @@ export function AttendanceForm({
       toast.success("Presenze salvate")
       router.refresh()
     } catch (error) {
-      console.error("[attendance form] save error", error)
+      logError("[attendance form] save error", error)
       toast.error("Errore salvataggio presenze")
     } finally {
       setBusy(false)

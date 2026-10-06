@@ -55,6 +55,8 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.28 Aggiungere un tab
 - [Errori e diagnostica](#errori-e-diagnostica)
   - §17.37 Catch generico "riprova tra qualche istante" su errori permanenti
+- [Supabase Data API](#supabase-data-api)
+  - §17.46 RLS spenta di proposito, Data API chiusa con i REVOKE in migration
 - [Supabase Auth](#supabase-auth)
   - §17.35 Email OTP expiration a 86400: avviso del security advisor voluto
 - [Domain specifico](#domain-specifico)
@@ -393,6 +395,10 @@ Scoperto: Sprint 3.7 Reminder tab, aprile 2026.
 Pattern applicato in `src/app/ricevute/[receiptId]/route.ts` (pagine distinte 404/403/410/500 con log) e `ReceiptRenderError` in `src/lib/receipts/receipt-document.ts`. Bug reale: la route della ricevuta rispondeva "Non è stato possibile generare la ricevuta, riprova tra qualche istante" per il logo SVG di §17.36, un errore che nessun nuovo tentativo avrebbe risolto. Scoperto: sprint ricevuta lato admin, settembre 2026.
 
 ---
+
+## Supabase Data API
+
+**§17.46 RLS spenta di proposito, Data API chiusa con i REVOKE in migration**: le tabelle dello schema `public` non hanno Row Level Security e non devono averla finché il portale parla col database solo tramite Prisma lato server (ruolo `postgres`, che la bypasserebbe comunque). Le policy sarebbero codice che non gira mai, e darebbero una falsa sicurezza. La chiusura verso la Data API di Supabase (PostgREST, raggiungibile con la chiave `anon` che sta nel bundle e con il JWT di qualsiasi genitore autenticato) sono i **grant**: la migration `20261010090000_revoke_data_api_grants` toglie a `anon` e `authenticated` ogni privilegio su tabelle, sequenze e funzioni, l'`USAGE` sullo schema e i default privileges per gli oggetti futuri; è idempotente e non fa niente dove quei ruoli non esistono (Postgres locale). Regole: (a) nessun `GRANT … TO anon|authenticated` in nessuna migration futura; (b) nessun `createClient` di Supabase nel browser che interroghi tabelle (`.from(…)`): se un giorno servirà, prima le RLS, poi i grant; (c) il controllo notturno del repo di backup sulla Data API resta acceso, è la rete di sicurezza se qualcuno riapre i grant dalla dashboard. Verifica locale: ruoli `anon`/`authenticated` creati a mano con i grant di Supabase, migration applicata, `SET ROLE anon; SELECT … FROM athletes` → `permission denied`, Prisma come `postgres` funziona.
 
 ## Supabase Auth
 

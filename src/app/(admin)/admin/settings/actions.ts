@@ -39,6 +39,8 @@ import {
 import { normalizeIban } from "@/lib/schemas/fiscal-validators"
 
 import { diffChanges, logSettingsChange } from "./audit-helpers"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE, userFacingMessage } from "@/lib/errors"
 
 const SETTINGS_PATH = "/admin/settings"
 
@@ -111,7 +113,7 @@ export async function updateAssociation(
     revalidatePath(SETTINGS_PATH)
     return { ok: true }
   } catch (error) {
-    console.error("[settings] updateAssociation failed", error)
+    logError("[settings] updateAssociation failed", error)
     return { ok: false, error: "Errore aggiornamento dati associazione" }
   }
 }
@@ -156,7 +158,7 @@ export async function updateBrand(
     revalidatePath(SETTINGS_PATH)
     return { ok: true }
   } catch (error) {
-    console.error("[settings] updateBrand failed", error)
+    logError("[settings] updateBrand failed", error)
     return { ok: false, error: "Errore aggiornamento brand" }
   }
 }
@@ -212,10 +214,8 @@ export async function uploadLogo(
     revalidatePath(SETTINGS_PATH)
     return { ok: true, data: { publicUrl } }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Errore upload logo"
-    console.error("[settings] uploadLogo failed", { slot, error })
-    return { ok: false, error: message }
+    logError("[settings] uploadLogo failed", error, { slot })
+    return { ok: false, error: userFacingMessage(error) }
   }
 }
 
@@ -252,8 +252,8 @@ export async function deleteLogo(
     revalidatePath(SETTINGS_PATH)
     return { ok: true }
   } catch (error) {
-    console.error("[settings] deleteLogo failed", { slot, error })
-    return { ok: false, error: "Errore eliminazione logo" }
+    logError("[settings] deleteLogo failed", error, { slot })
+    return { ok: false, error: GENERIC_ERROR_MESSAGE }
   }
 }
 
@@ -372,7 +372,7 @@ export async function updateRicevute(
     revalidatePath(SETTINGS_PATH)
     return { ok: true }
   } catch (error) {
-    console.error("[settings] updateRicevute failed", error)
+    logError("[settings] updateRicevute failed", error)
     return { ok: false, error: "Errore aggiornamento numerazione ricevute" }
   }
 }
@@ -420,7 +420,7 @@ export async function updateProfile(
           email: parsed.data.email,
         })
       } catch (error) {
-        console.warn("[settings] auth email sync failed", error)
+        logError("[settings] auth email sync failed", error)
       }
     }
 
@@ -444,7 +444,7 @@ export async function updateProfile(
     ) {
       return { ok: false, error: "Email già in uso" }
     }
-    console.error("[settings] updateProfile failed", error)
+    logError("[settings] updateProfile failed", error)
     return { ok: false, error: "Errore aggiornamento profilo" }
   }
 }
@@ -468,7 +468,8 @@ export async function changePassword(
       password: parsed.data.newPassword,
     })
     if (error) {
-      return { ok: false, error: error.message }
+      logError("[settings] updateUser password failed", { name: "AuthError", code: error.code })
+      return { ok: false, error: "Non è stato possibile cambiare la password, riprova." }
     }
 
     await logSettingsChange({
@@ -480,7 +481,7 @@ export async function changePassword(
 
     return { ok: true }
   } catch (error) {
-    console.error("[settings] changePassword failed", error)
+    logError("[settings] changePassword failed", error)
     return { ok: false, error: "Errore cambio password" }
   }
 }
@@ -555,9 +556,7 @@ export async function inviteAdmin(
     revalidatePath(SETTINGS_PATH)
     return { ok: true, data: { email } }
   } catch (error) {
-    console.error("[settings] inviteAdmin failed", { email })
-    const message =
-      error instanceof Error ? error.message : "Errore invito admin"
-    return { ok: false, error: message }
+    logError("[settings] inviteAdmin failed", error)
+    return { ok: false, error: userFacingMessage(error) }
   }
 }

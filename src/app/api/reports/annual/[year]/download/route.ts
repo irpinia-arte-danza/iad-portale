@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { generateAnnualBundle } from "@/lib/zip/annual-bundle"
+import { logAudit } from "@/lib/audit/log-audit"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
+import { logError } from "@/lib/logging/log-error"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -11,7 +14,7 @@ type RouteParams = {
 }
 
 export async function GET(_req: Request, { params }: RouteParams) {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const { year: yearParam } = await params
   const year = Number.parseInt(yearParam, 10)
@@ -27,6 +30,15 @@ export async function GET(_req: Request, { params }: RouteParams) {
     const { buffer, filename } = await generateAnnualBundle(year)
     const body = new Uint8Array(buffer)
 
+    // Export di tutti i dati contabili dell'anno: si segna chi l'ha fatto
+    await logAudit({
+      userId,
+      action: "ANNUAL_EXPORT",
+      entityType: "AnnualExport",
+      entityId: String(year),
+      changes: { year, bytes: body.byteLength },
+    })
+
     return new NextResponse(body, {
       status: 200,
       headers: {
@@ -37,11 +49,9 @@ export async function GET(_req: Request, { params }: RouteParams) {
       },
     })
   } catch (error) {
-    console.error("[annual bundle] generation failed", { year })
-    const message =
-      error instanceof Error ? error.message : "Errore sconosciuto"
+    logError("[annual bundle] generation failed", error, { year })
     return NextResponse.json(
-      { error: message },
+      { error: GENERIC_ERROR_MESSAGE },
       { status: 500 },
     )
   }

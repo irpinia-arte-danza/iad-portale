@@ -11,6 +11,7 @@ import {
 } from "@/lib/receipts/receipt-preview"
 import { uuidSchema } from "@/lib/schemas/common"
 import { createClient } from "@/lib/supabase/server"
+import { logError } from "@/lib/logging/log-error"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     })
   } catch (error) {
     const code = error instanceof ReceiptRenderError ? error.code : "RENDER_FAILED"
-    console.error("[receipt preview] render failed", { ...logContext, code }, error)
+    logError("[receipt preview] render failed", error, { ...logContext, code })
     return messagePage({
       status: 500,
       title: "Anteprima non generata",

@@ -20,6 +20,8 @@ import {
   type ScheduleAmountValues,
   type WaiveScheduleValues,
 } from "@/lib/schemas/payment-schedule"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
 
 const SCHEDULE_FOR_WAIVER_SELECT = {
   ...SCHEDULE_LINE_SELECT,
@@ -34,8 +36,8 @@ function mapPrismaError(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2025") return "Scadenza non trovata"
   }
-  console.error("[schedules action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[schedules action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 // Colonna @db.Date: giorno UTC

@@ -23,6 +23,9 @@ import {
 } from "@/lib/schemas/payment"
 
 import { getPaymentById, type PaymentWithRelations } from "./queries"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
+import { logAudit } from "@/lib/audit/log-audit"
 
 function mapPrismaError(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -30,8 +33,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2003") return "Riferimento a record inesistente"
     if (error.code === "P2025") return "Pagamento non trovato"
   }
-  console.error("[payments action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[payments action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 function athletePath(athleteId: string) {
@@ -98,7 +101,7 @@ export async function updatePayment(
   paymentId: string,
   values: PaymentUpdateValues,
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(paymentId)
   if (!idParsed.success) {
@@ -126,6 +129,13 @@ export async function updatePayment(
       where: { id: idParsed.data },
       data: { notes: emptyToNull(parsed.data.notes) },
     })
+    await logAudit({
+      userId,
+      action: "PAYMENT_UPDATE",
+      entityType: "Payment",
+      entityId: idParsed.data,
+      changes: { athleteId: existing.athleteId, fields: ["notes"] },
+    })
     revalidatePath("/admin/payments")
     revalidatePath(athletePath(existing.athleteId))
     return { ok: true }
@@ -137,7 +147,7 @@ export async function updatePayment(
 export async function deletePayment(
   paymentId: string,
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(paymentId)
   if (!idParsed.success) {
@@ -173,6 +183,13 @@ export async function deletePayment(
       })
     })
 
+    await logAudit({
+      userId,
+      action: "PAYMENT_DELETE",
+      entityType: "Payment",
+      entityId: idParsed.data,
+      changes: { athleteId: existing.athleteId },
+    })
     revalidatePath("/admin/payments")
     revalidatePath("/admin/scadenze")
     revalidatePath(athletePath(existing.athleteId))

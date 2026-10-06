@@ -33,6 +33,8 @@ import {
 import { toDateOnly, toDateOnlyOrNull } from "@/lib/utils/date-only"
 
 import { formatEuro } from "@/lib/utils/format"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
 const STAGES_PATH = "/admin/stages"
 const DASHBOARD_PATH = "/admin/dashboard"
 
@@ -42,8 +44,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2003") return "Riferimento a record inesistente"
     if (error.code === "P2025") return "Risorsa non trovata"
   }
-  console.error("[stages action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[stages action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 function emptyToNull(value: string | undefined | null): string | null {
@@ -661,7 +663,7 @@ export async function sendStageInvites(
         text: rendered.bodyText,
       })
     } catch (err) {
-      console.error("[stage invite] render failed", err)
+      logError("[stage invite] render failed", err)
     }
   }
 

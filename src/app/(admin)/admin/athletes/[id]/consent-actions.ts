@@ -25,6 +25,8 @@ import {
 import { isMinorAt } from "@/lib/utils/age"
 import { toDateOnly } from "@/lib/utils/date-only"
 import { validateFileSignature } from "@/lib/utils/file-signature"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE, UserFacingError } from "@/lib/errors"
 
 // ─────────────────────────────────────────────────────────────────────────
 // Consensi cartacei: la segreteria registra la firma sul modulo di carta.
@@ -47,8 +49,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2003") return "Allieva non trovata"
     if (error.code === "P2025") return "Consenso non trovato"
   }
-  console.error("[consent action] error", error)
-  return "Errore interno, riprova"
+  logError("[consent action] error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 // Scheda, elenco (chip «Senza consenso privacy») e dashboard (riquadro)
@@ -231,9 +233,7 @@ export async function registerConsents(
     // Il file è salito ma le righe no: non deve restare un modulo che
     // nessun consenso punta
     if (filePath) await deleteConsentFiles([filePath])
-    if (error instanceof Error && /Upload fallito|Storage|Bucket/.test(error.message)) {
-      return { ok: false, error: error.message }
-    }
+    if (error instanceof UserFacingError) return { ok: false, error: error.message }
     return { ok: false, error: mapPrismaError(error) }
   }
 }
@@ -319,9 +319,7 @@ export async function attachConsentFile(
     return { ok: true, data: { attached: updated.count } }
   } catch (error) {
     if (filePath) await deleteConsentFiles([filePath])
-    if (error instanceof Error && /Upload fallito|Storage|Bucket/.test(error.message)) {
-      return { ok: false, error: error.message }
-    }
+    if (error instanceof UserFacingError) return { ok: false, error: error.message }
     return { ok: false, error: mapPrismaError(error) }
   }
 }

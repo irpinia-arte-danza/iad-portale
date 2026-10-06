@@ -11,6 +11,7 @@ import {
   renderReceiptPdf,
   type LoadedReceipt,
 } from "./receipt-document"
+import { logError } from "@/lib/logging/log-error"
 
 // ─────────────────────────────────────────────────────────────────────────
 // Archivio dei PDF delle ricevute (bucket privato "receipts").
@@ -96,10 +97,10 @@ async function generateAndArchive(
     })
     return { pdf, archived: true }
   } catch (error) {
-    console.error(
+    logError(
       "[receipt pdf] archive failed, retried on next access or by nightly cron",
-      { receiptId: receipt.id, receiptNumber: receipt.receiptNumber },
       error,
+      { receiptId: receipt.id, receiptNumber: receipt.receiptNumber },
     )
     return { pdf: generated, archived: false }
   }
@@ -118,10 +119,10 @@ export async function archiveReceiptPdf(
     const { archived } = await generateAndArchive(receipt, storage)
     return archived
   } catch (error) {
-    console.error(
+    logError(
       "[receipt pdf] generation for archive failed",
-      { receiptId },
       error,
+      { receiptId },
     )
     return false
   }

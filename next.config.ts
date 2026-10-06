@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
+import { securityHeaders } from "./src/lib/security/headers";
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseHost = supabaseUrl ? new URL(supabaseUrl).hostname : undefined;
+const supabaseOrigin = supabaseUrl ? new URL(supabaseUrl).origin : null;
 
 // ─────────────────────────────────────────────────────────────────────────
 // Prisma: fuori dal bundle quello che a runtime non si carica mai.
@@ -58,6 +61,19 @@ const nextConfig: NextConfig = {
   // bundle della pagina anche se il tracer non segue la lettura
   outputFileTracingIncludes: {
     "/privacy": ["./content/privacy.md"],
+  },
+  // Header di sicurezza su tutte le risposte; la CSP è in solo report
+  // (src/lib/security/headers.ts)
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: securityHeaders({
+          supabaseOrigin,
+          dev: process.env.NODE_ENV === "development",
+        }),
+      },
+    ];
   },
   images: {
     remotePatterns: supabaseHost

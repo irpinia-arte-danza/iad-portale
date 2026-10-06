@@ -37,6 +37,7 @@ import {
   refreshCardSignedUrl,
   softDeleteCard,
 } from "../../../tessere/actions"
+import { logError } from "@/lib/logging/log-error"
 
 export type AthleteCardItem = {
   id: string
@@ -115,7 +116,7 @@ export function EndasCardSection({ athleteId, entity, cards }: Props) {
       }
       window.open(target, "_blank", "noopener,noreferrer")
     } catch (error) {
-      console.error("[tessera] download error", error)
+      logError("[tessera] download error", error)
       toast.error("Errore durante il download")
     } finally {
       setDownloadingId(null)

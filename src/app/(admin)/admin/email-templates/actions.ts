@@ -11,6 +11,7 @@ import {
   emailTemplateEditSchema,
   type EmailTemplateEditInput,
 } from "@/lib/schemas/email-template"
+import { logError } from "@/lib/logging/log-error"
 
 export async function listEmailTemplates() {
   await requireAdmin()
@@ -104,7 +105,7 @@ export async function updateEmailTemplate(
           },
         })
       } catch (auditErr) {
-        console.error("[audit] updateEmailTemplate failed", auditErr)
+        logError("[audit] updateEmailTemplate failed", auditErr)
       }
     }
 

@@ -16,6 +16,10 @@ import {
 } from "@/lib/schemas/expense"
 import { fiscalYearForDate } from "@/lib/fiscal-years"
 import { toDateOnly } from "@/lib/utils/date-only"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
+import { logAudit } from "@/lib/audit/log-audit"
+import { changedFields } from "@/lib/audit/changed-fields"
 
 const EXPENSES_PATH = "/admin/expenses"
 
@@ -25,8 +29,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2003") return "Riferimento a record inesistente"
     if (error.code === "P2025") return "Spesa non trovata"
   }
-  console.error("[expenses action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[expenses action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 function emptyToNull(value: string | undefined | null): string | null {
@@ -62,7 +66,7 @@ async function resolveYearIds(
 export async function registerExpense(
   values: ExpenseCreateValues,
 ): Promise<ActionResult<{ id: string }>> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const parsed = expenseCreateSchema.safeParse(values)
   if (!parsed.success) {
@@ -92,6 +96,13 @@ export async function registerExpense(
       select: { id: true },
     })
 
+    await logAudit({
+      userId,
+      action: "EXPENSE_CREATE",
+      entityType: "Expense",
+      entityId: created.id,
+      changes: { type: parsed.data.type, amountCents },
+    })
     revalidatePath(EXPENSES_PATH)
     return { ok: true, data: { id: created.id } }
   } catch (error) {
@@ -103,7 +114,7 @@ export async function updateExpense(
   expenseId: string,
   values: ExpenseUpdateValues,
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(expenseId)
   if (!idParsed.success) {
@@ -120,7 +131,6 @@ export async function updateExpense(
 
   const existing = await prisma.expense.findFirst({
     where: { id: idParsed.data, deletedAt: null },
-    select: { id: true },
   })
   if (!existing) {
     return { ok: false, error: "Spesa non trovata" }
@@ -131,9 +141,7 @@ export async function updateExpense(
 
   try {
     const years = await resolveYearIds(expenseDate)
-    await prisma.expense.update({
-      where: { id: idParsed.data },
-      data: {
+    const data = {
         fiscalYearId: years.fiscalYearId,
         academicYearId: years.academicYearId,
         type: parsed.data.type,
@@ -143,9 +151,16 @@ export async function updateExpense(
         description: parsed.data.description,
         recipient: emptyToNull(parsed.data.recipient),
         notes: emptyToNull(parsed.data.notes),
-      },
-    })
+    }
+    await prisma.expense.update({ where: { id: idParsed.data }, data })
 
+    await logAudit({
+      userId,
+      action: "EXPENSE_UPDATE",
+      entityType: "Expense",
+      entityId: idParsed.data,
+      changes: { fields: changedFields(existing, data), amountCents },
+    })
     revalidatePath(EXPENSES_PATH)
     return { ok: true }
   } catch (error) {
@@ -156,7 +171,7 @@ export async function updateExpense(
 export async function deleteExpense(
   expenseId: string,
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(expenseId)
   if (!idParsed.success) {
@@ -177,6 +192,13 @@ export async function deleteExpense(
       data: { deletedAt: new Date() },
     })
 
+    await logAudit({
+      userId,
+      action: "EXPENSE_SOFT_DELETE",
+      entityType: "Expense",
+      entityId: idParsed.data,
+      changes: undefined,
+    })
     revalidatePath(EXPENSES_PATH)
     return { ok: true }
   } catch (error) {

@@ -19,6 +19,7 @@ import {
 } from "@/lib/receipts/receipt-pdf-store"
 import { uuidSchema } from "@/lib/schemas/common"
 import { createClient } from "@/lib/supabase/server"
+import { logError } from "@/lib/logging/log-error"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -166,6 +167,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         backHref,
       })
     }
+    // Pagamento o allieva nel Cestino: per la famiglia la ricevuta non c'è
+    // più, come un'annullata (voluto: vedi runbook, «Ricevute — PDF
+    // archiviati»). L'admin la apre ancora, con la filigrana.
+    if (receipt.payment?.deletedAt || receipt.payment?.athlete.deletedAt) {
+      console.info(
+        "[receipt pdf] receipt of a trashed payment or athlete requested from portal",
+        logContext,
+      )
+      return messagePage({
+        status: 410,
+        title: "Ricevuta non disponibile",
+        message:
+          "Questa ricevuta non è più disponibile. Per chiarimenti contatta la segreteria.",
+        backHref,
+      })
+    }
     if (receipt.status !== ReceiptStatus.VALID) {
       console.info(
         "[receipt pdf] cancelled receipt requested from portal",
@@ -205,7 +222,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       error instanceof ReceiptArchiveError || error instanceof ReceiptRenderError
         ? error.code
         : "RENDER_FAILED"
-    console.error("[receipt pdf] delivery failed", { ...logContext, code }, error)
+    logError("[receipt pdf] delivery failed", error, { ...logContext, code })
     return messagePage({ ...pdfFailureMessage(code, isAdmin), backHref })
   }
 
@@ -218,7 +235,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         reason: receipt.cancelReason,
       })
     } catch (error) {
-      console.error("[receipt pdf] cancelled stamp failed", logContext, error)
+      logError("[receipt pdf] cancelled stamp failed", error, logContext)
       return messagePage({
         status: 500,
         title: "PDF non generato",

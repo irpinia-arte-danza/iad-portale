@@ -330,6 +330,8 @@ Sistema email end-to-end operativo (Sprint 3 chiuso 22 aprile 2026).
 
 Per dettagli architettura, cronologia 9 fasi, gotcha specifici (§17.25-27), file principali ed env vars: **`docs/email-system.md`**.
 
+**Regola: nessuna email alle famiglie parte da sola** (inviti, solleciti, ricevute li manda l'admin). **Unica eccezione**: l'avviso di sicurezza «La tua password è stata cambiata» (`src/lib/auth/password-changed-email.ts`), inviato all'interessato subito dopo un cambio password da `/imposta-password`. È un avviso all'utente stesso, non una comunicazione alle famiglie: se non è stato lui, ha il tempo di scrivere alla segreteria. Testo fisso nel codice, non nei modelli modificabili; tracciato in `EmailLog` con `milestoneKey = PASSWORD_CHANGED`.
+
 ### WhatsApp (MVP = link manuale)
 Per ora NON integriamo WhatsApp Business API. Però ogni pagina rilevante ha un bottone "Invia via WhatsApp" che apre `wa.me/NUMERO?text=MESSAGGIO_PRECOMPILATO`. Giuseppina clicca → si apre WhatsApp Web → manda.
 

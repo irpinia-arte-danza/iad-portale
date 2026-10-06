@@ -2,6 +2,7 @@ import "server-only"
 
 import { createAdminClient } from "./admin-client"
 import { detectMimeFromSignature } from "@/lib/utils/file-signature"
+import { UserFacingError } from "@/lib/errors"
 
 export const BRAND_BUCKET = "brand"
 
@@ -48,15 +49,15 @@ export async function uploadBrandAsset(
 ): Promise<{ publicUrl: string; path: string }> {
   const allowed = SLOT_CONTENT_TYPE[slot]
   if (slot === "logo-svg") {
-    throw new Error("Upload SVG disattivato per sicurezza. Usa PNG, JPEG o WebP.")
+    throw new UserFacingError("Upload SVG disattivato per sicurezza. Usa PNG, JPEG o WebP.")
   }
   if (!allowed.includes(file.type)) {
-    throw new Error(
+    throw new UserFacingError(
       `Formato non supportato per ${slot}. Ammessi: ${allowed.join(", ")}`,
     )
   }
   if (file.size > MAX_BYTES) {
-    throw new Error("File troppo grande (max 2 MB)")
+    throw new UserFacingError("File troppo grande (max 2 MB)")
   }
 
   await ensureBrandBucket()
@@ -68,7 +69,7 @@ export async function uploadBrandAsset(
   const arrayBuffer = await file.arrayBuffer()
   const signatureMime = detectMimeFromSignature(arrayBuffer)
   if (!signatureMime || !allowed.includes(signatureMime)) {
-    throw new Error("Il contenuto del file non corrisponde a un formato ammesso.")
+    throw new UserFacingError("Il contenuto del file non corrisponde a un formato ammesso.")
   }
 
   const buffer = Buffer.from(arrayBuffer)

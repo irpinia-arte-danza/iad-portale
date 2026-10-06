@@ -8,7 +8,7 @@ import {
   ACCESS_TEMPLATE_SLUG,
   PASSWORD_RESET_TEMPLATE_SLUG,
 } from "@/lib/resend/template-usage"
-import { substituteVariables } from "@/lib/resend/template-vars"
+import { escapeHtml, substituteVariables } from "@/lib/resend/template-vars"
 import { createAdminClient } from "@/lib/supabase/admin-client"
 
 import { athleteAccessEligibility } from "./athlete-access"
@@ -109,15 +109,6 @@ Se non hai fatto tu questa richiesta puoi ignorare questa email: la password att
 function getAppUrl(): string | null {
   const url = process.env.NEXT_PUBLIC_APP_URL?.trim()
   return url ? url.replace(/\/+$/, "") : null
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
 }
 
 function buildConfirmLink(

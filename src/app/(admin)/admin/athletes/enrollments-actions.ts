@@ -29,6 +29,8 @@ import {
 import { toDateOnly } from "@/lib/utils/date-only"
 
 import { generateMonthlySchedulesForEnrollment } from "./schedule-generator"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
 
 function athletePath(athleteId: string) {
   return `/admin/athletes/${athleteId}`
@@ -42,8 +44,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2025") return "Iscrizione non trovata"
     if (error.code === "P2003") return "Riferimento a record inesistente"
   }
-  console.error("[enrollments action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[enrollments action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 export async function createEnrollment(

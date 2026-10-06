@@ -45,6 +45,7 @@ import {
 } from "../reminder-actions"
 
 import { StickySaveBar } from "./sticky-save-bar"
+import { logError } from "@/lib/logging/log-error"
 
 interface ReminderTabProps {
   initial: ReminderConfigValues
@@ -98,7 +99,7 @@ export function ReminderTab({
         const next = await previewCronReminders()
         setPreview(next)
       } catch (err) {
-        console.error(err)
+        logError("[reminder tab] preview failed", err)
         toast.error("Impossibile aggiornare l'anteprima")
       }
     })

@@ -6,9 +6,11 @@ import { AttendanceStatus, Prisma } from "@prisma/client"
 import { z } from "zod"
 
 import { prisma } from "@/lib/prisma"
+import { attendanceEditCutoff } from "@/lib/attendance/edit-window"
 import { requireTeacher } from "@/lib/auth/require-teacher"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
+import { logError } from "@/lib/logging/log-error"
 
 // ─────────────────────────────────────────────────────────────────────
 // Helper: verifica che il corso sia tra i corsi assegnati al teacher.
@@ -110,7 +112,7 @@ export async function createOrFindTodayLesson(
     revalidatePath("/teacher/dashboard")
     return { ok: true, data: { lessonId: lesson.id } }
   } catch (error) {
-    console.error("[teacher session] create lesson failed", error)
+    logError("[teacher session] create lesson failed", error)
     return { ok: false, error: "Errore creazione lezione" }
   }
 }
@@ -149,12 +151,22 @@ export async function saveAttendance(
     select: {
       id: true,
       status: true,
-      schedule: { select: { courseId: true } },
+      date: true,
+      schedule: { select: { courseId: true, course: { select: { deletedAt: true } } } },
     },
   })
 
-  if (!lesson) {
+  if (!lesson || lesson.schedule.course.deletedAt) {
     return { ok: false, error: "Lezione non trovata" }
+  }
+
+  // Le presenze si segnano in sala, al massimo con qualche giorno di
+  // ritardo: una lezione più vecchia di una settimana non si riscrive
+  if (lesson.date < attendanceEditCutoff(new Date())) {
+    return {
+      ok: false,
+      error: "Lezione di più di 7 giorni fa: le presenze non si modificano più",
+    }
   }
 
   // IDOR check: il corso della lezione deve essere assegnato al teacher
@@ -226,7 +238,7 @@ export async function saveAttendance(
     revalidatePath("/teacher/dashboard")
     return { ok: true }
   } catch (error) {
-    console.error("[teacher session] save attendance failed", error)
+    logError("[teacher session] save attendance failed", error)
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2003") {
         return { ok: false, error: "Riferimento a record inesistente" }

@@ -14,6 +14,7 @@ import {
 } from "./receipt-email"
 import { loadReceiptForPdf, receiptPdfFileName } from "./receipt-document"
 import { ReceiptArchiveError, readReceiptPdf } from "./receipt-pdf-store"
+import { logError } from "@/lib/logging/log-error"
 
 // ─────────────────────────────────────────────────────────────────────────
 // Invio della ricevuta per email, con il PDF in allegato.
@@ -82,10 +83,10 @@ export async function sendReceiptEmailCore(params: {
   } catch (error) {
     const code =
       error instanceof ReceiptArchiveError ? error.code : "RENDER_FAILED"
-    console.error(
+    logError(
       "[receipt email] pdf not available",
-      { receiptId: receipt.id, code },
       error,
+      { receiptId: receipt.id, code },
     )
     return {
       ok: false,
@@ -120,7 +121,7 @@ export async function sendReceiptEmailCore(params: {
       importo: formatEuro(receipt.amountCents ?? receipt.payment?.amountCents ?? 0),
     })
   } catch (error) {
-    console.error("[receipt email] template error", { receiptId: receipt.id }, error)
+    logError("[receipt email] template error", error, { receiptId: receipt.id })
     return {
       ok: false,
       code: "TEMPLATE",

@@ -4,6 +4,13 @@ import { redirect } from "next/navigation";
 
 import { resolveAccountState } from "@/lib/auth/account-state";
 import { getDashboardPath } from "@/lib/auth/dashboard-path";
+import {
+  attemptEmail,
+  attemptsBlockedUntil,
+  clientIp,
+  recordLoginAttempt,
+  TOO_MANY_ATTEMPTS_MESSAGE,
+} from "@/lib/auth/login-attempts";
 import { loginErrorMessage } from "@/lib/auth/login-error";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,6 +22,17 @@ type LoginValues = {
 export async function login(
   values: LoginValues
 ): Promise<{ error: string } | void> {
+  // Dopo 5 tentativi falliti in 10 minuti (per email o per IP) si rifiuta
+  // per 15 minuti, prima ancora di chiedere a Supabase
+  const key = {
+    kind: "LOGIN" as const,
+    email: attemptEmail(values.email),
+    ip: await clientIp(),
+  };
+  if (await attemptsBlockedUntil(key)) {
+    return { error: TOO_MANY_ATTEMPTS_MESSAGE };
+  }
+
   const supabase = await createClient();
 
   const { data: authData, error } = await supabase.auth.signInWithPassword({
@@ -23,8 +41,10 @@ export async function login(
   });
 
   if (error) {
+    await recordLoginAttempt(key, false);
     return { error: loginErrorMessage(error.message) };
   }
+  await recordLoginAttempt(key, true);
 
   // Credenziali valide ma account non utilizzabile (utente disattivato,
   // genitore/insegnante nel cestino, account senza profilo): logout e

@@ -3,6 +3,7 @@ import "server-only"
 import { AuditAction, Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { logError } from "@/lib/logging/log-error"
 
 type LogParams = {
   userId: string
@@ -27,7 +28,7 @@ export async function logSettingsChange(params: LogParams): Promise<void> {
       },
     })
   } catch (error) {
-    console.error("[audit] logSettingsChange failed", { action: params.action, error })
+    logError("[audit] logSettingsChange failed", error, { action: params.action })
   }
 }
 

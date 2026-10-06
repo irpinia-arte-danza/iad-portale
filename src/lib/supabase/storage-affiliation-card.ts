@@ -4,6 +4,7 @@ import { createAdminClient } from "./admin-client"
 import { SIGNED_URL_TTL_SECONDS } from "./signed-url"
 import { CARD_ALLOWED_MIME, CARD_MAX_BYTES } from "@/lib/affiliations/file-rules"
 import { detectMimeFromSignature } from "@/lib/utils/file-signature"
+import { UserFacingError } from "@/lib/errors"
 
 // Path: {athleteId}/{cardId}.pdf, come i certificati medici.
 export const AFFILIATION_CARD_BUCKET = "affiliation-cards"
@@ -61,11 +62,11 @@ export async function uploadAffiliationCardFile(
   bytes: ArrayBuffer,
 ): Promise<UploadedCard> {
   if (bytes.byteLength > CARD_MAX_BYTES) {
-    throw new Error("File troppo grande (max 3 MB)")
+    throw new UserFacingError("File troppo grande (max 3 MB)")
   }
   const signatureMime = detectMimeFromSignature(bytes)
   if (!signatureMime || !ALLOWED_MIME_SET.has(signatureMime)) {
-    throw new Error("Il contenuto del file non è un PDF.")
+    throw new UserFacingError("Il contenuto del file non è un PDF.")
   }
 
   await ensureAffiliationCardBucket()

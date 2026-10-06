@@ -24,6 +24,8 @@ import {
 import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 
 import { getActiveCards, getMatchCandidates } from "./queries"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE, userFacingMessage } from "@/lib/errors"
 
 const TESSERE_PATH = "/admin/tessere"
 
@@ -41,8 +43,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2003") return "Allieva non trovata"
     if (error.code === "P2025") return "Tessera non trovata"
   }
-  console.error("[tessere action] error", error)
-  return "Errore interno, riprova"
+  logError("[tessere action] error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 function isSupportedEntity(value: unknown): value is CardEntity {
@@ -283,13 +285,8 @@ export async function importCardFile(
     } catch (uploadError) {
       // Senza il PDF la tessera non serve: si torna indietro del tutto
       await prisma.affiliation.delete({ where: { id: created.id } })
-      return {
-        ok: false,
-        error:
-          uploadError instanceof Error
-            ? uploadError.message
-            : "Upload fallito",
-      }
+      logError("[tessere action] upload failed", uploadError, { cardId: created.id })
+      return { ok: false, error: userFacingMessage(uploadError) }
     }
 
     await prisma.auditLog.create({

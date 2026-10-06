@@ -4,6 +4,11 @@ import { after } from "next/server"
 import { z } from "zod"
 
 import { sendPasswordResetCore } from "@/lib/auth/access-emails"
+import {
+  attemptsBlockedUntil,
+  clientIp,
+  recordLoginAttempt,
+} from "@/lib/auth/login-attempts"
 import type { ActionResult } from "@/lib/schemas/common"
 
 const requestSchema = z.object({
@@ -28,6 +33,16 @@ export async function requestPasswordReset(values: {
   }
 
   const email = parsed.data.email
+
+  // Stesso contatore del login, per IP: dopo 5 richieste in 10 minuti si
+  // smette di mandare per 15, con la stessa risposta di sempre (chi prova
+  // non deve sapere né se l'email esiste né se è stato fermato)
+  const key = { kind: "RESET" as const, email: null, ip: await clientIp() }
+  if (await attemptsBlockedUntil(key)) {
+    return { ok: true }
+  }
+  await recordLoginAttempt(key, false)
+
   after(async () => {
     try {
       await sendPasswordResetCore(email)

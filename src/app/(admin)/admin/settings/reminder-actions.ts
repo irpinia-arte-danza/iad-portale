@@ -15,6 +15,7 @@ import {
 } from "@/lib/schemas/reminder-config"
 
 import { diffChanges } from "./audit-helpers"
+import { logError } from "@/lib/logging/log-error"
 
 const SETTINGS_PATH = "/admin/settings"
 
@@ -118,14 +119,14 @@ export async function updateReminderConfig(
           },
         })
       } catch (err) {
-        console.error("[audit] ReminderConfig update failed", err)
+        logError("[audit] ReminderConfig update failed", err)
       }
     }
 
     revalidatePath(SETTINGS_PATH)
     return { ok: true }
   } catch (err) {
-    console.error("[reminder-config] update failed", err)
+    logError("[reminder-config] update failed", err)
     return { ok: false, error: "Errore di salvataggio" }
   }
 }

@@ -16,6 +16,10 @@ import {
   type ParentCreateValues,
   type ParentUpdateValues,
 } from "@/lib/schemas/parent"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
+import { logAudit } from "@/lib/audit/log-audit"
+import { changedFields } from "@/lib/audit/changed-fields"
 
 const PARENTS_PATH = "/admin/parents"
 
@@ -38,8 +42,8 @@ function mapPrismaError(error: unknown): string {
     if (error.code === "P2025") return "Genitore non trovato"
     if (error.code === "P2003") return "Riferimento a record inesistente"
   }
-  console.error("[parents action] unexpected error", error)
-  return "Errore interno, riprova"
+  logError("[parents action] unexpected error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 // Creare un genitore NON invia nulla: l'accesso al portale è un'azione
@@ -47,7 +51,7 @@ function mapPrismaError(error: unknown): string {
 export async function createParent(
   values: ParentCreateValues
 ): Promise<ActionResult<{ id: string }>> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const parsed = parentCreateSchema.safeParse(values)
   if (!parsed.success) {
@@ -60,6 +64,13 @@ export async function createParent(
       select: { id: true },
     })
 
+    await logAudit({
+      userId,
+      action: "PARENT_CREATE",
+      entityType: "Parent",
+      entityId: parent.id,
+      changes: { fields: Object.keys(parsed.data) },
+    })
     revalidatePath(PARENTS_PATH)
     return { ok: true, data: { id: parent.id } }
   } catch (error) {
@@ -71,7 +82,7 @@ export async function updateParent(
   id: string,
   values: ParentUpdateValues
 ): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(id)
   if (!idParsed.success) {
@@ -84,9 +95,19 @@ export async function updateParent(
   }
 
   try {
+    const before = await prisma.parent.findUnique({
+      where: { id: idParsed.data },
+    })
     await prisma.parent.update({
       where: { id: idParsed.data, deletedAt: null },
       data: cleanEmptyStrings(parsed.data),
+    })
+    await logAudit({
+      userId,
+      action: "PARENT_UPDATE",
+      entityType: "Parent",
+      entityId: idParsed.data,
+      changes: { fields: changedFields(before, cleanEmptyStrings(parsed.data)) },
     })
     revalidatePath(PARENTS_PATH)
     return { ok: true }
@@ -96,7 +117,7 @@ export async function updateParent(
 }
 
 export async function softDeleteParent(id: string): Promise<ActionResult> {
-  await requireAdmin()
+  const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(id)
   if (!idParsed.success) {
@@ -146,6 +167,13 @@ export async function softDeleteParent(id: string): Promise<ActionResult> {
         : []),
     ])
 
+    await logAudit({
+      userId,
+      action: "PARENT_SOFT_DELETE",
+      entityType: "Parent",
+      entityId: idParsed.data,
+      changes: undefined,
+    })
     revalidatePath(PARENTS_PATH)
     return { ok: true }
   } catch (error) {

@@ -154,6 +154,15 @@ export const changePasswordSchema = z
 
 export type ChangePasswordValues = z.infer<typeof changePasswordSchema>
 
+// /imposta-password: la password attuale serve solo se la sessione non viene
+// da un link personale appena aperto (src/lib/auth/recent-otp.ts). Il
+// server decide se è richiesta; qui è facoltativa
+export const setOwnPasswordSchema = changePasswordSchema.safeExtend({
+  currentPassword: z.string().max(72).optional().or(z.literal("")),
+})
+
+export type SetOwnPasswordValues = z.infer<typeof setOwnPasswordSchema>
+
 // ============================================================================
 // Tab Admin — invite
 // ============================================================================

@@ -18,6 +18,8 @@ import {
   deleteAllMedicalCertFilesForAthlete,
   deleteMedicalCertFile,
 } from "@/lib/supabase/storage-medical-cert"
+import { logError } from "@/lib/logging/log-error"
+import { GENERIC_ERROR_MESSAGE } from "@/lib/errors"
 
 const CESTINO_PATH = "/admin/cestino"
 
@@ -34,8 +36,8 @@ function mapPrismaError(error: unknown): string {
       return "Impossibile ripristinare: esiste già un elemento che occupa quel posto"
     }
   }
-  console.error("[cestino action] error", error)
-  return "Errore interno, riprova"
+  logError("[cestino action] error", error)
+  return GENERIC_ERROR_MESSAGE
 }
 
 type EntityKind =
@@ -533,7 +535,14 @@ export async function hardDeleteParent(
             }),
           ]
         : []),
-      prisma.consent.deleteMany({ where: { parentId: parent.id } }),
+      // I consensi firmati da lui per le figlie restano (sono la prova che
+      // il consenso c'era): perdono solo il firmatario. Spariscono solo
+      // quelli che riguardavano lui e nessun'allieva
+      prisma.consent.updateMany({
+        where: { parentId: parent.id, athleteId: { not: null } },
+        data: { parentId: null },
+      }),
+      prisma.consent.deleteMany({ where: { parentId: parent.id, athleteId: null } }),
       prisma.athleteParent.deleteMany({ where: { parentId: parent.id } }),
       prisma.parent.delete({ where: { id: parent.id } }),
     ])

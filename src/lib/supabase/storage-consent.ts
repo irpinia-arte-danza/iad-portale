@@ -10,6 +10,7 @@ import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 
 import { createAdminClient } from "./admin-client"
 import { SIGNED_URL_TTL_SECONDS } from "./signed-url"
+import { UserFacingError } from "@/lib/errors"
 
 // Moduli firmati dei consensi. Path: {uuid}.{ext}, senza l'id dell'allieva:
 // lo stesso modulo può valere per più consensi e più sorelle, e il legame
@@ -65,15 +66,15 @@ function extForMime(mime: string): string {
 // consensi che il modulo copre. Nessun link al caricamento.
 export async function uploadConsentFile(file: File): Promise<string> {
   if (!ALLOWED_MIME_SET.has(file.type)) {
-    throw new Error("Formato non supportato. Ammessi: PDF, JPEG, PNG")
+    throw new UserFacingError("Formato non supportato. Ammessi: PDF, JPEG, PNG")
   }
   if (file.size > CONSENT_FILE_MAX_BYTES) {
-    throw new Error("File troppo grande (max 3 MB)")
+    throw new UserFacingError("File troppo grande (max 3 MB)")
   }
   const bytes = await file.arrayBuffer()
   const signatureMime = detectMimeFromSignature(bytes)
   if (!signatureMime || !ALLOWED_MIME_SET.has(signatureMime)) {
-    throw new Error("Il contenuto del file non corrisponde a un formato ammesso.")
+    throw new UserFacingError("Il contenuto del file non corrisponde a un formato ammesso.")
   }
 
   await ensureConsentBucket()
