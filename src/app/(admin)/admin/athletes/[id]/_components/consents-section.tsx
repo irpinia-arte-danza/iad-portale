@@ -47,6 +47,10 @@ import {
   restoreConsent,
   softDeleteConsent,
 } from "../consent-actions"
+import {
+  ConsentAttachDialog,
+  type AttachableConsent,
+} from "./consent-attach-dialog"
 import { ConsentFormDialog, type ConsentSigner } from "./consent-form-dialog"
 
 export type ConsentItem = {
@@ -88,6 +92,7 @@ export function ConsentsSection({
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
   const [busyId, setBusyId] = React.useState<string | null>(null)
   const [trashOpen, setTrashOpen] = React.useState(false)
+  const [attachingId, setAttachingId] = React.useState<string | null>(null)
   const [downloadingId, setDownloadingId] = React.useState<string | null>(null)
 
   const active = consents.filter((c) => c.deletedAt === null)
@@ -101,6 +106,15 @@ export function ConsentsSection({
       currentByKind.set(c.type, c)
     }
   }
+
+  // Per «Allega modulo»: i consensi correnti di questa allieva ancora senza
+  // foglio. Un modulo ne copre spesso più d'uno.
+  const withoutFile: AttachableConsent[] = CONSENT_KINDS.flatMap((kind) => {
+    const current = currentByKind.get(kind)
+    return current && !current.filePath
+      ? [{ id: current.id, label: CONSENT_KIND_LABELS[kind] }]
+      : []
+  })
 
   const signers: ConsentSigner[] = [
     ...parents.map((p) => ({
@@ -229,6 +243,19 @@ export function ConsentsSection({
                       )}
                       Scarica
                     </Button>
+                  ) : current ? (
+                    // Registrato senza foglio: il modulo si allega dopo
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11"
+                      onClick={() => setAttachingId(current.id)}
+                      disabled={busyId !== null}
+                    >
+                      <Paperclip className="mr-1 h-4 w-4" />
+                      Allega modulo
+                    </Button>
                   ) : null}
                   {current ? (
                     <Button
@@ -319,6 +346,13 @@ export function ConsentsSection({
           </div>
         ) : null}
       </CardContent>
+
+      <ConsentAttachDialog
+        consentId={attachingId}
+        onClose={() => setAttachingId(null)}
+        athleteId={athleteId}
+        candidates={withoutFile}
+      />
 
       <ConsentFormDialog
         open={formKind !== null}

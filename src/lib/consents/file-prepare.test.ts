@@ -19,11 +19,11 @@ describe("file del consenso", () => {
     expect(planForFile({ type: "text/plain", name: "a.txt" })).toBe("REJECT")
   })
 
-  it("il dialog riusa prepareCertificateFile", () => {
+  it("la scelta del file riusa prepareCertificateFile", () => {
     const dialog = readFileSync(
       path.resolve(
         __dirname,
-        "../../app/(admin)/admin/athletes/[id]/_components/consent-form-dialog.tsx",
+        "../../app/(admin)/admin/athletes/[id]/_components/consent-file-picker.tsx",
       ),
       "utf8",
     )

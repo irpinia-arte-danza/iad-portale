@@ -238,6 +238,94 @@ export async function registerConsents(
   }
 }
 
+// «Allega modulo»: il foglio arriva dopo la registrazione. Un caricamento,
+// e lo stesso percorso su tutti i consensi scelti — solo consensi di questa
+// allieva, non nel Cestino e ancora senza modulo: un modulo già allegato non
+// si sostituisce da qui.
+export async function attachConsentFile(
+  athleteId: string,
+  formData: FormData,
+): Promise<ActionResult<{ attached: number }>> {
+  const { userId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(athleteId)
+  if (!idParsed.success) {
+    return { ok: false, error: "Identificativo allieva non valido" }
+  }
+  const ids = [
+    ...new Set(
+      formData.getAll("consentIds").filter((v) => typeof v === "string"),
+    ),
+  ]
+  if (ids.length === 0 || ids.length > 10) {
+    return { ok: false, error: "Scegli almeno un consenso" }
+  }
+  if (ids.some((id) => !uuidSchema.safeParse(id).success)) {
+    return { ok: false, error: "Identificativo consenso non valido" }
+  }
+
+  const file = fileFromForm(formData)
+  if (!file) return { ok: false, error: "Scegli il modulo da allegare" }
+  const fileError = await validateFile(file)
+  if (fileError) return { ok: false, error: fileError }
+
+  let filePath: string | null = null
+  try {
+    const eligible = await prisma.consent.count({
+      where: {
+        id: { in: ids },
+        athleteId: idParsed.data,
+        deletedAt: null,
+        filePath: null,
+      },
+    })
+    if (eligible !== ids.length) {
+      return {
+        ok: false,
+        error:
+          "Il modulo si allega solo a consensi di questa allieva ancora senza modulo. Ricarica la pagina.",
+      }
+    }
+
+    filePath = await uploadConsentFile(file)
+
+    // filePath: null anche qui: se nel frattempo qualcuno ha allegato un
+    // altro modulo, non lo si sovrascrive
+    const updated = await prisma.consent.updateMany({
+      where: {
+        id: { in: ids },
+        athleteId: idParsed.data,
+        deletedAt: null,
+        filePath: null,
+      },
+      data: { filePath },
+    })
+    if (updated.count === 0) {
+      await deleteConsentFiles([filePath])
+      return { ok: false, error: "Consenso non trovato" }
+    }
+
+    await prisma.auditLog.createMany({
+      data: ids.map((id) => ({
+        userId,
+        action: "UPDATE" as const,
+        entityType: "Consent",
+        entityId: id,
+        changes: { athleteId: idParsed.data, fileAttached: true },
+      })),
+    })
+
+    revalidateAthlete(idParsed.data)
+    return { ok: true, data: { attached: updated.count } }
+  } catch (error) {
+    if (filePath) await deleteConsentFiles([filePath])
+    if (error instanceof Error && /Upload fallito|Storage|Bucket/.test(error.message)) {
+      return { ok: false, error: error.message }
+    }
+    return { ok: false, error: mapPrismaError(error) }
+  }
+}
+
 // Il link al modulo firmato, generato al clic su «Scarica»: vive cinque
 // minuti (SIGNED_URL_TTL_SECONDS) e non si salva. Vale anche per un consenso
 // nel Cestino: il file resta finché una riga lo punta.
