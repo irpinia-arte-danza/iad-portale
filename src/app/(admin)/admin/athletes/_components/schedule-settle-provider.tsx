@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, type ReactNode } from "react"
+import type { PaymentMethod } from "@prisma/client"
 
 import type {
   AthleteWithFormRelations,
@@ -17,7 +18,15 @@ import {
 // un altro gruppo, e un dialog tenuto nella riga si chiuderebbe da solo prima
 // di poter emettere la ricevuta (scenario sportello: la famiglia aspetta).
 
-type OpenScheduleSettle = (schedule: SettleSchedule) => void
+// L'allieva arriva con la scadenza: nella scheda è sempre la stessa (e il
+// provider la riceve come default), nell'elenco Scadenze cambia a ogni riga.
+export type SettleTarget = SettleSchedule & {
+  athlete?: { id: string; firstName: string; lastName: string }
+  // Ultimo metodo usato dalla famiglia: precompila il form
+  defaultMethod?: PaymentMethod | null
+}
+
+type OpenScheduleSettle = (target: SettleTarget) => void
 
 const ScheduleSettleContext = createContext<OpenScheduleSettle | null>(null)
 
@@ -30,9 +39,11 @@ export function useOpenScheduleSettle(): OpenScheduleSettle {
 }
 
 interface ScheduleSettleProviderProps {
-  athleteId: string
-  athleteFirstName: string
-  athleteLastName: string
+  // Allieva di default: la scheda allieva ne ha una sola, l'elenco Scadenze
+  // nessuna (la porta ogni riga)
+  athleteId?: string
+  athleteFirstName?: string
+  athleteLastName?: string
   athletesForPaymentForm: AthleteWithFormRelations[]
   openSchedulesByAthlete: Record<string, OpenScheduleOption[]>
   children: ReactNode
@@ -48,25 +59,32 @@ export function ScheduleSettleProvider({
 }: ScheduleSettleProviderProps) {
   // Copia della scadenza presa all'apertura: resta valida anche quando, dopo
   // il pagamento, la scadenza risulta pagata e non è più "saldabile"
-  const [schedule, setSchedule] = useState<SettleSchedule | null>(null)
+  const [target, setTarget] = useState<SettleTarget | null>(null)
   const [open, setOpen] = useState(false)
 
-  function openSettle(next: SettleSchedule) {
-    setSchedule(next)
+  function openSettle(next: SettleTarget) {
+    setTarget(next)
     setOpen(true)
+  }
+
+  const athlete = target?.athlete ?? {
+    id: athleteId ?? "",
+    firstName: athleteFirstName ?? "",
+    lastName: athleteLastName ?? "",
   }
 
   return (
     <ScheduleSettleContext.Provider value={openSettle}>
       {children}
-      {schedule ? (
+      {target && athlete.id ? (
         <ScheduleSettleDialog
           open={open}
           onOpenChange={setOpen}
-          schedule={schedule}
-          athleteId={athleteId}
-          athleteFirstName={athleteFirstName}
-          athleteLastName={athleteLastName}
+          schedule={target}
+          athleteId={athlete.id}
+          athleteFirstName={athlete.firstName}
+          athleteLastName={athlete.lastName}
+          defaultMethod={target.defaultMethod ?? null}
           athletesForPaymentForm={athletesForPaymentForm}
           openSchedulesByAthlete={openSchedulesByAthlete}
         />

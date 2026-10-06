@@ -1,8 +1,20 @@
-import { Prisma, ScheduleStatus } from "@prisma/client"
+import {
+  AuditAction,
+  PaymentStatus,
+  Prisma,
+  ScheduleStatus,
+  type FeeType,
+  type PaymentMethod,
+} from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { withActiveCourseOrAssociationScheduleFilter } from "@/lib/queries/active-schedule-filter"
+import {
+  summarizeReminders,
+  type ReminderSummary,
+  type ReminderTrace,
+} from "@/lib/scadenze/reminder-trace"
 import { isMinorAt } from "@/lib/utils/age"
 import { todayDateOnly } from "@/lib/utils/date-only"
 
@@ -27,7 +39,7 @@ export type ScadenzaWithDetails = {
   dueDate: Date
   amountCents: number
   status: ScheduleStatus
-  feeType: string
+  feeType: FeeType
   // Causale della scadenza (es. "Quota associativa 2026/2027")
   notes: string | null
   giorniRitardo: number // > 0 se scaduta, 0 = oggi, < 0 = in scadenza futura
@@ -44,7 +56,14 @@ export type ScadenzaWithDetails = {
     email: string | null
     phone: string | null
     isAthlete: boolean
+    // null quando il destinatario è l'allieva: è la chiave con cui il
+    // sollecito di gruppo mette insieme le rate di una famiglia
+    parentId: string | null
   } | null
+  // Serve al dialog "Incassa" per spuntare la rata giusta
+  courseEnrollmentId: string | null
+  // Ultimo metodo usato dalla famiglia: precompila l'incasso
+  lastMethod: PaymentMethod | null
   // null per la quota associativa, che non è legata a un corso
   course: {
     id: string
@@ -56,8 +75,8 @@ export type ScadenzaWithDetails = {
     label: string
   }
 
-  ultimoSollecito: Date | null
-  emailCount: number
+  // Email partite più chat di WhatsApp aperte dal gestionale
+  reminders: ReminderSummary
 }
 
 // Allieva e genitore di riferimento: dall'iscrizione al corso per le mensili,
@@ -204,23 +223,72 @@ export async function getScadenze(
 
   const scheduleIds = schedules.map((s) => s.id)
 
-  const emailAggregates =
+  // Le singole righe e non un groupBy: dell'ultimo sollecito serve sapere
+  // anche da che canale è partito
+  const emailLogs =
     scheduleIds.length > 0
-      ? await prisma.emailLog.groupBy({
-          by: ["paymentScheduleId"],
+      ? await prisma.emailLog.findMany({
           where: { paymentScheduleId: { in: scheduleIds } },
-          _count: { _all: true },
-          _max: { sentAt: true },
+          select: { paymentScheduleId: true, sentAt: true },
         })
       : []
 
-  const emailMap = new Map<string, { count: number; lastSent: Date | null }>()
-  for (const agg of emailAggregates) {
-    if (!agg.paymentScheduleId) continue
-    emailMap.set(agg.paymentScheduleId, {
-      count: agg._count._all,
-      lastSent: agg._max.sentAt,
-    })
+  // Solleciti aperti su WhatsApp: non sono email, stanno in AuditLog come la
+  // ricevuta condivisa. Qui si rimettono insieme le due fonti.
+  const whatsappRows =
+    scheduleIds.length > 0
+      ? await prisma.auditLog.findMany({
+          where: {
+            action: AuditAction.REMINDER_WHATSAPP_OPENED,
+            entityType: "PaymentSchedule",
+            entityId: { in: scheduleIds },
+          },
+          select: { entityId: true, createdAt: true },
+        })
+      : []
+
+  const tracesByScheduleId = new Map<string, ReminderTrace[]>()
+  function addTrace(scheduleId: string, trace: ReminderTrace) {
+    const list = tracesByScheduleId.get(scheduleId)
+    if (list) list.push(trace)
+    else tracesByScheduleId.set(scheduleId, [trace])
+  }
+  for (const log of emailLogs) {
+    if (!log.paymentScheduleId) continue
+    addTrace(log.paymentScheduleId, { at: log.sentAt, channel: "EMAIL" })
+  }
+  for (const row of whatsappRows) {
+    if (!row.entityId) continue
+    addTrace(row.entityId, { at: row.createdAt, channel: "WHATSAPP" })
+  }
+
+  // Ultimo metodo usato da ciascuna allieva: precompila "Incassa". Chi paga
+  // in contanti paga in contanti anche il mese dopo.
+  const athleteIds = [
+    ...new Set(
+      schedules.flatMap((s) => {
+        const athlete = s.courseEnrollment?.athlete ?? s.athlete
+        return athlete ? [athlete.id] : []
+      }),
+    ),
+  ]
+  const lastPayments =
+    athleteIds.length > 0
+      ? await prisma.payment.findMany({
+          where: {
+            athleteId: { in: athleteIds },
+            deletedAt: null,
+            status: PaymentStatus.PAID,
+          },
+          orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
+          select: { athleteId: true, method: true },
+        })
+      : []
+  const lastMethodByAthlete = new Map<string, PaymentMethod>()
+  for (const payment of lastPayments) {
+    if (!lastMethodByAthlete.has(payment.athleteId)) {
+      lastMethodByAthlete.set(payment.athleteId, payment.method)
+    }
   }
 
   const today = todayDateOnly()
@@ -230,7 +298,6 @@ export async function getScadenze(
     if (!athlete) return []
 
     const parentRel = athlete.parentRelations[0] ?? null
-    const email = emailMap.get(s.id)
 
     const dueUTC = new Date(
       Date.UTC(
@@ -257,12 +324,15 @@ export async function getScadenze(
           firstName: athlete.firstName,
           lastName: athlete.lastName,
         },
+        courseEnrollmentId: s.courseEnrollment?.id ?? null,
+        lastMethod: lastMethodByAthlete.get(athlete.id) ?? null,
         contact: parentRel
           ? {
               name: `${parentRel.parent.lastName} ${parentRel.parent.firstName}`,
               email: parentRel.parent.email,
               phone: parentRel.parent.phone,
               isAthlete: false,
+              parentId: parentRel.parent.id,
             }
           : isMinorAt(athlete.dateOfBirth, today)
             ? // Minorenne senza genitori collegati: non c'è nessuno a cui
@@ -275,17 +345,59 @@ export async function getScadenze(
                 email: athlete.email,
                 phone: athlete.phone,
                 isAthlete: true,
+                parentId: null,
               },
         course: s.courseEnrollment?.course ?? null,
         academicYear: {
           id: s.academicYear.id,
           label: s.academicYear.label,
         },
-        ultimoSollecito: email?.lastSent ?? null,
-        emailCount: email?.count ?? 0,
+        reminders: summarizeReminders(tracesByScheduleId.get(s.id) ?? []),
       },
     ]
   })
+}
+
+export type ScadenzeCount = {
+  stato: ScadenzeStatoFilter
+  count: number
+  amountCents: number
+}
+
+/**
+ * I numeri sui chip dei filtri.
+ *
+ * Stesso `scadenzeWhere()` dell'elenco e dei riquadri della dashboard, con il
+ * solo `stato` che cambia: il numero sul chip è per costruzione quello delle
+ * righe che si vedono cliccandolo.
+ */
+export async function getScadenzeCounts(
+  filter: Omit<ScadenzeFilter, "stato">,
+): Promise<ScadenzeCount[]> {
+  await requireAdmin()
+
+  const stati: ScadenzeStatoFilter[] = [
+    "DEFAULT",
+    "IN_RITARDO",
+    "IN_SCADENZA_7GG",
+    "TUTTE",
+  ]
+
+  const aggregates = await Promise.all(
+    stati.map((stato) =>
+      prisma.paymentSchedule.aggregate({
+        where: scadenzeWhere({ ...filter, stato }),
+        _count: true,
+        _sum: { amountCents: true },
+      }),
+    ),
+  )
+
+  return stati.map((stato, i) => ({
+    stato,
+    count: aggregates[i]._count,
+    amountCents: aggregates[i]._sum.amountCents ?? 0,
+  }))
 }
 
 export async function listCoursesForFilter() {
