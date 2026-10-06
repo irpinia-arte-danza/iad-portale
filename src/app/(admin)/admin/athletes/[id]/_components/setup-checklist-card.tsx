@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import type { SetupStep, SetupStepId } from "@/lib/athletes/setup-checklist"
+import { cn } from "@/lib/utils"
 
 import {
   AthleteEditDialog,
@@ -37,6 +38,9 @@ export const CARD_SECTION_ID = "tessera"
 
 type Props = {
   steps: SetupStep[]
+  // Nella colonna della panoramica il blocco sta stretto: una riga sola per
+  // passo, con la conseguenza in poche parole
+  compact?: boolean
   athlete: EditableAthlete
   linkedParents: number
   // Dati che i dialog già esistenti si aspettano, caricati dalla pagina
@@ -71,8 +75,18 @@ const ACTION_LABELS: Record<SetupStepId, string> = {
 // Un passo completato sparisce al refresh della pagina (ogni azione fa
 // revalidatePath della scheda). Se non resta niente, il blocco non si mostra.
 // ─────────────────────────────────────────────────────────────────────────
+// Il certificato per primo: è l'unico passo che impedisce di fare lezione
+const STEP_ORDER: SetupStepId[] = [
+  "certificate",
+  "guardian",
+  "email",
+  "course",
+  "card",
+]
+
 export function SetupChecklistCard({
   steps,
+  compact = false,
   athlete,
   linkedParents,
   course,
@@ -80,6 +94,10 @@ export function SetupChecklistCard({
   const [open, setOpen] = React.useState<SetupStepId | null>(null)
 
   if (steps.length === 0) return null
+
+  const ordered = [...steps].sort(
+    (a, b) => STEP_ORDER.indexOf(a.id) - STEP_ORDER.indexOf(b.id),
+  )
 
   function trigger(step: SetupStep) {
     const label = ACTION_LABELS[step.id]
@@ -147,18 +165,37 @@ export function SetupChecklistCard({
         </CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {steps.map((step) => {
+            {ordered.map((step) => {
               const Icon = ICONS[step.id]
+              const isCertificate = step.id === "certificate"
               return (
                 <li
                   key={step.id}
-                  className="flex flex-col gap-2 rounded-md border bg-background p-3 sm:flex-row sm:items-center"
+                  className={cn(
+                    // Il tasto resta a destra anche sul telefono: la riga non
+                    // va mai a capo sopra di lui
+                    "flex items-center gap-2 rounded-md border bg-background p-3",
+                    isCertificate &&
+                      "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/30",
+                  )}
                 >
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground sm:mt-0" />
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-muted-foreground",
+                      isCertificate && "text-red-700 dark:text-red-300",
+                    )}
+                  />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{step.label}</p>
+                    <p
+                      className={cn(
+                        "text-sm font-medium",
+                        isCertificate && "text-red-900 dark:text-red-200",
+                      )}
+                    >
+                      {step.label}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      {step.reason}
+                      {compact ? step.short : step.reason}
                     </p>
                   </div>
                   {trigger(step)}

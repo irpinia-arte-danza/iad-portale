@@ -283,6 +283,16 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
             type: true,
             monthlyFeeCents: true,
             isActive: true,
+            // Giorno e orario: la panoramica dice quando si allena
+            schedules: {
+              select: {
+                dayOfWeek: true,
+                startTime: true,
+                endTime: true,
+                location: true,
+              },
+              orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
+            },
           },
         },
         academicYear: {
