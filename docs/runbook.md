@@ -295,6 +295,13 @@ sia di stanotte.
 
 ### Quando il controllo Data API fallisce
 
+> Dal 10 ottobre 2026 i `REVOKE` su `anon` e `authenticated` stanno nella
+> migration `20261010090000_revoke_data_api_grants` (idempotente, con i
+> default privileges per gli oggetti futuri): un database ricostruito da zero
+> nasce chiuso. **Il controllo notturno resta acceso**: è la rete di sicurezza
+> se qualcuno riapre i grant dalla dashboard o riattiva la Data API. RLS
+> spenta di proposito: `docs/gotchas.md` §17.46.
+
 **Cosa significa.** Il portale legge e scrive il database solo con Prisma, in SQL
 diretto: la Data API di Supabase (PostgREST, `https://<ref>.supabase.co/rest/v1/…`)
 non serve a niente e oggi non è raggiungibile, perché sullo schema `public` i ruoli
