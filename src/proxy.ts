@@ -2,22 +2,10 @@ import { NextResponse, type NextRequest } from "next/server"
 
 import { resolveAccountState } from "@/lib/auth/account-state"
 import { getDashboardPath } from "@/lib/auth/dashboard-path"
+// Le pagine pubbliche (login, privacy, …) stanno in un modulo a parte, con
+// il loro test
+import { isPublicPath } from "@/lib/auth/public-paths"
 import { updateSession } from "@/lib/supabase/middleware"
-
-const PUBLIC_PATHS = [
-  "/",
-  "/login",
-  "/password-dimenticata",
-  "/accesso-non-attivo",
-]
-
-// Path interni gestiti senza session (es. callback OAuth crea la session)
-const PUBLIC_PREFIXES = ["/auth/"]
-
-function isPublicPath(pathname: string): boolean {
-  if (PUBLIC_PATHS.includes(pathname)) return true
-  return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
-}
 
 export async function proxy(request: NextRequest) {
   // Step 1: refresh session (critico — cookies Supabase hanno TTL

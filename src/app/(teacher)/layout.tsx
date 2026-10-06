@@ -3,6 +3,7 @@ import Image from "next/image"
 import { requireTeacher } from "@/lib/auth/require-teacher"
 import { prisma } from "@/lib/prisma"
 import { LogoutButton } from "@/components/auth/logout-button"
+import { PrivacyLink } from "@/components/privacy-link"
 
 import { TeacherTabbar } from "./_components/teacher-tabbar"
 
@@ -53,7 +54,12 @@ export default async function TeacherLayout({
         <LogoutButton />
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 pb-20">{children}</main>
+      <main className="flex-1 overflow-y-auto p-4 pb-20">
+        {children}
+        <footer className="mt-8 text-center">
+          <PrivacyLink />
+        </footer>
+      </main>
 
       <TeacherTabbar />
     </div>

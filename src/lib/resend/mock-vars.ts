@@ -22,6 +22,7 @@ export const MOCK_TEMPLATE_VARS: TemplateVars = {
   descrizione_area: "consultare contributi, ricevute, presenze e orari delle tue figlie",
   link_accesso: "https://area.irpiniaartedanza.it/auth/confirm?esempio",
   link_recupero: "https://area.irpiniaartedanza.it/password-dimenticata",
+  link_privacy: "https://area.irpiniaartedanza.it/privacy",
   asd_nome: "A.S.D. IAD Irpinia Arte Danza",
   asd_email: "info@irpiniaartedanza.it",
 }
@@ -59,6 +60,10 @@ export const TEMPLATE_VAR_GROUPS: TemplateVarGroup[] = [
       { key: "descrizione_area", description: "Cosa si può fare nell'area" },
       { key: "link_accesso", description: "Link personale (obbligatorio nel testo)" },
       { key: "link_recupero", description: "Pagina «Password dimenticata»" },
+      {
+        key: "link_privacy",
+        description: "Informativa privacy (nell'invito c'è comunque, in fondo)",
+      },
       { key: "asd_nome", description: "Nome dell'associazione" },
       { key: "asd_email", description: "Email della segreteria" },
     ],

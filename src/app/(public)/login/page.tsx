@@ -1,3 +1,5 @@
+import { PrivacyLink } from "@/components/privacy-link";
+
 import { LoginForm } from "./login-form";
 
 // Codici errore passati via ?error= da /auth/callback: solo messaggi noti,
@@ -23,6 +25,9 @@ export default async function LoginPage({ searchParams }: PageProps) {
     <main className="min-h-dvh flex items-center justify-center p-4 bg-background">
       <div className="w-full max-w-sm">
         <LoginForm errorMessage={errorMessage} />
+        <footer className="mt-2 text-center">
+          <PrivacyLink />
+        </footer>
       </div>
     </main>
   );

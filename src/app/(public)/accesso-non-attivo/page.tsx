@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { UserX } from "lucide-react"
 
+import { PrivacyLink } from "@/components/privacy-link"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -63,6 +64,9 @@ export default async function AccessNotActivePage() {
             </Button>
           </CardContent>
         </Card>
+        <footer className="mt-2 text-center">
+          <PrivacyLink />
+        </footer>
       </div>
     </main>
   )

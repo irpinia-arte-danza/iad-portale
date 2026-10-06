@@ -12,6 +12,7 @@ import { substituteVariables } from "@/lib/resend/template-vars"
 import { createAdminClient } from "@/lib/supabase/admin-client"
 
 import { athleteAccessEligibility } from "./athlete-access"
+import { withPrivacyFooter } from "./privacy-footer"
 
 import { resolveAccountState, type AccountState } from "./account-state"
 import {
@@ -163,7 +164,12 @@ function accessInviteVars(
           ? "vedere le tue classi e segnare le presenze"
           : "consultare i tuoi contributi, le ricevute, le presenze e gli orari",
     link_recupero: `${appUrl}/password-dimenticata`,
+    link_privacy: privacyUrl(appUrl),
   }
+}
+
+function privacyUrl(appUrl: string): string {
+  return `${appUrl}/privacy`
 }
 
 export type AccessInvitePreview = { subject: string; text: string }
@@ -227,6 +233,19 @@ async function renderPersonalEmail(
     },
   })
 
+  // L'invito porta sempre il link all'informativa privacy, in fondo, anche
+  // se il modello salvato non lo prevede (vedi privacy-footer.ts)
+  const finish = (
+    templateSlug: string | null,
+    rendered: ReturnType<typeof renderFrom>,
+  ): RenderedEmail => {
+    if (slug !== ACCESS_TEMPLATE_SLUG || !vars.link_privacy) {
+      return { templateSlug, ...rendered }
+    }
+    const body = withPrivacyFooter(rendered, vars.link_privacy)
+    return { templateSlug, subject: rendered.subject, ...body }
+  }
+
   if (template?.isActive) {
     const rendered = renderFrom({
       subject: template.subject,
@@ -234,12 +253,12 @@ async function renderPersonalEmail(
       bodyText: template.bodyText ?? fallback.bodyText,
     })
     if (rendered.html.includes(escapeHtml(link)) && rendered.text.includes(link)) {
-      return { templateSlug: template.slug, ...rendered }
+      return finish(template.slug, rendered)
     }
     console.warn("[access email] template without link, using default", { slug })
   }
 
-  return { templateSlug: null, ...renderFrom(fallback) }
+  return finish(null, renderFrom(fallback))
 }
 
 // Il link è una credenziale temporanea: non va salvato nello storico email.
