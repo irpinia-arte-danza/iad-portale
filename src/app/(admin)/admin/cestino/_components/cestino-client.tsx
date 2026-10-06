@@ -31,7 +31,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { EmptyState } from "@/components/empty-state"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { firstCategoryWithItems } from "@/lib/cestino/categories"
 import { formatDateShort, formatEuro } from "@/lib/utils/format"
+import { fullName, listName } from "@/lib/utils/person-name"
 import {
   MEDICAL_CERT_TYPE_LABELS,
   normalizeCertType,
@@ -211,6 +221,15 @@ function daysAgo(date: Date | null): string {
   return `${days} giorni fa`
 }
 
+type Category = {
+  key: string
+  label: string
+  count: number
+  emptyTitle: string
+  columns: string[]
+  rows: CestinoRow[]
+}
+
 type ConfirmTarget = {
   id: string
   label: string
@@ -263,272 +282,269 @@ export function CestinoClient({
     setBusy(false)
   }
 
+  // ── Le categorie, come dati ─────────────────────────────────────────────
+  // Erano dieci blocchi copiati: aggiungerne una voleva dire toccare la
+  // lista delle schede e il contenuto, e sbagliare l'ordine in uno dei due.
+  const categories: Category[] = [
+    {
+      key: "athletes",
+      label: "Allieve",
+      count: counts.athletes,
+      emptyTitle: "Nessuna allieva nel cestino",
+      columns: ["Nome", "C.F.", "Eliminata"],
+      rows: athletes.map((a) => ({
+        id: a.id,
+        cells: [listName(a), a.fiscalCode ?? "—", daysAgo(a.deletedAt)],
+        label: fullName(a),
+        kind: "athlete",
+        confirmExpected: fullName(a),
+        confirmKind: "name",
+      })),
+    },
+    {
+      key: "parents",
+      label: "Genitori",
+      count: counts.parents,
+      emptyTitle: "Nessun genitore nel cestino",
+      columns: ["Nome", "Email", "Eliminato"],
+      rows: parents.map((p) => ({
+        id: p.id,
+        cells: [listName(p), p.email ?? "—", daysAgo(p.deletedAt)],
+        label: fullName(p),
+        kind: "parent",
+        confirmExpected: fullName(p),
+        confirmKind: "name",
+      })),
+    },
+    {
+      key: "teachers",
+      label: "Insegnanti",
+      count: counts.teachers,
+      emptyTitle: "Nessuna insegnante nel cestino",
+      columns: ["Nome", "Email", "Eliminato"],
+      rows: teachers.map((t) => ({
+        id: t.id,
+        cells: [listName(t), t.email ?? "—", daysAgo(t.deletedAt)],
+        label: fullName(t),
+        kind: "teacher",
+        confirmExpected: fullName(t),
+        confirmKind: "name",
+      })),
+    },
+    {
+      key: "courses",
+      label: "Corsi",
+      count: counts.courses,
+      emptyTitle: "Nessun corso nel cestino",
+      columns: ["Nome", "Tipo", "Stato", "Eliminato"],
+      rows: courses.map((c) => ({
+        id: c.id,
+        cells: [
+          c.name,
+          c.type,
+          c.isActive ? (
+            <Badge key={`${c.id}-active`}>Attivo</Badge>
+          ) : (
+            <Badge key={`${c.id}-arch`} variant="outline">
+              Archiviato
+            </Badge>
+          ),
+          daysAgo(c.deletedAt),
+        ],
+        label: c.name,
+        kind: "course",
+        confirmExpected: c.name,
+        confirmKind: "name",
+      })),
+    },
+    {
+      key: "expenses",
+      label: "Spese",
+      count: counts.expenses,
+      emptyTitle: "Nessuna spesa nel cestino",
+      columns: ["Tipo", "Importo", "Data", "Descrizione", "Eliminata"],
+      rows: expenses.map((e) => ({
+        id: e.id,
+        cells: [
+          e.type,
+          formatEuro(e.amountCents),
+          formatDateShort(new Date(e.expenseDate)),
+          e.description ?? "—",
+          daysAgo(e.deletedAt),
+        ],
+        label: `${e.type} · ${formatEuro(e.amountCents)} · ${formatDateShort(new Date(e.expenseDate))}`,
+        kind: "expense",
+        confirmExpected: new Date(e.expenseDate).toISOString().slice(0, 10),
+        confirmKind: "date",
+      })),
+    },
+    {
+      key: "certs",
+      label: "Certificati",
+      count: counts.certs,
+      emptyTitle: "Nessun certificato nel cestino",
+      columns: ["Allieva", "Tipo", "Emesso", "Scade", "Eliminato"],
+      rows: certs.map((c) => ({
+        id: c.id,
+        cells: [
+          listName(c.athlete),
+          MEDICAL_CERT_TYPE_LABELS[normalizeCertType(c.type)],
+          formatDateShort(new Date(c.issueDate)),
+          formatDateShort(new Date(c.expiryDate)),
+          daysAgo(c.deletedAt),
+        ],
+        label: `${fullName(c.athlete)} · ${MEDICAL_CERT_TYPE_LABELS[normalizeCertType(c.type)]}`,
+        kind: "cert",
+        confirmExpected: fullName(c.athlete),
+        confirmKind: "name",
+      })),
+    },
+    {
+      key: "cards",
+      label: "Tessere",
+      count: counts.cards,
+      emptyTitle: "Nessuna tessera nel cestino",
+      columns: ["Allieva", "Ente", "Numero", "Anno", "Scade", "Eliminata"],
+      rows: cards.map((c) => ({
+        id: c.id,
+        cells: [
+          listName(c.athlete),
+          c.entity,
+          c.cardNumber ?? "—",
+          String(c.cardYear),
+          c.expiryDate ? formatDateShort(new Date(c.expiryDate)) : "—",
+          daysAgo(c.deletedAt),
+        ],
+        label: `${fullName(c.athlete)} · tessera ${c.entity} n. ${c.cardNumber ?? "—"}`,
+        kind: "card",
+        confirmExpected: fullName(c.athlete),
+        confirmKind: "name",
+      })),
+    },
+    {
+      key: "enrollments",
+      label: "Iscrizioni",
+      count: counts.enrollments,
+      emptyTitle: "Nessuna iscrizione nel cestino",
+      columns: ["Allieva", "Corso", "Anno", "Rate", "Annullata"],
+      rows: enrollments.map((e) => ({
+        id: e.id,
+        cells: [
+          listName(e.athlete),
+          e.course.name,
+          e.academicYear.label,
+          String(e._count.paymentSchedules),
+          daysAgo(e.deletedAt),
+        ],
+        label: `${fullName(e.athlete)} · ${e.course.name}`,
+        kind: "enrollment",
+        confirmExpected: fullName(e.athlete),
+        confirmKind: "name",
+      })),
+    },
+    {
+      key: "showcases",
+      label: "Saggi",
+      count: counts.showcases,
+      emptyTitle: "Nessun saggio nel cestino",
+      columns: ["Saggio", "AA", "Data", "Eliminato"],
+      rows: showcases.map((s) => ({
+        id: s.id,
+        cells: [
+          s.title,
+          s.academicYear.label,
+          formatDateShort(new Date(s.date)),
+          daysAgo(s.deletedAt),
+        ],
+        label: s.title,
+        kind: "showcase",
+        confirmExpected: s.title,
+        confirmKind: "name",
+      })),
+    },
+    {
+      key: "costumes",
+      label: "Costumi",
+      count: counts.costumes,
+      emptyTitle: "Nessun costume nel cestino",
+      columns: ["Costume", "Saggio", "Costo", "Eliminato"],
+      rows: costumes.map((c) => ({
+        id: c.id,
+        cells: [
+          c.name,
+          c.showcase.title + (c.showcase.deletedAt ? " (cestinato)" : ""),
+          formatEuro(c.costCents),
+          daysAgo(c.deletedAt),
+        ],
+        label: c.name,
+        kind: "costume",
+        confirmExpected: c.name,
+        confirmKind: "name",
+      })),
+    },
+  ]
+
+  // Si apre sulla prima categoria che ha qualcosa: prima si apriva sempre
+  // su Allieve, quasi sempre vuota, e il cestino sembrava vuoto anche
+  // quando non lo era
+  const firstWithItems = firstCategoryWithItems(categories)
+  const [chosen, setChosen] = React.useState<string | null>(null)
+  const active = chosen ?? firstWithItems ?? categories[0].key
+
+  // Vuoto del tutto: una sola cosa da dire, non dieci schede vuote
+  if (firstWithItems === null) {
+    return (
+      <EmptyState
+        icon={Trash2}
+        title="Il cestino è vuoto"
+        description="Quello che elimini finisce qui e si può ripristinare"
+      />
+    )
+  }
+
+  const label = (c: Category) =>
+    c.count > 0 ? `${c.label} (${c.count})` : c.label
+
   return (
     <>
-      <Tabs defaultValue="athletes" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-8">
-          <TabsTrigger value="athletes">
-            Allieve {counts.athletes > 0 ? `(${counts.athletes})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="parents">
-            Genitori {counts.parents > 0 ? `(${counts.parents})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="teachers">
-            Insegnanti {counts.teachers > 0 ? `(${counts.teachers})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="courses">
-            Corsi {counts.courses > 0 ? `(${counts.courses})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="expenses">
-            Spese {counts.expenses > 0 ? `(${counts.expenses})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="certs">
-            Certificati {counts.certs > 0 ? `(${counts.certs})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="cards">
-            Tessere {counts.cards > 0 ? `(${counts.cards})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="enrollments">
-            Iscrizioni {counts.enrollments > 0 ? `(${counts.enrollments})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="showcases">
-            Saggi {counts.showcases > 0 ? `(${counts.showcases})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="costumes">
-            Costumi {counts.costumes > 0 ? `(${counts.costumes})` : ""}
-          </TabsTrigger>
+      <Tabs value={active} onValueChange={setChosen} className="space-y-4">
+        {/* Sotto 1024 dieci schede non ci stanno su una riga e andavano a
+            capo su quattro: lì diventano una select, con gli stessi numeri */}
+        <Select value={active} onValueChange={setChosen}>
+          <SelectTrigger
+            className="h-11 w-full lg:hidden"
+            aria-label="Categoria del cestino"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map((c) => (
+              <SelectItem key={c.key} value={c.key}>
+                {label(c)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <TabsList className="hidden h-auto flex-wrap justify-start lg:flex">
+          {categories.map((c) => (
+            <TabsTrigger key={c.key} value={c.key}>
+              {label(c)}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="athletes">
-          <CestinoTable
-            empty="Nessuna allieva eliminata."
-            columns={["Nome", "C.F.", "Eliminata"]}
-            rows={athletes.map((a) => ({
-              id: a.id,
-              cells: [
-                `${a.lastName} ${a.firstName}`,
-                a.fiscalCode ?? "—",
-                daysAgo(a.deletedAt),
-              ],
-              label: `${a.firstName} ${a.lastName}`,
-              kind: "athlete" as const,
-              confirmExpected: `${a.firstName} ${a.lastName}`,
-              confirmKind: "name" as const,
-            }))}
-            onRestore={setConfirm}
-            onHardDelete={setHardTarget}
-          />
-        </TabsContent>
-
-        <TabsContent value="parents">
-          <CestinoTable
-            empty="Nessun genitore eliminato."
-            columns={["Nome", "Email", "Eliminato"]}
-            rows={parents.map((p) => ({
-              id: p.id,
-              cells: [
-                `${p.lastName} ${p.firstName}`,
-                p.email ?? "—",
-                daysAgo(p.deletedAt),
-              ],
-              label: `${p.firstName} ${p.lastName}`,
-              kind: "parent" as const,
-              confirmExpected: `${p.firstName} ${p.lastName}`,
-              confirmKind: "name" as const,
-            }))}
-            onRestore={setConfirm}
-            onHardDelete={setHardTarget}
-          />
-        </TabsContent>
-
-        <TabsContent value="teachers">
-          <CestinoTable
-            empty="Nessun insegnante eliminato."
-            columns={["Nome", "Email", "Eliminato"]}
-            rows={teachers.map((t) => ({
-              id: t.id,
-              cells: [
-                `${t.lastName} ${t.firstName}`,
-                t.email ?? "—",
-                daysAgo(t.deletedAt),
-              ],
-              label: `${t.firstName} ${t.lastName}`,
-              kind: "teacher" as const,
-              confirmExpected: `${t.firstName} ${t.lastName}`,
-              confirmKind: "name" as const,
-            }))}
-            onRestore={setConfirm}
-            onHardDelete={setHardTarget}
-          />
-        </TabsContent>
-
-        <TabsContent value="courses">
-          <CestinoTable
-            empty="Nessun corso eliminato."
-            columns={["Nome", "Tipo", "Stato", "Eliminato"]}
-            rows={courses.map((c) => ({
-              id: c.id,
-              cells: [
-                c.name,
-                c.type,
-                c.isActive ? (
-                  <Badge key={`${c.id}-active`}>Attivo</Badge>
-                ) : (
-                  <Badge key={`${c.id}-arch`} variant="outline">
-                    Archiviato
-                  </Badge>
-                ),
-                daysAgo(c.deletedAt),
-              ],
-              label: c.name,
-              kind: "course" as const,
-              confirmExpected: c.name,
-              confirmKind: "name" as const,
-            }))}
-            onRestore={setConfirm}
-            onHardDelete={setHardTarget}
-          />
-        </TabsContent>
-
-        <TabsContent value="expenses">
-          <CestinoTable
-            empty="Nessuna spesa eliminata."
-            columns={["Tipo", "Importo", "Data", "Descrizione", "Eliminata"]}
-            rows={expenses.map((e) => ({
-              id: e.id,
-              cells: [
-                e.type,
-                formatEuro(e.amountCents),
-                formatDateShort(new Date(e.expenseDate)),
-                e.description ?? "—",
-                daysAgo(e.deletedAt),
-              ],
-              label: `${e.type} · ${formatEuro(e.amountCents)} · ${formatDateShort(new Date(e.expenseDate))}`,
-              kind: "expense" as const,
-              confirmExpected: new Date(e.expenseDate)
-                .toISOString()
-                .slice(0, 10),
-              confirmKind: "date" as const,
-            }))}
-            onRestore={setConfirm}
-            onHardDelete={setHardTarget}
-          />
-        </TabsContent>
-
-        <TabsContent value="certs">
-          <CestinoTable
-            empty="Nessun certificato eliminato."
-            columns={["Allieva", "Tipo", "Emesso", "Scade", "Eliminato"]}
-            rows={certs.map((c) => ({
-              id: c.id,
-              cells: [
-                `${c.athlete.lastName} ${c.athlete.firstName}`,
-                MEDICAL_CERT_TYPE_LABELS[normalizeCertType(c.type)],
-                formatDateShort(new Date(c.issueDate)),
-                formatDateShort(new Date(c.expiryDate)),
-                daysAgo(c.deletedAt),
-              ],
-              label: `${c.athlete.firstName} ${c.athlete.lastName} · ${MEDICAL_CERT_TYPE_LABELS[normalizeCertType(c.type)]}`,
-              kind: "cert" as const,
-              confirmExpected: `${c.athlete.firstName} ${c.athlete.lastName}`,
-              confirmKind: "name" as const,
-            }))}
-            onRestore={setConfirm}
-            onHardDelete={setHardTarget}
-          />
-        </TabsContent>
-
-        <TabsContent value="cards">
-          <CestinoTable
-            empty="Nessuna tessera eliminata."
-            columns={["Allieva", "Ente", "Numero", "Anno", "Scade", "Eliminata"]}
-            rows={cards.map((c) => ({
-              id: c.id,
-              cells: [
-                `${c.athlete.lastName} ${c.athlete.firstName}`,
-                c.entity,
-                c.cardNumber ?? "—",
-                String(c.cardYear),
-                c.expiryDate ? formatDateShort(new Date(c.expiryDate)) : "—",
-                daysAgo(c.deletedAt),
-              ],
-              label: `${c.athlete.firstName} ${c.athlete.lastName} · tessera ${c.entity} n. ${c.cardNumber ?? "—"}`,
-              kind: "card" as const,
-              confirmExpected: `${c.athlete.firstName} ${c.athlete.lastName}`,
-              confirmKind: "name" as const,
-            }))}
-            onRestore={setConfirm}
-            onHardDelete={setHardTarget}
-          />
-        </TabsContent>
-
-        <TabsContent value="enrollments">
-          <CestinoTable
-            empty="Nessuna iscrizione annullata."
-            columns={["Allieva", "Corso", "Anno", "Rate", "Annullata"]}
-            rows={enrollments.map((e) => ({
-              id: e.id,
-              cells: [
-                `${e.athlete.lastName} ${e.athlete.firstName}`,
-                e.course.name,
-                e.academicYear.label,
-                String(e._count.paymentSchedules),
-                daysAgo(e.deletedAt),
-              ],
-              label: `${e.athlete.firstName} ${e.athlete.lastName} · ${e.course.name}`,
-              kind: "enrollment" as const,
-              confirmExpected: `${e.athlete.firstName} ${e.athlete.lastName}`,
-              confirmKind: "name" as const,
-            }))}
-            onRestore={setConfirm}
-            onHardDelete={setHardTarget}
-          />
-        </TabsContent>
-
-        <TabsContent value="showcases">
-          <CestinoTable
-            empty="Nessun saggio eliminato."
-            columns={["Saggio", "AA", "Data", "Eliminato"]}
-            rows={showcases.map((s) => ({
-              id: s.id,
-              cells: [
-                s.title,
-                s.academicYear.label,
-                formatDateShort(new Date(s.date)),
-                daysAgo(s.deletedAt),
-              ],
-              label: s.title,
-              kind: "showcase" as const,
-              confirmExpected: s.title,
-              confirmKind: "name" as const,
-            }))}
-            onRestore={setConfirm}
-            onHardDelete={setHardTarget}
-          />
-        </TabsContent>
-
-        <TabsContent value="costumes">
-          <CestinoTable
-            empty="Nessun costume eliminato."
-            columns={["Costume", "Saggio", "Costo", "Eliminato"]}
-            rows={costumes.map((c) => ({
-              id: c.id,
-              cells: [
-                c.name,
-                c.showcase.title +
-                  (c.showcase.deletedAt ? " (cestinato)" : ""),
-                formatEuro(c.costCents),
-                daysAgo(c.deletedAt),
-              ],
-              label: c.name,
-              kind: "costume" as const,
-              confirmExpected: c.name,
-              confirmKind: "name" as const,
-            }))}
-            onRestore={setConfirm}
-            onHardDelete={setHardTarget}
-          />
-        </TabsContent>
+        {categories.map((c) => (
+          <TabsContent key={c.key} value={c.key}>
+            <CestinoTable
+              emptyTitle={c.emptyTitle}
+              columns={c.columns}
+              rows={c.rows}
+              onRestore={setConfirm}
+              onHardDelete={setHardTarget}
+            />
+          </TabsContent>
+        ))}
       </Tabs>
 
       <HardDeleteDialog
@@ -592,21 +608,23 @@ const RESTORE_ONLY_KINDS = new Set<EntityKind>(["showcase", "costume"])
 function CestinoTable({
   columns,
   rows,
-  empty,
+  emptyTitle,
   onRestore,
   onHardDelete,
 }: {
   columns: string[]
   rows: CestinoRow[]
-  empty: string
+  emptyTitle: string
   onRestore: (target: ConfirmTarget) => void
   onHardDelete: (target: HardDeleteTarget) => void
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-md border border-dashed py-12 text-center text-sm text-muted-foreground">
-        {empty}
-      </div>
+      <EmptyState
+        icon={Trash2}
+        title={emptyTitle}
+        description="Quello che elimini finisce qui e si può ripristinare"
+      />
     )
   }
   return (

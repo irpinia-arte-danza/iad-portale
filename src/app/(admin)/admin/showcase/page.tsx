@@ -1,4 +1,7 @@
 import { redirect } from "next/navigation"
+import { Sparkles } from "lucide-react"
+
+import { EmptyState } from "@/components/empty-state"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -44,22 +47,15 @@ export default async function ShowcasePage() {
     <>
       <ResourceHeader
         breadcrumbs={[{ label: "Saggio" }]}
-        title={`Saggio AA ${academicYear.label}`}
-        description="Un solo saggio per anno accademico. Crea quello dell'AA corrente."
+        title={`Saggio ${academicYear.label}`}
       />
       <ResourceContent>
-        <Card>
-          <CardHeader>
-            <CardTitle>Nessun saggio configurato per l&apos;AA {academicYear.label}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-              Crea il saggio per definire date, scadenze caparra/saldo e contributi.
-              Le partecipazioni si gestiscono dalla scheda del saggio.
-            </p>
-            <ShowcaseCreateDialog academicYearId={academicYear.id} />
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Sparkles}
+          title={`Il saggio ${academicYear.label} non è ancora configurato`}
+          description="Date, caparra e saldo si impostano qui"
+          action={<ShowcaseCreateDialog academicYearId={academicYear.id} />}
+        />
       </ResourceContent>
     </>
   )
