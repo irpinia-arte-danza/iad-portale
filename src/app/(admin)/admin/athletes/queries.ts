@@ -98,6 +98,11 @@ const athleteListInclude = Prisma.validator<Prisma.AthleteInclude>()({
       createdAt: true,
     },
   },
+  // Consensi registrati: al passo Privacy basta sapere di che tipo sono
+  consents: {
+    where: { deletedAt: null },
+    select: { type: true },
+  },
 })
 
 type AthleteListRecord = Prisma.AthleteGetPayload<{
@@ -158,6 +163,7 @@ function toListRow(
     affiliations,
     enrollments,
     parentRelations,
+    consents,
     ...athlete
   } = record
   const expiryDate = medicalCertificates[0]?.expiryDate ?? null
@@ -195,6 +201,7 @@ function toListRow(
         enrollments,
         certificates: medicalCertificates,
         cards: affiliations,
+        consents,
       },
       { currentAcademicYear, at: today },
     ).map((step) => step.id),
@@ -235,6 +242,7 @@ export type AthleteListCounts = {
   tutte: number
   certificate: number
   guardian: number
+  privacy: number
   overdue: { count: number; amountCents: number }
 }
 
@@ -316,6 +324,8 @@ export async function listAthletes(
     ).length,
     guardian: inScope.filter((row) => matchesFilter(row, GUARDIAN_GAP_FILTER))
       .length,
+    privacy: inScope.filter((row) => matchesFilter(row, "senza-privacy"))
+      .length,
     overdue: inScope.reduce(
       (acc, row) => ({
         count: acc.count + (row.overdue.count > 0 ? 1 : 0),
@@ -386,6 +396,7 @@ export async function countAthleteSteps(): Promise<AthleteStepCounts> {
     email: 0,
     course: 0,
     certificate: 0,
+    privacy: 0,
   }
 
   for (const athlete of athletes) {
@@ -466,6 +477,21 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
         notes: true,
         filePath: true,
         createdAt: true,
+      },
+    },
+    // Consensi cartacei, cestinati compresi: la sezione Consensi ha il suo
+    // cestino con «Ripristina»
+    consents: {
+      orderBy: [{ acceptedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        type: true,
+        acceptedAt: true,
+        documentVersion: true,
+        method: true,
+        notes: true,
+        deletedAt: true,
+        parent: { select: { id: true, firstName: true, lastName: true } },
       },
     },
     // Tessere dell'ente (corrente + storico), gemelle dei certificati

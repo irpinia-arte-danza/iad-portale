@@ -44,6 +44,8 @@ export type TodoCounters = {
   allieveSenzaGenitore: number
   allieveSenzaCorso: number
   allieveSenzaEmail: number
+  // Senza informativa privacy firmata e registrata
+  allieveSenzaPrivacy: number
   certificatiScaduti: number
   certificatiInScadenza: number
   certificatiAssenti: number
@@ -197,6 +199,16 @@ export function todoTiles(counters: TodoCounters): TodoTile[] {
       count: counters.allieveSenzaEmail,
       href: athleteStepHref("email"),
       tone: statusTone({ kind: "setupStep", step: "email" }),
+    })
+  }
+
+  if (counters.allieveSenzaPrivacy > 0) {
+    tiles.push({
+      id: "allieve-senza-privacy",
+      label: "Senza consenso privacy",
+      count: counters.allieveSenzaPrivacy,
+      href: athleteStepHref("privacy"),
+      tone: statusTone({ kind: "setupStep", step: "privacy" }),
     })
   }
 

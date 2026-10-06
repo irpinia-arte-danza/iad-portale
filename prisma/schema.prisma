@@ -1067,9 +1067,15 @@ model Affiliation {
 enum ConsentType {
   REGULATION
   WITHDRAWAL_TERMS
+  // Liberatoria foto/video senza distinzione: valore storico, non più usato
+  // dalle registrazioni nuove (vedi i due sotto)
   IMAGE_RELEASE
   PAYMENT_TERMS
   GDPR
+  // Foto e video per uso interno (archivio, saggio, chat del corso)
+  IMAGE_RELEASE_INTERNAL
+  // Foto e video pubblicati su sito e canali social
+  IMAGE_RELEASE_PUBLIC
 }
 
 enum ConsentMethod {
@@ -1092,6 +1098,11 @@ model Consent {
 
   revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(6)
   revokeReason String?   @map("revoke_reason")
+
+  // Consensi cartacei registrati dalla segreteria: una nota libera (dove sta
+  // il modulo, chi l'ha consegnato) e il Cestino, come certificati e tessere
+  notes     String?
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   athlete Athlete? @relation(fields: [athleteId], references: [id])
   parent  Parent?  @relation(fields: [parentId], references: [id])

@@ -1,10 +1,12 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
   BookOpen,
   IdCard,
   Mail,
+  ShieldCheck,
   Stethoscope,
   UserPlus,
 } from "lucide-react"
@@ -17,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { athleteTabHref } from "@/lib/athletes/athlete-tabs"
 import type { SetupStep, SetupStepId } from "@/lib/athletes/setup-checklist"
 import { statusTone, TONE_SURFACE, TONE_TEXT } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
@@ -33,9 +36,11 @@ import {
 import { GuardianPickerDialog } from "../../_components/guardian-picker-dialog"
 import { MedicalCertFormDialog } from "./medical-cert-form-dialog"
 
-// Ancora della sezione tessera, nella pagina: la tessera arriva dall'ente,
-// non si crea da qui, quindi il passo porta a guardarla e non a un form
+// Ancore nella scheda Documenti: la tessera arriva dall'ente, non si crea da
+// qui, quindi il passo porta a guardarla e non a un form; il consenso si
+// registra dalla sua sezione, che sa chi può aver firmato
 export const CARD_SECTION_ID = "tessera"
+export const CONSENTS_SECTION_ID = "consensi"
 
 type Props = {
   steps: SetupStep[]
@@ -59,6 +64,7 @@ const ICONS: Record<SetupStepId, React.ComponentType<{ className?: string }>> = 
   course: BookOpen,
   certificate: Stethoscope,
   card: IdCard,
+  privacy: ShieldCheck,
 }
 
 const ACTION_LABELS: Record<SetupStepId, string> = {
@@ -67,6 +73,7 @@ const ACTION_LABELS: Record<SetupStepId, string> = {
   course: "Iscrivi",
   certificate: "Carica",
   card: "Vedi tessera",
+  privacy: "Registra",
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -82,6 +89,7 @@ const STEP_ORDER: SetupStepId[] = [
   "guardian",
   "email",
   "course",
+  "privacy",
   "card",
 ]
 
@@ -134,10 +142,16 @@ export function SetupChecklistCard({
         />
       )
     }
-    if (step.id === "card") {
+    // Tessera e consenso stanno nella scheda Documenti: il link apre quella
+    // scheda (il valore vive nell'URL) e scende alla sezione
+    if (step.id === "card" || step.id === "privacy") {
+      const anchor =
+        step.id === "card" ? CARD_SECTION_ID : CONSENTS_SECTION_ID
       return (
         <Button asChild size="sm" variant="outline" className="min-h-11 shrink-0">
-          <a href={`#${CARD_SECTION_ID}`}>{label}</a>
+          <Link href={`${athleteTabHref(athlete.id, "documenti")}#${anchor}`}>
+            {label}
+          </Link>
         </Button>
       )
     }

@@ -51,6 +51,10 @@ const EMPTY_BY_FILTER: Record<
     title: "Nessuna allieva senza certificato valido",
     hint: "Tutte hanno un certificato medico in corso di validità.",
   },
+  "senza-privacy": {
+    title: "Nessuna allieva senza consenso privacy",
+    hint: "Per tutte risulta registrata la firma dell'informativa privacy.",
+  },
   [OVERDUE_FILTER]: {
     title: "Nessun contributo in ritardo",
     hint: "Tutte le rate scadute risultano incassate.",

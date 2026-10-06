@@ -105,6 +105,11 @@ export function AthletesFilters({
       count: counts.overdue.count,
       amountCents: counts.overdue.amountCents,
     },
+    {
+      filter: "senza-privacy",
+      label: ATHLETE_FILTER_LABELS["senza-privacy"],
+      count: counts.privacy,
+    },
   ]
 
   // Un filtro che arriva da un riquadro della dashboard e non ha un chip

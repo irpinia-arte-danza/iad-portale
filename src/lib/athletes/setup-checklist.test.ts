@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 
+import { statusTone } from "@/lib/status/tone"
+
 import {
   athleteSetupChecklist,
   type ChecklistAthlete,
@@ -38,6 +40,7 @@ function completa(overrides: Partial<ChecklistAthlete> = {}): ChecklistAthlete {
         createdAt: d("2026-09-16"),
       },
     ],
+    consents: [{ type: "GDPR" }],
     ...overrides,
   }
 }
@@ -52,6 +55,32 @@ describe("athleteSetupChecklist", () => {
 
   it("minorenne senza genitore → Genitore", () => {
     expect(ids(completa({ linkedParents: 0 }))).toEqual(["guardian"])
+  })
+
+  it("nessun consenso registrato → Privacy, ambra", () => {
+    const steps = athleteSetupChecklist(completa({ consents: [] }), ANNO)
+    expect(steps.map((s) => s.id)).toEqual(["privacy"])
+    expect(steps[0].reason).toContain("Consensi")
+    expect(statusTone({ kind: "setupStep", step: "privacy" })).toBe("fix")
+  })
+
+  it("le liberatorie foto non valgono come informativa privacy", () => {
+    expect(
+      ids(
+        completa({
+          consents: [
+            { type: "IMAGE_RELEASE_INTERNAL" },
+            { type: "IMAGE_RELEASE_PUBLIC" },
+          ],
+        }),
+      ),
+    ).toEqual(["privacy"])
+  })
+
+  it("il passo Privacy non dipende dall'anno accademico", () => {
+    expect(
+      ids(completa({ consents: [] }), { currentAcademicYear: null, at: OGGI }),
+    ).toEqual(["privacy"])
   })
 
   it("il motivo del passo Genitore dice cosa non arriva alla famiglia", () => {
