@@ -10,6 +10,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.1 shadcn css rewrite
   - §17.8 Sidebar tooltip
   - §17.42 `sidebar.tsx` è modificato a mano: `shadcn add sidebar` lo sovrascrive
+  - §17.43 I colori di stato non si scrivono nei componenti: si chiedono a `statusTone`
 - [Prisma / Schema](#prisma--schema)
   - §17.2 Prisma version pinning
   - §17.3 Prisma CLI env loading
@@ -63,6 +64,15 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
 ## Shadcn / Tailwind
 
 **§17.1 shadcn 4.3.0**: il comando `npx shadcn@latest add` riscrive `src/app/globals.css` senza chiedere conferma, sostituendo il pattern corretto `var(--font-geist-sans)` con stringhe hardcoded (`"Geist", "Geist Fallback", ...`) e duplicando i fallback. Verificare SEMPRE `git diff src/app/globals.css` dopo ogni `shadcn add` PRIMA di committare. Se il pattern è alterato, ripristinare manualmente le righe `--font-sans` e `--font-mono`. Lo stesso vale per `shadcn init` che auto-committa senza chiedere — usare `git reset --soft origin/main` + ricommit manuale con messaggio conventional.
+
+**§17.43 I colori di stato non si scrivono nei componenti**: rosso e ambra erano scritti a mano in una ventina di file (`text-red-700 dark:text-red-300`, `border-amber-500/40 bg-amber-500/10`, …), e lo stesso stato finiva di colori diversi in pagine diverse: la tessera assente era ambra nella scheda allieva e rossa nel menu, il certificato scaduto rosso in lista e `variant="destructive"` nella scheda. Adesso:
+
+- il significato è uno: **rosso** = blocca la lezione o un documento (certificato e tessera mancanti o scaduti, minorenne senza genitore, email tornata indietro), **ambra** = da sistemare ma intanto si lavora (contributi in ritardo, ricevute da consegnare, dati da completare, genitori mai invitati), **neutro** tutto il resto — le uscite del bilancio comprese, che non sono un problema;
+- a deciderlo è `statusTone(status)` in `src/lib/status/tone.ts`, una funzione pura che prende lo **stato di dominio** (`{ kind: "certificate", status }`, `{ kind: "receipt", toDeliver }`, …) e torna `"block" | "fix" | "neutral"`;
+- le classi stanno in `TONE_BADGE` / `TONE_SURFACE` / `TONE_TEXT` nello stesso file e usano i token `--status-block*` / `--status-fix*` di `globals.css` (definiti per chiaro e scuro in `:root` e `.dark`);
+- i moduli di dominio (`athlete-status.ts`, `due-label.ts`, `delivery.ts`, `todo-tiles.ts`) espongono `tone: StatusTone`, mai un nome di colore: `"amber"` in un tipo tornava a essere una decisione grafica presa nel posto sbagliato.
+
+Regola pratica: in un componente di stato non deve comparire `red-*`, `amber-*`, `rose-*` o `orange-*`. Restano legittimi fuori dagli stati: avvisi di configurazione (anni accademici/fiscali da creare, reminder spenti), conferme distruttive (`variant="destructive"`, box di conseguenza nei dialog), errori di validazione dei form, e le aree `/parent` e `/teacher`, dove il destinatario è un altro e il rosso su una rata scaduta è l'avviso di sospensione previsto dal regolamento. Un test in `tone.test.ts` verifica che `TONE_BADGE` non contenga nomi di colore. Scoperto: PR #42 "colori di stato", ottobre 2026.
 
 **§17.8 Shadcn Sidebar richiede TooltipProvider globale**: shadcn `<Sidebar>` usa internamente `<Tooltip>` per i menu item in modalità `collapsible="icon"` (vedi `SidebarMenuButton` in `src/components/ui/sidebar.tsx`). Richiede quindi `<TooltipProvider>` mounted in un ancestor (tipicamente root layout). Sintomo se mancante: Runtime Error `"Tooltip must be used within TooltipProvider"`, cascade su ThemeProvider/altri provider (React error boundary pulls everything down). Fix: `import { TooltipProvider } from "@/components/ui/tooltip"` in `src/app/layout.tsx`, wrap `{children}` dentro `ThemeProvider`. Scoperto: 20 aprile 2026, Sprint 0 Fase 3D.2.
 

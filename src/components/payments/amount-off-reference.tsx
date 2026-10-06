@@ -34,7 +34,8 @@ export function AmountOffReference({
   return (
     <span
       className={
-        "inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400" +
+        // Ambra: da sistemare, non blocca niente (stesso token dei chip)
+        "inline-flex items-center gap-1 text-xs text-status-fix" +
         (className ? ` ${className}` : "")
       }
       title={`La quota del corso è ${formatEur(referenceAmountCents ?? 0)}. Correggi con «Modifica importo».`}

@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { statusTone, TONE_BADGE } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 
 import type { ReceiptDeliveryFilter } from "../queries"
@@ -93,7 +94,7 @@ export function ReceiptsFilters({
                 !active &&
                   value === "da-consegnare" &&
                   counts[value] > 0 &&
-                  "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200",
+                  TONE_BADGE[statusTone({ kind: "receipt", toDeliver: true })],
               )}
               onClick={() => updateParam("stato", value)}
             >

@@ -37,6 +37,16 @@ const MONTH_FULL_IT = new Intl.DateTimeFormat("it-IT", {
   year: "numeric",
 })
 
+// Giorno di calendario per le intestazioni ("lunedì 6 ottobre"). Il fuso va
+// forzato: le date di calendario sono a mezzanotte UTC (§17.40) e su una
+// macchina a ovest di Greenwich si leggerebbe il giorno prima.
+const DAY_LONG_ROME = new Intl.DateTimeFormat("it-IT", {
+  timeZone: "Europe/Rome",
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+})
+
 const PERCENT_IT = new Intl.NumberFormat("it-IT", {
   style: "percent",
   minimumFractionDigits: 1,
@@ -53,6 +63,10 @@ export function formatDateShort(date: Date): string {
 
 export function formatDateLong(date: Date): string {
   return DATE_LONG_IT.format(date)
+}
+
+export function formatDayLongRome(date: Date): string {
+  return DAY_LONG_ROME.format(date)
 }
 
 export function toDateInputValue(date: Date): string {

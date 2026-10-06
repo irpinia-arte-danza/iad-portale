@@ -5,6 +5,7 @@ import {
 import { classifyCert } from "@/lib/medical-certificates/certificate-status"
 import { daysOverdue } from "@/lib/scadenze/due-label"
 import { compareCurrentFirst } from "@/lib/utils/expiry-status"
+import { statusTone, type StatusTone } from "@/lib/status/tone"
 import { formatDateShort, formatEur } from "@/lib/utils/format"
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -18,11 +19,13 @@ import { formatDateShort, formatEur } from "@/lib/utils/format"
 // predicato dell'elenco Scadenze — rata non pagata con la scadenza passata,
 // contata sul giorno di Roma.
 //
-// Il rosso è solo del certificato: senza, l'allieva non può fare lezione,
-// punto. Il resto è ambra o neutro, come nell'elenco Scadenze.
+// Il colore non si decide qui: lo dà statusTone dallo stato di dominio, lo
+// stesso che colora i badge, i riquadri della dashboard e i contatori del
+// menu. Rosso dove manca la copertura per fare lezione (certificato,
+// tessera), ambra dove si sistema con calma (contributi in ritardo).
 // ─────────────────────────────────────────────────────────────────────────
 
-export type StatusTone = "red" | "amber" | "neutral"
+export type { StatusTone }
 
 export type StatusAction = "CARICA_CERTIFICATO" | "VAI_TESSERAMENTO"
 
@@ -74,27 +77,27 @@ export function athleteStatusStrip(input: StatusInput): AthleteStatusStrip {
   const certItem: AthleteStatusItem =
     certStatus === "missing"
       ? {
-          tone: "red",
+          tone: statusTone({ kind: "certificate", status: certStatus }),
           label: "Certificato mancante",
           detail: "Senza non può fare lezione",
           action: "CARICA_CERTIFICATO",
         }
       : certStatus === "expired"
         ? {
-            tone: "red",
+            tone: statusTone({ kind: "certificate", status: certStatus }),
             label: "Certificato scaduto",
             detail: `Scaduto il ${formatDateShort(certificate!.expiryDate)}`,
             action: "CARICA_CERTIFICATO",
           }
         : certStatus === "expiring"
           ? {
-              tone: "amber",
+              tone: statusTone({ kind: "certificate", status: certStatus }),
               label: "Certificato in scadenza",
               detail: `Scade il ${formatDateShort(certificate!.expiryDate)}`,
               action: "CARICA_CERTIFICATO",
             }
           : {
-              tone: "neutral",
+              tone: statusTone({ kind: "certificate", status: certStatus }),
               label: "Certificato valido",
               detail: `Fino al ${formatDateShort(certificate!.expiryDate)}`,
               action: null,
@@ -109,7 +112,7 @@ export function athleteStatusStrip(input: StatusInput): AthleteStatusStrip {
     0,
   )
   const contributions = {
-    tone: (overdueCents > 0 ? "amber" : "neutral") as StatusTone,
+    tone: statusTone({ kind: "contributions", overdue: overdueCents > 0 }),
     label: overdueCents > 0 ? "Contributi in ritardo" : "Contributi in regola",
     detail: overdueCents > 0 ? formatEur(overdueCents) : null,
     action: null,
@@ -132,21 +135,22 @@ export function athleteStatusStrip(input: StatusInput): AthleteStatusStrip {
   const cardItem: AthleteStatusItem =
     seasonYear === null
       ? {
-          tone: "neutral",
+          tone: "neutral" as StatusTone,
           label: "Tessera",
           detail: "Nessun anno accademico corrente",
           action: null,
         }
       : cardStatus === "missing"
         ? {
-            tone: "amber",
+            // Senza tessera non c'è assicurazione: rosso come il certificato
+            tone: statusTone({ kind: "card", status: cardStatus }),
             label: `Non tesserata ${seasonYear}`,
             detail: "È nell'elenco da mandare al referente",
             action: "VAI_TESSERAMENTO",
           }
         : cardStatus === "expired"
           ? {
-              tone: "amber",
+              tone: statusTone({ kind: "card", status: cardStatus }),
               label: `Tessera ${seasonYear} scaduta`,
               detail: card?.expiryDate
                 ? `Scaduta il ${formatDateShort(card.expiryDate)}`
@@ -155,7 +159,7 @@ export function athleteStatusStrip(input: StatusInput): AthleteStatusStrip {
             }
           : cardStatus === "expiring"
             ? {
-                tone: "amber",
+                tone: statusTone({ kind: "card", status: cardStatus }),
                 label: `Tessera ${seasonYear} in scadenza`,
                 detail: card?.expiryDate
                   ? `Scade il ${formatDateShort(card.expiryDate)}`
@@ -163,7 +167,7 @@ export function athleteStatusStrip(input: StatusInput): AthleteStatusStrip {
                 action: null,
               }
             : {
-                tone: "neutral",
+                tone: statusTone({ kind: "card", status: cardStatus }),
                 label: `Tesserata ${seasonYear}`,
                 detail: card?.expiryDate
                   ? `Fino al ${formatDateShort(card.expiryDate)}`

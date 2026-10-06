@@ -26,7 +26,7 @@ const BASE: StatusInput = {
 describe("certificato", () => {
   it("assente: rosso, con il tasto per caricarlo", () => {
     const { certificate } = athleteStatusStrip(BASE)
-    expect(certificate.tone).toBe("red")
+    expect(certificate.tone).toBe("block")
     expect(certificate.label).toBe("Certificato mancante")
     expect(certificate.action).toBe("CARICA_CERTIFICATO")
   })
@@ -36,7 +36,7 @@ describe("certificato", () => {
       ...BASE,
       certificates: [cert("2026-09-30")],
     })
-    expect(certificate.tone).toBe("red")
+    expect(certificate.tone).toBe("block")
     expect(certificate.detail).toBe("Scaduto il 30/09/2026")
     expect(certificate.action).toBe("CARICA_CERTIFICATO")
   })
@@ -46,7 +46,7 @@ describe("certificato", () => {
       ...BASE,
       certificates: [cert("2026-10-20")],
     })
-    expect(certificate.tone).toBe("amber")
+    expect(certificate.tone).toBe("fix")
     expect(certificate.detail).toBe("Scade il 20/10/2026")
   })
 
@@ -94,7 +94,7 @@ describe("contributi", () => {
         { status: "PAID", dueDate: d("2026-07-10"), amountCents: 9900 },
       ],
     })
-    expect(contributions.tone).toBe("amber")
+    expect(contributions.tone).toBe("fix")
     expect(contributions.overdueCents).toBe(8000)
     // Lo spazio prima dell'euro è unificatore (U+00A0), come lo mette Intl
     expect(contributions.detail?.replace(/\u00a0/g, " ")).toBe("80,00 €")
@@ -120,9 +120,10 @@ describe("tessera", () => {
     expect(item.action).toBeNull()
   })
 
-  it("assente: ambra, con il rimando all'elenco da tesserare", () => {
+  it("assente: rossa, con il rimando all'elenco da tesserare", () => {
+    // Senza tessera non c'è assicurazione: blocca come il certificato
     const { card: item } = athleteStatusStrip(BASE)
-    expect(item.tone).toBe("amber")
+    expect(item.tone).toBe("block")
     expect(item.label).toBe("Non tesserata 2026")
     expect(item.action).toBe("VAI_TESSERAMENTO")
   })

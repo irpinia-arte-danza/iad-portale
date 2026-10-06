@@ -2,6 +2,8 @@ import Link from "next/link"
 import { UserX, X } from "lucide-react"
 
 import { GUARDIAN_GAP_FILTER } from "@/lib/athletes/guardian-gap"
+import { ATHLETE_LIST_FILTERS } from "@/lib/athletes/list-filters"
+import { statusTone, TONE_BADGE } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 
 import type { AthleteListFilter } from "../queries"
@@ -35,7 +37,19 @@ export function AthletesFilterChip({
   if (activeFilter) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-900 dark:text-amber-200">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
+            // Rosso sulle minorenni senza genitore, ambra sugli altri due:
+            // lo decide statusTone dal passo, come in dashboard
+            TONE_BADGE[
+              statusTone({
+                kind: "setupStep",
+                step: ATHLETE_LIST_FILTERS[activeFilter],
+              })
+            ],
+          )}
+        >
           <UserX className="h-3.5 w-3.5" />
           {ACTIVE_LABEL[activeFilter]}
         </span>
@@ -60,7 +74,7 @@ export function AthletesFilterChip({
       className={cn(
         "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         withoutGuardianCount > 0
-          ? "border-amber-500/40 bg-amber-500/10 text-amber-900 hover:bg-amber-500/20 dark:text-amber-200"
+          ? TONE_BADGE[statusTone({ kind: "guardian", missing: true })]
           : "text-muted-foreground hover:bg-muted",
       )}
     >

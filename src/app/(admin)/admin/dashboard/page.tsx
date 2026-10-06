@@ -12,6 +12,7 @@ import {
   upcomingAcademicYearLabel,
 } from "@/lib/school-calendar"
 import { todayDateOnly } from "@/lib/utils/date-only"
+import { formatDayLongRome } from "@/lib/utils/format"
 
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
@@ -19,6 +20,8 @@ import {
   listAthletesWithRelations,
   listOpenSchedulesByAthlete,
 } from "../payments/queries"
+import { AthleteCreateDialog } from "../athletes/_components/athlete-create-dialog"
+import { PaymentCreateDialog } from "../payments/_components/payment-create-dialog"
 
 import {
   countUpcomingStages,
@@ -39,7 +42,6 @@ import { AnalyticsSection } from "./_components/analytics-section"
 import { KpiCards } from "./_components/kpi-cards"
 import { RecentActivity } from "./_components/recent-activity"
 import { TodoBlock } from "./_components/todo-block"
-import { QuickActions } from "./_components/quick-actions"
 import { ShowcaseWidget } from "./_components/showcase-widget"
 import { UpcomingStagesWidget } from "./_components/upcoming-stages-widget"
 
@@ -58,7 +60,6 @@ export default async function AdminDashboardPage() {
   const fiscalYearNow = fiscalYearOf(today)
 
   const [
-    user,
     stats,
     todoCounters,
     athletes,
@@ -75,10 +76,6 @@ export default async function AdminDashboardPage() {
     formAthletes,
     openSchedulesByAthlete,
   ] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: authUser.id },
-      select: { firstName: true },
-    }),
     getDashboardStats(),
     getTodoCounters(),
     getRecentAthletes(5),
@@ -152,8 +149,20 @@ export default async function AdminDashboardPage() {
     <>
       <ResourceHeader
         breadcrumbs={[{ label: "Dashboard" }]}
-        title={`Ciao ${user?.firstName ?? "Admin"} 👋`}
-        description="Cosa c'è da fare oggi. I numeri dell'anno sono più sotto."
+        title={`Da fare oggi · ${formatDayLongRome(today)}`}
+        description="I numeri dell'anno sono più sotto."
+        action={
+          /* Le due cose che si fanno più spesso: prima erano una card in
+             fondo al blocco, adesso stanno dove si guarda per prima cosa */
+          <div className="flex flex-wrap items-center gap-2">
+            <PaymentCreateDialog
+              athletes={formAthletes}
+              openSchedulesByAthlete={openSchedulesByAthlete}
+              triggerLabel="Registra incasso"
+            />
+            <AthleteCreateDialog />
+          </div>
+        }
       />
       <ResourceContent>
         <div className="flex flex-col gap-6">
@@ -194,10 +203,6 @@ export default async function AdminDashboardPage() {
             </div>
           ) : null}
           <TodoBlock tiles={tiles} />
-          <QuickActions
-            athletes={formAthletes}
-            openSchedulesByAthlete={openSchedulesByAthlete}
-          />
           <div className="grid gap-4 md:grid-cols-2">
             <UpcomingStagesWidget
               stages={upcomingStages}

@@ -1,4 +1,5 @@
 import { athleteStepHref } from "@/lib/athletes/list-filters"
+import { statusTone, type StatusTone } from "@/lib/status/tone"
 
 // ─────────────────────────────────────────────────────────────────────────
 // "Da fare": i riquadri della dashboard.
@@ -13,15 +14,12 @@ import { athleteStepHref } from "@/lib/athletes/list-filters"
 // di leggere.
 // ─────────────────────────────────────────────────────────────────────────
 
-export type TodoGroup = "Incassi" | "Allieve" | "Documenti"
-
-// rosso = blocca qualcosa (soldi non incassati, allieva che non può entrare
-// in sala, famiglia irraggiungibile). ambra = da sistemare, non blocca.
-export type TodoTone = "red" | "amber"
+// Il tono non si sceglie qui: lo decide statusTone dallo stato di dominio,
+// come per i badge, la striscia della scheda e i contatori del menu
+export type TodoTone = StatusTone
 
 export type TodoTile = {
   id: string
-  group: TodoGroup
   label: string
   count: number
   href: string
@@ -41,6 +39,8 @@ export type TodoCounters = {
   // Ricevute emesse che non sono ancora arrivate alla famiglia: né email, né
   // condivise, né consegnate a mano
   ricevuteDaConsegnare: number
+  // Genitori mai invitati all'area riservata
+  genitoriSenzaAccesso: number
   allieveSenzaGenitore: number
   allieveSenzaCorso: number
   allieveSenzaEmail: number
@@ -61,6 +61,7 @@ export const CERT_STATUS_HREF = {
 export const SCADENZE_IN_RITARDO_HREF = "/admin/scadenze?stato=IN_RITARDO"
 export const PAGAMENTI_SENZA_RICEVUTA_HREF = "/admin/payments?ricevuta=mancante"
 export const RICEVUTE_DA_CONSEGNARE_HREF = "/admin/receipts?stato=da-consegnare"
+export const GENITORI_SENZA_ACCESSO_HREF = "/admin/parents?filtro=senza-accesso"
 // La pagina Tessere apre già con l'elenco da mandare al referente: l'ancora
 // ci porta sopra senza inventare un filtro che non esiste
 export const TESSERE_DA_FARE_HREF = "/admin/tessere#da-tesserare"
@@ -72,10 +73,64 @@ function plural(count: number, uno: string, molti: string): string {
 export function todoTiles(counters: TodoCounters): TodoTile[] {
   const tiles: TodoTile[] = []
 
+  // ── Blocca qualcosa ─────────────────────────────────────────────────────
+  // Prima chi oggi non può fare lezione, poi chi non si riesce a raggiungere
+
+  if (counters.certificatiScaduti > 0) {
+    tiles.push({
+      id: "certificati-scaduti",
+      label: plural(
+        counters.certificatiScaduti,
+        "Certificato scaduto",
+        "Certificati scaduti",
+      ),
+      count: counters.certificatiScaduti,
+      href: CERT_STATUS_HREF.expired,
+      tone: statusTone({ kind: "certificate", status: "expired" }),
+    })
+  }
+
+  if (counters.certificatiAssenti > 0) {
+    tiles.push({
+      id: "certificati-assenti",
+      label: "Certificati assenti",
+      count: counters.certificatiAssenti,
+      href: CERT_STATUS_HREF.missing,
+      tone: statusTone({ kind: "certificate", status: "missing" }),
+    })
+  }
+
+  if (counters.tessereDaFare.count > 0) {
+    tiles.push({
+      id: "tessere-da-fare",
+      label: "Da tesserare",
+      count: counters.tessereDaFare.count,
+      href: TESSERE_DA_FARE_HREF,
+      // Senza tessera non c'è assicurazione: in sala non ci entra
+      tone: statusTone({ kind: "card", status: "missing" }),
+      note: `Anno sociale ${counters.tessereDaFare.seasonYear}`,
+    })
+  }
+
+  if (counters.allieveSenzaGenitore > 0) {
+    tiles.push({
+      id: "allieve-senza-genitore",
+      label: plural(
+        counters.allieveSenzaGenitore,
+        "Minorenne senza genitore",
+        "Minorenni senza genitore",
+      ),
+      count: counters.allieveSenzaGenitore,
+      href: athleteStepHref("guardian"),
+      tone: statusTone({ kind: "guardian", missing: true }),
+    })
+  }
+
+  // ── Da sistemare ────────────────────────────────────────────────────────
+
   if (counters.scadenzeInRitardo.count > 0) {
     tiles.push({
       id: "scadenze-in-ritardo",
-      group: "Incassi",
       label: plural(
         counters.scadenzeInRitardo.count,
         "Scadenza in ritardo",
@@ -84,7 +139,8 @@ export function todoTiles(counters: TodoCounters): TodoTile[] {
       count: counters.scadenzeInRitardo.count,
       amountCents: counters.scadenzeInRitardo.amountCents,
       href: SCADENZE_IN_RITARDO_HREF,
-      tone: "red",
+      // In ritardo non vuol dire bloccata: la lezione si fa e si sollecita
+      tone: statusTone({ kind: "contributions", overdue: true }),
       note:
         counters.inScadenza7gg > 0
           ? `+ ${counters.inScadenza7gg} in scadenza entro 7 giorni`
@@ -95,7 +151,6 @@ export function todoTiles(counters: TodoCounters): TodoTile[] {
   if (counters.pagamentiSenzaRicevuta > 0) {
     tiles.push({
       id: "pagamenti-senza-ricevuta",
-      group: "Incassi",
       label: plural(
         counters.pagamentiSenzaRicevuta,
         "Pagamento senza ricevuta",
@@ -103,14 +158,13 @@ export function todoTiles(counters: TodoCounters): TodoTile[] {
       ),
       count: counters.pagamentiSenzaRicevuta,
       href: PAGAMENTI_SENZA_RICEVUTA_HREF,
-      tone: "amber",
+      tone: statusTone({ kind: "receipt", toDeliver: true }),
     })
   }
 
   if (counters.ricevuteDaConsegnare > 0) {
     tiles.push({
       id: "ricevute-da-consegnare",
-      group: "Incassi",
       label: plural(
         counters.ricevuteDaConsegnare,
         "Ricevuta da consegnare",
@@ -118,40 +172,23 @@ export function todoTiles(counters: TodoCounters): TodoTile[] {
       ),
       count: counters.ricevuteDaConsegnare,
       href: RICEVUTE_DA_CONSEGNARE_HREF,
-      tone: "amber",
-    })
-  }
-
-  if (counters.allieveSenzaGenitore > 0) {
-    tiles.push({
-      id: "allieve-senza-genitore",
-      group: "Allieve",
-      label: plural(
-        counters.allieveSenzaGenitore,
-        "Minorenne senza genitore",
-        "Minorenni senza genitore",
-      ),
-      count: counters.allieveSenzaGenitore,
-      href: athleteStepHref("guardian"),
-      tone: "red",
+      tone: statusTone({ kind: "receipt", toDeliver: true }),
     })
   }
 
   if (counters.allieveSenzaCorso > 0) {
     tiles.push({
       id: "allieve-senza-corso",
-      group: "Allieve",
       label: "Senza corso quest'anno",
       count: counters.allieveSenzaCorso,
       href: athleteStepHref("course"),
-      tone: "amber",
+      tone: statusTone({ kind: "setupStep", step: "course" }),
     })
   }
 
   if (counters.allieveSenzaEmail > 0) {
     tiles.push({
       id: "allieve-senza-email",
-      group: "Allieve",
       label: plural(
         counters.allieveSenzaEmail,
         "Maggiorenne senza email",
@@ -159,70 +196,69 @@ export function todoTiles(counters: TodoCounters): TodoTile[] {
       ),
       count: counters.allieveSenzaEmail,
       href: athleteStepHref("email"),
-      tone: "amber",
+      tone: statusTone({ kind: "setupStep", step: "email" }),
     })
   }
 
-  if (counters.certificatiScaduti > 0) {
+  if (counters.genitoriSenzaAccesso > 0) {
     tiles.push({
-      id: "certificati-scaduti",
-      group: "Documenti",
+      id: "genitori-senza-accesso",
       label: plural(
-        counters.certificatiScaduti,
-        "Certificato scaduto",
-        "Certificati scaduti",
+        counters.genitoriSenzaAccesso,
+        "Genitore senza accesso",
+        "Genitori senza accesso",
       ),
-      count: counters.certificatiScaduti,
-      href: CERT_STATUS_HREF.expired,
-      tone: "red",
+      count: counters.genitoriSenzaAccesso,
+      href: GENITORI_SENZA_ACCESSO_HREF,
+      tone: statusTone({ kind: "access", invited: false }),
     })
   }
 
   if (counters.certificatiInScadenza > 0) {
     tiles.push({
       id: "certificati-in-scadenza",
-      group: "Documenti",
       label: "Certificati in scadenza",
       count: counters.certificatiInScadenza,
       href: CERT_STATUS_HREF.expiring,
-      tone: "amber",
-    })
-  }
-
-  if (counters.certificatiAssenti > 0) {
-    tiles.push({
-      id: "certificati-assenti",
-      group: "Documenti",
-      label: "Certificati assenti",
-      count: counters.certificatiAssenti,
-      href: CERT_STATUS_HREF.missing,
-      tone: "amber",
-    })
-  }
-
-  if (counters.tessereDaFare.count > 0) {
-    tiles.push({
-      id: "tessere-da-fare",
-      group: "Documenti",
-      label: "Da tesserare",
-      count: counters.tessereDaFare.count,
-      href: TESSERE_DA_FARE_HREF,
-      tone: "amber",
-      note: `Anno sociale ${counters.tessereDaFare.seasonYear}`,
+      tone: statusTone({ kind: "certificate", status: "expiring" }),
     })
   }
 
   return tiles
 }
 
-// Gruppi nell'ordine, con dentro solo i riquadri che si mostrano
-export function todoGroups(
-  tiles: TodoTile[],
-): { group: TodoGroup; tiles: TodoTile[] }[] {
-  const order: TodoGroup[] = ["Incassi", "Allieve", "Documenti"]
+// ─────────────────────────────────────────────────────────────────────────
+// Due sezioni, non tre gruppi per argomento.
+//
+// Prima i riquadri erano divisi per area (Incassi, Allieve, Documenti), e per
+// sapere cosa fosse urgente bisognava leggerli tutti. Adesso la domanda è
+// una sola: cosa impedisce di lavorare, e cosa invece si sistema con calma.
+// Una sezione senza riquadri non si mostra.
+// ─────────────────────────────────────────────────────────────────────────
+
+export type TodoSectionId = "block" | "fix"
+
+export type TodoSection = {
+  id: TodoSectionId
+  title: string
+  tiles: TodoTile[]
+}
+
+const SECTION_TITLE: Record<TodoSectionId, string> = {
+  block: "Blocca qualcosa",
+  fix: "Da sistemare",
+}
+
+export function todoSections(tiles: TodoTile[]): TodoSection[] {
+  const order: TodoSectionId[] = ["block", "fix"]
   return order
-    .map((group) => ({ group, tiles: tiles.filter((t) => t.group === group) }))
-    .filter((g) => g.tiles.length > 0)
+    .map((id) => ({
+      id,
+      title: SECTION_TITLE[id],
+      // L'ordine dentro la sezione è quello in cui todoTiles li crea
+      tiles: tiles.filter((tile) => tile.tone === id),
+    }))
+    .filter((section) => section.tiles.length > 0)
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -263,7 +299,7 @@ export function navCounters(counters: NavCounterInput): NavCounters {
   if (counters.scadenzeInRitardo.count > 0) {
     out[NAV_COUNTER_HREF.scadenze] = {
       count: counters.scadenzeInRitardo.count,
-      tone: "amber",
+      tone: statusTone({ kind: "contributions", overdue: true }),
     }
   }
 
@@ -272,7 +308,7 @@ export function navCounters(counters: NavCounterInput): NavCounters {
   if (counters.ricevuteDaConsegnare > 0) {
     out[NAV_COUNTER_HREF.ricevute] = {
       count: counters.ricevuteDaConsegnare,
-      tone: "amber",
+      tone: statusTone({ kind: "receipt", toDeliver: true }),
     }
   }
 
@@ -280,13 +316,17 @@ export function navCounters(counters: NavCounterInput): NavCounters {
   // lezione, ed è l'unico rosso del menu perché è l'unico che blocca
   const certificati = counters.certificatiScaduti + counters.certificatiAssenti
   if (certificati > 0) {
-    out[NAV_COUNTER_HREF.certificati] = { count: certificati, tone: "red" }
+    out[NAV_COUNTER_HREF.certificati] = {
+      count: certificati,
+      tone: statusTone({ kind: "certificate", status: "missing" }),
+    }
   }
 
   if (counters.tessereDaFare.count > 0) {
     out[NAV_COUNTER_HREF.tessere] = {
       count: counters.tessereDaFare.count,
-      tone: "amber",
+      // Rosso come i certificati: senza tessera non c'è assicurazione
+      tone: statusTone({ kind: "card", status: "missing" }),
     }
   }
 

@@ -1,5 +1,6 @@
 import type { ReceiptStatus } from "@prisma/client"
 
+import { statusTone, type StatusTone } from "@/lib/status/tone"
 import { formatDateShort } from "@/lib/utils/format"
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -67,18 +68,27 @@ const CHANNEL_LABEL: Record<DeliveryChannel, string> = {
   HAND: "Consegnata a mano",
 }
 
-export type DeliveryTone = "amber" | "neutral" | "muted"
+// Il tono è quello condiviso: da consegnare = ambra, tutto il resto neutro.
+// L'annullata si distingue nel testo ("Annullata"), non con un colore suo:
+// non è uno stato da sistemare, è una ricevuta chiusa.
+export type DeliveryTone = StatusTone
 
 // "Inviata il 28/09/2026" · "Da consegnare" · "Annullata"
 export function deliveryLabel(state: DeliveryState): {
   text: string
   tone: DeliveryTone
 } {
-  if (state.cancelled) return { text: "Annullata", tone: "muted" }
-  if (!state.last) return { text: "Da consegnare", tone: "amber" }
+  const tone = statusTone({
+    kind: "receipt",
+    toDeliver: isToDeliver(state),
+    cancelled: state.cancelled,
+  })
+
+  if (state.cancelled) return { text: "Annullata", tone }
+  if (!state.last) return { text: "Da consegnare", tone }
   return {
     text: `${CHANNEL_LABEL[state.last.channel]} il ${formatDateShort(state.last.at)}`,
-    tone: "neutral",
+    tone,
   }
 }
 

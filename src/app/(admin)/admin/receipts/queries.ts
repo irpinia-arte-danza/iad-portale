@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth/require-admin"
 import { todayInRome } from "@/lib/receipts/numbering"
 import {
   deliveryLabel,
+  type DeliveryTone,
   isToDeliver,
   type DeliveryState,
 } from "@/lib/receipts/delivery"
@@ -78,7 +79,7 @@ export type ReceiptListRow = ReceiptListItem & {
   // Email, condivisione o consegna a mano: lo stesso predicato del riquadro
   // in dashboard e del contatore del menu
   delivery: DeliveryState
-  deliveryLabel: { text: string; tone: "amber" | "neutral" | "muted" }
+  deliveryLabel: { text: string; tone: DeliveryTone }
 }
 
 function matchesDeliveryFilter(

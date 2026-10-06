@@ -4,7 +4,7 @@ import { ADMIN_NAV_ITEMS } from "@/app/(admin)/_components/admin-nav"
 
 import {
   navCounters,
-  todoGroups,
+  todoSections,
   todoTiles,
   type TodoCounters,
 } from "./todo-tiles"
@@ -14,6 +14,7 @@ const ZERO: TodoCounters = {
   inScadenza7gg: 0,
   pagamentiSenzaRicevuta: 0,
   ricevuteDaConsegnare: 0,
+  genitoriSenzaAccesso: 0,
   allieveSenzaGenitore: 0,
   allieveSenzaCorso: 0,
   allieveSenzaEmail: 0,
@@ -21,6 +22,21 @@ const ZERO: TodoCounters = {
   certificatiInScadenza: 0,
   certificatiAssenti: 0,
   tessereDaFare: { count: 0, seasonYear: 2026 },
+}
+
+// Tutti i contatori accesi: serve a fissare l'ordine dei riquadri e i toni
+const TUTTI: Partial<TodoCounters> = {
+  scadenzeInRitardo: { count: 2, amountCents: 8000 },
+  pagamentiSenzaRicevuta: 1,
+  ricevuteDaConsegnare: 49,
+  genitoriSenzaAccesso: 7,
+  allieveSenzaGenitore: 8,
+  allieveSenzaCorso: 1,
+  allieveSenzaEmail: 3,
+  certificatiScaduti: 2,
+  certificatiInScadenza: 4,
+  certificatiAssenti: 50,
+  tessereDaFare: { count: 20, seasonYear: 2026 },
 }
 
 const ids = (c: Partial<TodoCounters>) =>
@@ -35,54 +51,34 @@ describe("todoTiles", () => {
     expect(ids({ certificatiScaduti: 3 })).toEqual(["certificati-scaduti"])
   })
 
-  it("ordine fisso: incassi, allieve, documenti", () => {
-    expect(
-      ids({
-        scadenzeInRitardo: { count: 2, amountCents: 8000 },
-        pagamentiSenzaRicevuta: 1,
-        ricevuteDaConsegnare: 49,
-        allieveSenzaGenitore: 8,
-        allieveSenzaCorso: 1,
-        allieveSenzaEmail: 3,
-        certificatiScaduti: 2,
-        certificatiInScadenza: 4,
-        certificatiAssenti: 50,
-        tessereDaFare: { count: 20, seasonYear: 2026 },
-      }),
-    ).toEqual([
+  it("ordine fisso: prima quello che blocca, poi quello da sistemare", () => {
+    expect(ids(TUTTI)).toEqual([
+      "certificati-scaduti",
+      "certificati-assenti",
+      "tessere-da-fare",
+      "allieve-senza-genitore",
       "scadenze-in-ritardo",
       "pagamenti-senza-ricevuta",
       "ricevute-da-consegnare",
-      "allieve-senza-genitore",
       "allieve-senza-corso",
       "allieve-senza-email",
-      "certificati-scaduti",
+      "genitori-senza-accesso",
       "certificati-in-scadenza",
-      "certificati-assenti",
-      "tessere-da-fare",
     ])
   })
 
   it("rosso solo su ciò che blocca", () => {
-    const tiles = todoTiles({
-      ...ZERO,
-      scadenzeInRitardo: { count: 1, amountCents: 4000 },
-      pagamentiSenzaRicevuta: 1,
-      ricevuteDaConsegnare: 1,
-      allieveSenzaGenitore: 1,
-      allieveSenzaCorso: 1,
-      allieveSenzaEmail: 1,
-      certificatiScaduti: 1,
-      certificatiInScadenza: 1,
-      certificatiAssenti: 1,
-      tessereDaFare: { count: 1, seasonYear: 2026 },
-    })
-    const rossi = tiles.filter((t) => t.tone === "red").map((t) => t.id)
-    expect(rossi).toEqual([
-      "scadenze-in-ritardo",
-      "allieve-senza-genitore",
+    const tiles = todoTiles({ ...ZERO, ...TUTTI })
+    const blocca = tiles.filter((t) => t.tone === "block").map((t) => t.id)
+    expect(blocca).toEqual([
       "certificati-scaduti",
+      "certificati-assenti",
+      "tessere-da-fare",
+      "allieve-senza-genitore",
     ])
+    // Tutto il resto è ambra: nessun riquadro resta senza tono
+    const altri = tiles.filter((t) => t.tone !== "block")
+    expect(altri.every((t) => t.tone === "fix")).toBe(true)
   })
 
   it("le scadenze in ritardo portano il totale in euro", () => {
@@ -123,19 +119,7 @@ describe("todoTiles", () => {
   })
 
   it("ogni riquadro ha un href che porta a un elenco filtrato", () => {
-    const tiles = todoTiles({
-      ...ZERO,
-      scadenzeInRitardo: { count: 1, amountCents: 1 },
-      pagamentiSenzaRicevuta: 1,
-      ricevuteDaConsegnare: 1,
-      allieveSenzaGenitore: 1,
-      allieveSenzaCorso: 1,
-      allieveSenzaEmail: 1,
-      certificatiScaduti: 1,
-      certificatiInScadenza: 1,
-      certificatiAssenti: 1,
-      tessereDaFare: { count: 1, seasonYear: 2026 },
-    })
+    const tiles = todoTiles({ ...ZERO, ...TUTTI })
     for (const tile of tiles) {
       expect(tile.href.startsWith("/admin/"), tile.id).toBe(true)
       // o un filtro nell'URL, o un'ancora sull'elenco giusto della pagina
@@ -150,28 +134,46 @@ describe("todoTiles", () => {
   })
 })
 
-describe("todoGroups", () => {
-  it("salta i gruppi senza riquadri", () => {
+describe("todoSections", () => {
+  it("salta la sezione senza riquadri", () => {
     const tiles = todoTiles({ ...ZERO, certificatiAssenti: 5 })
-    expect(todoGroups(tiles).map((g) => g.group)).toEqual(["Documenti"])
+    expect(todoSections(tiles).map((s) => s.id)).toEqual(["block"])
+
+    const soloDaSistemare = todoTiles({ ...ZERO, genitoriSenzaAccesso: 3 })
+    expect(todoSections(soloDaSistemare).map((s) => s.id)).toEqual(["fix"])
   })
 
-  it("mantiene l'ordine dei gruppi", () => {
-    const tiles = todoTiles({
-      ...ZERO,
-      certificatiAssenti: 1,
-      allieveSenzaCorso: 1,
-      pagamentiSenzaRicevuta: 1,
-    })
-    expect(todoGroups(tiles).map((g) => g.group)).toEqual([
-      "Incassi",
-      "Allieve",
-      "Documenti",
+  it("due sezioni, «Blocca qualcosa» per prima", () => {
+    const sections = todoSections(todoTiles({ ...ZERO, ...TUTTI }))
+    expect(sections.map((s) => s.title)).toEqual([
+      "Blocca qualcosa",
+      "Da sistemare",
+    ])
+    expect(sections[0].tiles.map((t) => t.id)).toEqual([
+      "certificati-scaduti",
+      "certificati-assenti",
+      "tessere-da-fare",
+      "allieve-senza-genitore",
+    ])
+    expect(sections[1].tiles.map((t) => t.id)).toEqual([
+      "scadenze-in-ritardo",
+      "pagamenti-senza-ricevuta",
+      "ricevute-da-consegnare",
+      "allieve-senza-corso",
+      "allieve-senza-email",
+      "genitori-senza-accesso",
+      "certificati-in-scadenza",
     ])
   })
 
-  it("niente riquadri, niente gruppi", () => {
-    expect(todoGroups([])).toEqual([])
+  it("nessun riquadro resta fuori dalle due sezioni", () => {
+    const tiles = todoTiles({ ...ZERO, ...TUTTI })
+    const dentro = todoSections(tiles).flatMap((s) => s.tiles)
+    expect(dentro).toHaveLength(tiles.length)
+  })
+
+  it("niente riquadri, niente sezioni", () => {
+    expect(todoSections([])).toEqual([])
   })
 })
 
@@ -194,16 +196,16 @@ describe("navCounters", () => {
       scadenzeInRitardo: { count: 28, amountCents: 103500 },
     })
     expect(Object.keys(counters)).toEqual(["/admin/scadenze"])
-    expect(counters["/admin/scadenze"]).toEqual({ count: 28, tone: "amber" })
+    expect(counters["/admin/scadenze"]).toEqual({ count: 28, tone: "fix" })
   })
 
   it("le ricevute da consegnare hanno il loro badge, in ambra", () => {
     const counters = navCounters({ ...INPUT, ricevuteDaConsegnare: 49 })
     expect(Object.keys(counters)).toEqual(["/admin/receipts"])
-    expect(counters["/admin/receipts"]).toEqual({ count: 49, tone: "amber" })
+    expect(counters["/admin/receipts"]).toEqual({ count: 49, tone: "fix" })
   })
 
-  it("certificati = scaduti + assenti, ed è l'unico rosso", () => {
+  it("certificati e tessere sono rossi, scadenze e ricevute ambra", () => {
     const counters = navCounters({
       ...INPUT,
       scadenzeInRitardo: { count: 2, amountCents: 100 },
@@ -214,12 +216,13 @@ describe("navCounters", () => {
     })
     expect(counters["/admin/medical-certificates"]).toEqual({
       count: 59,
-      tone: "red",
+      tone: "block",
     })
+    // Rosso dove manca la copertura per fare lezione: certificato e tessera
     const rossi = Object.entries(counters)
-      .filter(([, c]) => c.tone === "red")
+      .filter(([, c]) => c.tone === "block")
       .map(([href]) => href)
-    expect(rossi).toEqual(["/admin/medical-certificates"])
+    expect(rossi).toEqual(["/admin/medical-certificates", "/admin/tessere"])
   })
 
   it("gli stessi numeri dei riquadri della dashboard", () => {

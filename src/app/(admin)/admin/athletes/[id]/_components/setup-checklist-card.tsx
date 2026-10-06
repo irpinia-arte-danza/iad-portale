@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import type { SetupStep, SetupStepId } from "@/lib/athletes/setup-checklist"
+import { statusTone, TONE_SURFACE, TONE_TEXT } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 
 import {
@@ -154,7 +155,9 @@ export function SetupChecklistCard({
 
   return (
     <>
-      <Card className="border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20">
+      {/* La card è ambra: sono dati da completare. I passi che bloccano
+          (certificato, tessera, genitore) si colorano di rosso riga per riga */}
+      <Card className="border-status-fix-border bg-status-fix-bg">
         <CardHeader>
           <CardTitle>Da completare</CardTitle>
           <CardDescription>
@@ -167,7 +170,8 @@ export function SetupChecklistCard({
           <ul className="space-y-2">
             {ordered.map((step) => {
               const Icon = ICONS[step.id]
-              const isCertificate = step.id === "certificate"
+              const tone = statusTone({ kind: "setupStep", step: step.id })
+              const blocca = tone === "block"
               return (
                 <li
                   key={step.id}
@@ -175,21 +179,20 @@ export function SetupChecklistCard({
                     // Il tasto resta a destra anche sul telefono: la riga non
                     // va mai a capo sopra di lui
                     "flex items-center gap-2 rounded-md border bg-background p-3",
-                    isCertificate &&
-                      "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/30",
+                    blocca && TONE_SURFACE[tone],
                   )}
                 >
                   <Icon
                     className={cn(
                       "h-4 w-4 shrink-0 text-muted-foreground",
-                      isCertificate && "text-red-700 dark:text-red-300",
+                      blocca && TONE_TEXT[tone],
                     )}
                   />
                   <div className="min-w-0 flex-1">
                     <p
                       className={cn(
                         "text-sm font-medium",
-                        isCertificate && "text-red-900 dark:text-red-200",
+                        blocca && TONE_TEXT[tone],
                       )}
                     >
                       {step.label}

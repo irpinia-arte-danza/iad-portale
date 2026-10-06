@@ -19,9 +19,10 @@ const CATEGORY_LABEL: Record<EmailCategory, string> = {
   COMUNICAZIONE: "Comunicazione",
 }
 
+// Colori di categoria, non di stato: il rosso qui non c'è, perché un
+// modello di sollecito non blocca niente — è solo un testo da mandare
 const CATEGORY_CLASS: Record<EmailCategory, string> = {
-  SOLLECITO:
-    "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
+  SOLLECITO: "",
   PROMEMORIA:
     "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
   BENVENUTO:

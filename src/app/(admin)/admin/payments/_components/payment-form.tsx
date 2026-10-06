@@ -393,7 +393,7 @@ export function PaymentForm({
                           ) : null}
                           {option.referenceAmountCents !== null &&
                           option.amountCents < option.referenceAmountCents ? (
-                            <span className="max-w-[16rem] text-right text-xs text-amber-700 dark:text-amber-400">
+                            <span className="max-w-[16rem] text-right text-xs text-status-fix">
                               La quota del corso è{" "}
                               <span className="font-mono tabular-nums">
                                 {formatEur(option.referenceAmountCents)}

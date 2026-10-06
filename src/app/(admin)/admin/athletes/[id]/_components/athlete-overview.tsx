@@ -18,6 +18,7 @@ import type { AthleteRecentPayment } from "@/app/(admin)/admin/athletes/queries"
 import type { OpenScheduleOption } from "@/app/(admin)/admin/payments/queries"
 import { receiptPdfHref } from "@/lib/receipts/types"
 import { dueLabel } from "@/lib/scadenze/due-label"
+import { TONE_TEXT } from "@/lib/status/tone"
 import { formatDateShort, formatEur } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
@@ -133,8 +134,8 @@ export function AthleteOverview({
                           <p
                             className={cn(
                               "text-xs",
-                              due.tone === "amber"
-                                ? "text-amber-700 dark:text-amber-400"
+                              due.tone === "fix"
+                                ? TONE_TEXT[due.tone]
                                 : "text-muted-foreground",
                             )}
                           >

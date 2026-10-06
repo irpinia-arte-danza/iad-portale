@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import type { CardStatus } from "@/lib/affiliations/card-status"
 import type { CertStatus } from "@/lib/medical-certificates/certificate-status"
+import { statusTone } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 import { computeAge } from "@/lib/utils/date-helpers"
 import { formatDateShort } from "@/lib/utils/format"
@@ -159,13 +160,16 @@ export function AthletesTable({
             const age = computeAge(athlete.dateOfBirth)
             const { certificate } = athlete
             const expired = certificate.status === "expired"
+            // Riga rossa dove il certificato blocca la lezione
+            const blocca =
+              statusTone({ kind: "certificate", status: certificate.status }) ===
+              "block"
             return (
             <TableRow
               key={athlete.id}
               className={cn(
                 "hover:bg-muted/50",
-                expired &&
-                  "bg-red-50 hover:bg-red-100/70 dark:bg-red-950/30 dark:hover:bg-red-950/50",
+                blocca && "bg-status-block-bg",
               )}
             >
               <TableCell>
@@ -194,7 +198,7 @@ export function AthletesTable({
               </TableCell>
               <TableCell>
                 <div className="flex flex-col items-start gap-1">
-                  <CertStatusBadge status={certificate.status} alertMissing />
+                  <CertStatusBadge status={certificate.status} />
                   {certificate.expiryDate ? (
                     <span className="hidden text-xs text-muted-foreground sm:inline">
                       {expired ? "scaduto il" : "scade il"}{" "}
