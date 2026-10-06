@@ -244,6 +244,7 @@ export type NavCounters = Record<string, NavCounter>
 export type NavCounterInput = Pick<
   TodoCounters,
   | "scadenzeInRitardo"
+  | "ricevuteDaConsegnare"
   | "certificatiScaduti"
   | "certificatiAssenti"
   | "tessereDaFare"
@@ -251,6 +252,7 @@ export type NavCounterInput = Pick<
 
 export const NAV_COUNTER_HREF = {
   scadenze: "/admin/scadenze",
+  ricevute: "/admin/receipts",
   certificati: "/admin/medical-certificates",
   tessere: "/admin/tessere",
 } as const
@@ -261,6 +263,15 @@ export function navCounters(counters: NavCounterInput): NavCounters {
   if (counters.scadenzeInRitardo.count > 0) {
     out[NAV_COUNTER_HREF.scadenze] = {
       count: counters.scadenzeInRitardo.count,
+      tone: "amber",
+    }
+  }
+
+  // Emesse e non ancora arrivate alla famiglia: email, condivisione o
+  // consegna a mano, lo stesso predicato del chip e del riquadro
+  if (counters.ricevuteDaConsegnare > 0) {
+    out[NAV_COUNTER_HREF.ricevute] = {
+      count: counters.ricevuteDaConsegnare,
       tone: "amber",
     }
   }
