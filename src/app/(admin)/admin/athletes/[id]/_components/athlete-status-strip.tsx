@@ -68,7 +68,7 @@ export function AthleteStatusStrip({
   card,
 }: AthleteStatusStripProps) {
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="grid gap-3 md:grid-cols-3 in-panel:grid-cols-1">
       <StatusCard
         item={certificate}
         icon={<Stethoscope className="h-4 w-4" />}

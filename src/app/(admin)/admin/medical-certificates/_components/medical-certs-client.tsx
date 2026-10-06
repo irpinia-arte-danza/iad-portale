@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { AthleteCardLink } from "@/components/athletes/athlete-card-link"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import {
@@ -234,7 +235,15 @@ export function MedicalCertsClient({ rows }: { rows: AthleteCertRow[] }) {
                       />
                     </TableCell>
                     <TableCell className="font-medium">
-                      {r.athleteName}
+                      {/* Il nome apre la scheda sui Documenti: nel pannello
+                          da 1024 in su, alla pagina sotto */}
+                      <AthleteCardLink
+                        athleteId={r.athleteId}
+                        tab="documenti"
+                        className="hover:underline"
+                      >
+                        {r.athleteName}
+                      </AthleteCardLink>
                     </TableCell>
                     <TableCell>
                       {r.parentName ? (

@@ -32,6 +32,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.9 Next dev logga Server Action body
   - §17.27 Lazy client init per env safety
   - §17.34 `redirect()` in server action + try/catch lato client → `unstable_rethrow`
+  - §17.47 Scheda in pannello dalle liste: intercepting route, e cosa non fa da sola
 - [Zod / RHF](#zod--rhf)
   - §17.11 Zod `.default()` + RHF generic mismatch
   - §17.12 Zod `z.coerce.date()` input/output mismatch
@@ -206,6 +207,18 @@ export function getResend(): Resend {
 }
 ```
 Applicato a `src/lib/resend/client.ts`. Stesso pattern preventivo per ogni SDK nuovo. Scoperto: Sprint 3.1, aprile 2026.
+
+**§17.47 Scheda in pannello dalle liste — intercepting route, e cosa non fa da sola**: da Scadenze e Certificati la scheda allieva si apre in un pannello laterale con la lista dietro. È una intercepting route di Next: `admin/<lista>/layout.tsx` rende `{children}{panel}`, `@panel/default.tsx` rende `null`, e `@panel/(..)athletes/[id]/page.tsx` rende lo stesso `AthleteCard` della pagina con `variant="panel"`. L'indirizzo è quello della scheda: navigando dalla lista si vede il pannello, ricaricando la pagina intera. Per portarlo su un'altra lista bastano quei tre file. Cose verificate nel browser, e trappole:
+
+- **la lista dietro si aggiorna da sola** dopo una server action con `revalidatePath` (incasso, certificato): non serve un `router.refresh()` alla chiusura;
+- **chiudere = `router.back()`**: è per questo che filtri, scorrimento e selezioni della lista restano — non è mai stata smontata. Le schede della scheda usano `router.replace`, quindi Indietro chiude il pannello in un colpo;
+- **l'intercettazione non guarda la larghezza**: ogni `<Link>` verso `/admin/athletes/{id}` da quelle due liste apre il pannello, anche su telefono. Sotto 1024 i nomi usano `AthleteCardLink`, che fa una navigazione piena; per gli altri link (ricerca, menu ⋯) il pannello sotto 1024 non si disegna e ricarica l'indirizzo, che mostra la pagina;
+- **"Apri la scheda intera" è un `<a>`, non un `<Link>`**: l'indirizzo è già quello, un `<Link>` non farebbe niente;
+- **i breakpoint guardano la finestra, non il pannello**: a 1440 `lg:grid-cols-2` si accende anche dentro 640 px. La variante `in-panel:` (`@custom-variant in-panel ([data-panel] &)` in `globals.css`) riporta le griglie a una colonna; con l'attributo nel selettore vince sulla utility col solo media query;
+- **le larghezze di `SheetContent` vanno scritte con la sua stessa variante** (`data-[side=right]:sm:max-w-[640px]`): un `sm:max-w-[640px]` semplice perde contro il `data-[side=right]:sm:max-w-sm` del componente, e il pannello resta a 384 px;
+- **scorre il corpo, non il pannello**: se `SheetContent` è il contenitore che scorre, la X (assoluta) se ne va con il contenuto.
+
+Per provarlo in locale senza toccare la produzione: Postgres locale, `next dev` con `DATABASE_URL` e le variabili Supabase sovrascritte nel processo (vincono su `.env.local`), e due stub temporanei non committati in `current-account.ts` e `supabase/middleware.ts` che restituiscono un admin finto. Scoperto: PR #47, ottobre 2026.
 
 **§17.34 Next.js 16 — `redirect()` in una server action + try/catch lato client = falso errore**: quando una server action chiama `redirect()`, lato client la promise della chiamata viene **rifiutata** con l'errore di redirect (vedi `server-action-reducer.js`, `reject(redirectError)`) mentre Next esegue comunque la navigazione. Un `try/catch` nel client component lo tratta come fallimento: compare il toast "salvataggio non riuscito" e intanto la pagina cambia. Vale anche per i `redirect()` impliciti di `requireAdmin()` / `requireParent()` a sessione scaduta. Pattern corretto:
 ```tsx

@@ -90,7 +90,7 @@ export function AthleteOverview({
 
   return (
     <>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 in-panel:grid-cols-1">
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
