@@ -47,7 +47,7 @@ export function ExpenseDeleteDialog({
     startTransition(async () => {
       const result = await deleteExpense(expense.id)
       if (result.ok) {
-        toast.success("Spesa eliminata")
+        toast.success("Spesa spostata nel cestino")
         onOpenChange(false)
         onSuccess?.()
         router.refresh()
@@ -66,7 +66,7 @@ export function ExpenseDeleteDialog({
               <AlertTriangle className="h-5 w-5 text-destructive" />
             </div>
             <AlertDialogTitle className="pt-1.5">
-              Eliminare definitivamente questa spesa?
+              Spostare questa spesa nel cestino?
             </AlertDialogTitle>
           </div>
         </AlertDialogHeader>
@@ -89,14 +89,18 @@ export function ExpenseDeleteDialog({
             </dl>
           </div>
 
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive-foreground">
-            <p className="mb-2 text-sm font-semibold">⚠️ Azione definitiva</p>
+          {/* Non è una cancellazione: la spesa va in Cestino › Spese e da lì
+              si ripristina. Prima il testo diceva "definitivamente" e "non è
+              possibile ripristinarla", ed erano false tutte e due. */}
+          <div className="rounded-md border border-border bg-muted/40 p-3">
             <ul className="list-disc space-y-1 pl-5 text-sm">
-              <li>La spesa verrà rimossa dalla lista e dai report.</li>
-              <li>Non è possibile ripristinarla dall&apos;interfaccia.</li>
+              <li>La spesa sparisce dalla lista e dai report.</li>
               <li>
-                Utilizza solo per errori di digitazione (fornitore sbagliato,
-                duplicato, test).
+                Resta nel Cestino, sotto Spese: da lì si può ripristinare.
+              </li>
+              <li>
+                Serve per gli errori di digitazione (fornitore sbagliato,
+                duplicato, prova).
               </li>
             </ul>
           </div>
@@ -112,10 +116,10 @@ export function ExpenseDeleteDialog({
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Eliminazione…
+                Spostamento…
               </>
             ) : (
-              "Sì, elimina definitivamente"
+              "Sposta nel cestino"
             )}
           </Button>
         </AlertDialogFooter>
