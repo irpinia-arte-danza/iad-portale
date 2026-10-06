@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Dentro il pannello laterale della scheda allieva (640 px): le griglie a
+   più colonne tornano a una. I breakpoint guardano la finestra, non il
+   contenitore, e a 1440 "lg:grid-cols-2" si accenderebbe anche in 640 px.
+   Il selettore con l'attributo vince sulla utility con il solo media query. */
+@custom-variant in-panel ([data-panel] &);
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

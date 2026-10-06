@@ -10,6 +10,7 @@ import {
   Wallet,
 } from "lucide-react"
 
+import { AthleteCardLink } from "@/components/athletes/athlete-card-link"
 import { AmountOffReference } from "@/components/payments/amount-off-reference"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -105,12 +106,13 @@ export function ScadenzaRow({
 
       <div className="min-w-0 [grid-area:nome]">
         {/* Unico link della riga: il resto non è cliccabile */}
-        <Link
-          href={`/admin/athletes/${s.athlete.id}`}
+        {/* Da 1024 in su apre la scheda nel pannello, con la lista dietro */}
+        <AthleteCardLink
+          athleteId={s.athlete.id}
           className="block truncate font-medium hover:underline"
         >
           {s.athlete.lastName} {s.athlete.firstName}
-        </Link>
+        </AthleteCardLink>
         <p className="truncate text-xs text-muted-foreground">{causale}</p>
       </div>
 
