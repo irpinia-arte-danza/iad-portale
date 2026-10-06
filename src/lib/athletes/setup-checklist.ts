@@ -29,8 +29,11 @@ export type SetupStepId =
 export type SetupStep = {
   id: SetupStepId
   label: string
-  // Perché manca, in una riga: cosa non funziona finché resta così
+  // Perché manca, per esteso: cosa non funziona finché resta così
   reason: string
+  // La stessa cosa in poche parole, per i posti stretti (la colonna della
+  // panoramica, dove la riga non deve andare a capo tre volte)
+  short: string
 }
 
 export type ChecklistEnrollment = {
@@ -79,6 +82,7 @@ function guardianStep(losses: readonly string[]): SetupStep {
     id: "guardian",
     label: "Collega un genitore",
     reason: `È minorenne e non ha nessuno collegato: alla famiglia non arrivano ${losses.join(", ")}.`,
+    short: "Senza genitore non si emettono ricevute né solleciti",
   }
 }
 
@@ -105,6 +109,7 @@ export function athleteSetupChecklist(
       label: "Aggiungi l'email",
       reason:
         "È maggiorenne e non ha genitori collegati: le comunicazioni vanno a lei, e senza email non riceve ricevute, solleciti né inviti agli stage.",
+      short: "Senza email non riceve ricevute né solleciti",
     })
   }
 
@@ -121,6 +126,7 @@ export function athleteSetupChecklist(
         id: "course",
         label: "Iscrivi a un corso",
         reason: `Nessuna iscrizione per l'anno ${year.label}: senza corso non nascono le rate mensili né il contributo di iscrizione.`,
+        short: "Senza corso non nascono le rate",
       })
     }
   }
@@ -136,6 +142,7 @@ export function athleteSetupChecklist(
         certStatus === "missing"
           ? "Non ne ha uno: senza certificato valido non può fare lezione."
           : `È scaduto il ${formatDateShort(certificate!.expiryDate)}: senza certificato valido non può fare lezione.`,
+      short: "Senza certificato non può fare lezione",
     })
   }
 
@@ -156,6 +163,7 @@ export function athleteSetupChecklist(
           cardStatus === "missing"
             ? `Non risulta tesserata per l'anno sociale ${seasonYear}: è nell'elenco da mandare al referente ${CARD_ENTITY}.`
             : `La tessera ${CARD_ENTITY} ${seasonYear} è scaduta il ${formatDateShort(card!.expiryDate!)}.`,
+        short: "Senza tessera non è assicurata",
       })
     }
   }

@@ -19,14 +19,9 @@ import type {
   AthleteEnrollment,
   AthletePaymentSchedule,
 } from "../queries"
-import type {
-  AthleteWithFormRelations,
-  OpenScheduleOption,
-} from "../../payments/queries"
 import { AmountOffReference } from "@/components/payments/amount-off-reference"
 
 import { ScheduleRowActions } from "./schedule-row-actions"
-import { ScheduleSettleProvider } from "./schedule-settle-provider"
 
 type FlattenedSchedule = AthletePaymentSchedule & {
   courseName: string
@@ -38,14 +33,11 @@ type FlattenedSchedule = AthletePaymentSchedule & {
   referenceAmountCents: number | null
 }
 
+// Il dialog "Salda" non sta più qui dentro: lo monta la pagina, una volta
+// sola, fuori dalle schede (vedi ScheduleSettleProvider e §17.38).
 interface SchedulesSectionProps {
-  athleteId: string
-  athleteFirstName: string
-  athleteLastName: string
   enrollments: AthleteEnrollment[]
   associationSchedules: AthleteAssociationSchedule[]
-  athletesForPaymentForm: AthleteWithFormRelations[]
-  openSchedulesByAthlete: Record<string, OpenScheduleOption[]>
 }
 
 function formatDate(date: Date): string {
@@ -86,13 +78,8 @@ function flatten(
 }
 
 export function SchedulesSection({
-  athleteId,
-  athleteFirstName,
-  athleteLastName,
   enrollments,
   associationSchedules,
-  athletesForPaymentForm,
-  openSchedulesByAthlete,
 }: SchedulesSectionProps) {
   const all = flatten(enrollments, associationSchedules)
 
@@ -128,17 +115,8 @@ export function SchedulesSection({
     { key: "WAIVED", label: "Non dovute", items: waived },
   ]
 
-  // Il dialog "Salda" sta nel provider, fuori dai gruppi: una scadenza appena
-  // pagata cambia gruppo e la sua riga viene rimontata altrove.
   return (
-    <ScheduleSettleProvider
-      athleteId={athleteId}
-      athleteFirstName={athleteFirstName}
-      athleteLastName={athleteLastName}
-      athletesForPaymentForm={athletesForPaymentForm}
-      openSchedulesByAthlete={openSchedulesByAthlete}
-    >
-      <Card>
+    <Card>
         <CardHeader>
           <CardTitle>Scadenze</CardTitle>
           <CardDescription>
@@ -184,9 +162,8 @@ export function SchedulesSection({
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
-    </ScheduleSettleProvider>
+      </CardContent>
+    </Card>
   )
 }
 

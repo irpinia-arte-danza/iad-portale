@@ -1,4 +1,9 @@
-import { Prisma } from "@prisma/client"
+import {
+  PaymentStatus,
+  Prisma,
+  type PaymentMethod,
+  type ReceiptStatus,
+} from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
@@ -18,6 +23,7 @@ import {
   compareByCertificateExpiry,
   CURRENT_CERTIFICATE_ORDER,
 } from "@/lib/medical-certificates/certificate-status"
+import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
 import { todayDateOnly } from "@/lib/utils/date-only"
 
 export type AthleteListSort = "name" | "certificate" | "card"
@@ -277,6 +283,16 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
             type: true,
             monthlyFeeCents: true,
             isActive: true,
+            // Giorno e orario: la panoramica dice quando si allena
+            schedules: {
+              select: {
+                dayOfWeek: true,
+                startTime: true,
+                endTime: true,
+                location: true,
+              },
+              orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
+            },
           },
         },
         academicYear: {
@@ -431,6 +447,86 @@ export type BrandForPDF = {
 export type AthletePDFPayload = {
   athlete: AthleteForPDF
   brand: BrandForPDF | null
+}
+
+/**
+ * Ultimo metodo usato dalla famiglia: precompila l'incasso dalla scheda,
+ * come fa l'elenco Scadenze. Chi paga in contanti paga in contanti anche il
+ * mese dopo.
+ */
+export async function getAthleteLastPaymentMethod(
+  athleteId: string,
+): Promise<PaymentMethod | null> {
+  await requireAdmin()
+  const last = await prisma.payment.findFirst({
+    where: { athleteId, deletedAt: null, status: PaymentStatus.PAID },
+    orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
+    select: { method: true },
+  })
+  return last?.method ?? null
+}
+
+export type AthleteRecentPayment = {
+  id: string
+  paymentDate: Date
+  amountCents: number
+  method: PaymentMethod
+  description: string
+  receipt: {
+    id: string
+    receiptNumber: string
+    status: ReceiptStatus
+    payerName: string | null
+    payerEmail: string | null
+  } | null
+}
+
+/**
+ * Gli ultimi pagamenti dell'allieva, con la ricevuta se è stata emessa: la
+ * panoramica ne mostra tre, con il tasto per consegnarla.
+ */
+export async function getAthleteRecentPayments(
+  athleteId: string,
+  limit = 3,
+): Promise<AthleteRecentPayment[]> {
+  await requireAdmin()
+
+  const payments = await prisma.payment.findMany({
+    where: { athleteId, deletedAt: null, status: PaymentStatus.PAID },
+    orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
+    take: limit,
+    select: {
+      id: true,
+      paymentDate: true,
+      amountCents: true,
+      method: true,
+      feeType: true,
+      notes: true,
+      courseEnrollment: { select: { course: { select: { name: true } } } },
+      receipt: {
+        select: {
+          id: true,
+          receiptNumber: true,
+          status: true,
+          payerName: true,
+          payerEmail: true,
+        },
+      },
+    },
+  })
+
+  return payments.map((p) => ({
+    id: p.id,
+    paymentDate: p.paymentDate,
+    amountCents: p.amountCents,
+    method: p.method,
+    description:
+      p.courseEnrollment?.course.name ??
+      p.notes ??
+      FEE_TYPE_LABELS[p.feeType] ??
+      "Pagamento",
+    receipt: p.receipt,
+  }))
 }
 
 export async function getAthleteForPDF(

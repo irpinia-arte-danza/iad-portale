@@ -22,6 +22,7 @@ import {
 // provider la riceve come default), nell'elenco Scadenze cambia a ogni riga.
 export type SettleTarget = SettleSchedule & {
   athlete?: { id: string; firstName: string; lastName: string }
+  // Rate da spuntare: vedi SettleSchedule.selection
   // Ultimo metodo usato dalla famiglia: precompila il form
   defaultMethod?: PaymentMethod | null
 }
