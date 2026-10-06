@@ -11,8 +11,10 @@
 // - Importi in centesimi (Int) per evitare problemi di floating point
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
+  // Niente previewFeatures: driverAdapters era dichiarato e non usato
+  // (src/lib/prisma.ts fa un `new PrismaClient()` liscio) e faceva generare
+  // il motore WebAssembly, 2,4 MB in ogni funzione.
 }
 
 datasource db {
