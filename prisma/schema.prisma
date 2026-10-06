@@ -1443,6 +1443,9 @@ enum AuditAction {
   // Condivisione del PDF dal foglio di iOS: si sa che è uscita dal
   // gestionale, non a chi è andata (il contatto si sceglie fuori dalla pagina)
   RECEIPT_SHARED
+  // Sollecito aperto su WhatsApp: stessa regola, si sa che la chat è stata
+  // aperta col messaggio già scritto, non che sia partito
+  REMINDER_WHATSAPP_OPENED
   // Tessere ENDAS/CSEN: caricamento singolo, caricamento in blocco dai PDF
   // dell'ente, cestino, ed export dell'elenco da tesserare per il referente
   // Importo di una scadenza corretto a mano, nei due versi

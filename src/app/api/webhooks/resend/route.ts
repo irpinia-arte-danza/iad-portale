@@ -136,9 +136,12 @@ export async function POST(request: NextRequest) {
 
   if (update) {
     try {
-      await prisma.emailLog.update({
-        where: { id: emailLog.id },
-        data: update,
+      // updateMany e non update: un sollecito a una famiglia con più rate è
+      // una email sola con una riga di log per rata, tutte con lo stesso
+      // providerId. Lo stato di consegna vale per tutte.
+      await prisma.emailLog.updateMany({
+        where: { providerId },
+        data: update as Prisma.EmailLogUpdateManyMutationInput,
       })
     } catch (err) {
       console.error(

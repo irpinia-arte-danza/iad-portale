@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import {
+  AuditAction,
   EmailCategory,
   EmailStatus,
   EmailTrigger,
@@ -16,7 +17,10 @@ import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { academicYearSlashLabel } from "@/lib/fees/association-fee"
 import { renderTemplate } from "@/lib/resend/render-template"
 import { sendBatch, type BatchItem } from "@/lib/resend/send-batch"
+import { groupByPayer } from "@/lib/scadenze/payer-grouping"
+import { reminderWhatsappText } from "@/lib/scadenze/reminder-text"
 import { FEE_TYPE_LABELS } from "@/lib/schemas/payment"
+import { uuidSchema } from "@/lib/schemas/common"
 import { formatMeseIt } from "@/lib/utils/format"
 import { withActiveCourseOrAssociationScheduleFilter } from "@/lib/queries/active-schedule-filter"
 
@@ -46,6 +50,7 @@ const SCHEDULE_ATHLETE_SELECT = {
   lastName: true,
   // Destinataria quando non ha genitori collegati (corso adulti)
   email: true,
+  phone: true,
   // Serve al limite dei 18 anni per il ripiego sull allieva
   dateOfBirth: true,
   parentRelations: {
@@ -89,6 +94,16 @@ function reminderPeriod(schedule: {
     return `associativa ${academicYearSlashLabel(schedule.academicYear.label)}`
   }
   return formatMeseIt(schedule.dueDate)
+}
+
+// "ottobre e novembre" · "ottobre, novembre e dicembre"
+function formatList(values: string[]): string {
+  if (values.length <= 1) return values[0] ?? ""
+  return `${values.slice(0, -1).join(", ")} e ${values[values.length - 1]}`
+}
+
+function formatEuroAmount(cents: number): string {
+  return CURRENCY_IT.format(cents / 100)
 }
 
 export async function getScadenzeCSVData(
@@ -209,11 +224,15 @@ export async function listReminderTemplates(): Promise<ReminderTemplateOption[]>
 export type ReminderPreview = {
   scheduleId: string
   recipientEmail: string | null
+  // Serve a comporre il link di WhatsApp: il messaggio lo manda Giuseppina
+  recipientPhone: string | null
   recipientName: string
   athleteName: string
   subject: string
   bodyHtml: string
   bodyText: string | null
+  // Lo stesso testo del modello, in chiaro, da mandare su WhatsApp
+  whatsappText: string
   warning?: string
 }
 
@@ -259,6 +278,9 @@ export async function previewReminder(
     mese: reminderPeriod(schedule),
     corso_nome: schedule.courseEnrollment?.course.name ?? "",
     tipo_quota: FEE_TYPE_LABELS[schedule.feeType] ?? "",
+    // Anche con una rata sola: l'anteprima deve mostrare quello che il
+    // destinatario leggerà, e l'invio riempie sempre questa variabile
+    elenco_rate: `${athleteName} — ${reminderPeriod(schedule)}: ${formatEuroAmount(schedule.amountCents)} €`,
   }
 
   const rendered = await renderTemplate(templateSlug, vars)
@@ -272,14 +294,65 @@ export async function previewReminder(
 
   return {
     scheduleId: schedule.id,
-    recipientEmail: parent?.email ?? null,
+    recipientEmail: parent?.email ?? athlete.email ?? null,
+    recipientPhone: parent?.phone ?? athlete.phone ?? null,
     recipientName,
     athleteName,
     subject: rendered.subject,
     bodyHtml: rendered.bodyHtml,
     bodyText: rendered.bodyText,
+    whatsappText: reminderWhatsappText(rendered),
     warning,
   }
+}
+
+/**
+ * Sollecito aperto su WhatsApp.
+ *
+ * Non invia niente: registra che la chat è stata aperta dal gestionale con il
+ * messaggio già scritto. Che poi il messaggio sia partito non lo sappiamo —
+ * wa.me apre WhatsApp e lì il gestionale non vede più niente — ed è lo stesso
+ * motivo per cui la ricevuta condivisa si traccia così (RECEIPT_SHARED).
+ */
+export async function recordWhatsappReminder(
+  scheduleId: string,
+): Promise<{ ok: boolean }> {
+  const { userId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(scheduleId)
+  if (!idParsed.success) return { ok: false }
+
+  const schedule = await prisma.paymentSchedule.findFirst({
+    where: withActiveCourseOrAssociationScheduleFilter({ id: idParsed.data }),
+    include: SCHEDULE_INCLUDE,
+  })
+  if (!schedule) return { ok: false }
+
+  const athlete = schedule.courseEnrollment?.athlete ?? schedule.athlete
+  const parent = athlete?.parentRelations[0]?.parent ?? null
+
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: AuditAction.REMINDER_WHATSAPP_OPENED,
+      entityType: "PaymentSchedule",
+      entityId: idParsed.data,
+      changes: {
+        athleteId: athlete?.id ?? null,
+        // Il nome di chi si è scelto di contattare, non il numero: a cosa è
+        // servito si capisce, i dati di contatto restano in anagrafica
+        destinatario: parent
+          ? `${parent.firstName} ${parent.lastName}`
+          : athlete
+            ? `${athlete.firstName} ${athlete.lastName}`
+            : null,
+        periodo: reminderPeriod(schedule),
+      },
+    },
+  })
+
+  revalidatePath("/admin/scadenze")
+  return { ok: true }
 }
 
 export type SendReminderResult = {
@@ -319,20 +392,35 @@ export async function sendReminderBatch(
     include: SCHEDULE_INCLUDE,
   })
 
-  type SendableItem = {
+  // Un messaggio per famiglia: le rate si raggruppano per destinatario, e
+  // l'email elenca i mesi. Prima partiva un'email per rata, e una famiglia
+  // con due figlie e due mesi ne riceveva quattro in mezzo secondo.
+  type Resolved = {
     scheduleId: string
     athleteId: string
-    // null quando il sollecito va all'allieva stessa
+    athleteName: string
     parentId: string | null
     recipientEmail: string
     recipientName: string
+    periodo: string
+    amountCents: number
+    dueDate: Date
+    courseName: string
+    feeTypeLabel: string
+  }
+
+  type SendableGroup = {
+    items: Resolved[]
+    recipientEmail: string
+    recipientName: string
+    parentId: string | null
     subject: string
     html: string
     text: string | null
   }
 
   const results: SendReminderResult[] = []
-  const sendable: SendableItem[] = []
+  const resolvedItems: Resolved[] = []
 
   for (const s of schedules) {
     const athlete = s.courseEnrollment?.athlete ?? s.athlete
@@ -353,90 +441,124 @@ export async function sendReminderBatch(
       continue
     }
 
-    const recipient = resolved.recipient
+    resolvedItems.push({
+      scheduleId: s.id,
+      athleteId: athlete.id,
+      athleteName: `${athlete.firstName} ${athlete.lastName}`,
+      parentId: resolved.recipient.parentId,
+      recipientEmail: resolved.recipient.email,
+      recipientName: resolved.recipient.name,
+      periodo: reminderPeriod(s),
+      amountCents: s.amountCents,
+      dueDate: s.dueDate,
+      courseName: s.courseEnrollment?.course.name ?? "",
+      feeTypeLabel: FEE_TYPE_LABELS[s.feeType] ?? "",
+    })
+  }
+
+  const sendable: SendableGroup[] = []
+
+  for (const group of groupByPayer(resolvedItems)) {
+    const items = group.items
+    const first = items[0]
+    const totalCents = items.reduce((sum, i) => sum + i.amountCents, 0)
+    // La più vicina: è quella che rende urgente il messaggio
+    const earliest = items.reduce((min, i) =>
+      i.dueDate.getTime() < min.dueDate.getTime() ? i : min,
+    )
+    const periodi = [...new Set(items.map((i) => i.periodo))]
+    const allieve = [...new Set(items.map((i) => i.athleteName))]
 
     const vars = {
-      genitore_nome: recipient.name,
-      allieva_nome: `${athlete.firstName} ${athlete.lastName}`,
-      importo: (s.amountCents / 100).toLocaleString("it-IT", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
-      data_scadenza: s.dueDate.toLocaleDateString("it-IT", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }),
-      mese: reminderPeriod(s),
-      corso_nome: s.courseEnrollment?.course.name ?? "",
-      tipo_quota: FEE_TYPE_LABELS[s.feeType] ?? "",
+      genitore_nome: first.recipientName,
+      allieva_nome: formatList(allieve),
+      // Con una rata sola è esattamente quello che usciva prima
+      importo: formatEuroAmount(totalCents),
+      data_scadenza: DATE_IT.format(earliest.dueDate),
+      mese: formatList(periodi),
+      corso_nome: first.courseName,
+      tipo_quota: first.feeTypeLabel,
+      // Variabile nuova: i modelli che non la usano restano come sono
+      elenco_rate: items
+        .map(
+          (i) =>
+            `${i.athleteName} — ${i.periodo}: ${formatEuroAmount(i.amountCents)} €`,
+        )
+        .join("; "),
     }
 
     try {
       const rendered = await renderTemplate(templateSlug, vars)
       sendable.push({
-        scheduleId: s.id,
-        athleteId: athlete.id,
-        parentId: recipient.parentId,
-        recipientEmail: recipient.email,
-        recipientName: recipient.name,
+        items,
+        recipientEmail: first.recipientEmail,
+        recipientName: first.recipientName,
+        parentId: group.parentId,
         subject: rendered.subject,
         html: rendered.bodyHtml,
         text: rendered.bodyText,
       })
     } catch (err) {
-      results.push({
-        scheduleId: s.id,
-        recipientEmail: recipient.email,
-        recipientName: recipient.name,
-        status: "FAILED",
-        error: err instanceof Error ? err.message : "Errore rendering template",
-      })
+      for (const item of items) {
+        results.push({
+          scheduleId: item.scheduleId,
+          recipientEmail: item.recipientEmail,
+          recipientName: item.recipientName,
+          status: "FAILED",
+          error:
+            err instanceof Error ? err.message : "Errore rendering template",
+        })
+      }
     }
   }
 
   let transportError: string | undefined
   if (sendable.length > 0) {
-    const batchItems: BatchItem[] = sendable.map((item) => ({
-      to: item.recipientEmail,
-      subject: item.subject,
-      html: item.html,
-      text: item.text ?? undefined,
+    const batchItems: BatchItem[] = sendable.map((group) => ({
+      to: group.recipientEmail,
+      subject: group.subject,
+      html: group.html,
+      text: group.text ?? undefined,
     }))
 
     const batchResponse = await sendBatch(batchItems)
     transportError = batchResponse.transportError
 
-    const logPayload = sendable.map((item, idx) => {
+    // Una riga di log per rata, anche quando l'email è una sola: così la
+    // storia dei solleciti resta giusta su ogni scadenza. Le righe della
+    // stessa email condividono il providerId.
+    const logPayload = sendable.flatMap((group, idx) => {
       const outcome = batchResponse.results[idx]
       const ok = outcome?.success === true
 
-      results.push({
-        scheduleId: item.scheduleId,
-        recipientEmail: item.recipientEmail,
-        recipientName: item.recipientName,
-        status: ok ? "SENT" : "FAILED",
-        providerId: ok ? outcome.providerId : undefined,
-        error: ok ? undefined : outcome?.error ?? "Errore invio",
-      })
+      return group.items.map((item) => {
+        results.push({
+          scheduleId: item.scheduleId,
+          recipientEmail: group.recipientEmail,
+          recipientName: group.recipientName,
+          status: ok ? "SENT" : "FAILED",
+          providerId: ok ? outcome.providerId : undefined,
+          error: ok ? undefined : outcome?.error ?? "Errore invio",
+        })
 
-      return {
-        sentBy: admin.userId,
-        recipientEmail: item.recipientEmail,
-        recipientName: item.recipientName,
-        templateSlug,
-        subject: item.subject,
-        bodyHtml: item.html,
-        bodyText: item.text,
-        athleteId: item.athleteId,
-        parentId: item.parentId,
-        paymentScheduleId: item.scheduleId,
-        status: ok ? EmailStatus.SENT : EmailStatus.FAILED,
-        providerId: ok ? outcome.providerId : null,
-        errorMessage: ok ? null : outcome?.error ?? "Errore invio",
-        triggeredBy: EmailTrigger.ADMIN_MANUAL,
-        milestoneKey: null,
-      }
+        return {
+          sentBy: admin.userId,
+          recipientEmail: group.recipientEmail,
+          recipientName: group.recipientName,
+          templateSlug,
+          subject: group.subject,
+          bodyHtml: group.html,
+          bodyText: group.text,
+          athleteId: item.athleteId,
+          parentId: group.parentId,
+          paymentScheduleId: item.scheduleId,
+          status: ok ? EmailStatus.SENT : EmailStatus.FAILED,
+          providerId: ok ? outcome.providerId : null,
+          errorMessage: ok ? null : outcome?.error ?? "Errore invio",
+          triggeredBy: EmailTrigger.ADMIN_MANUAL,
+          milestoneKey: null,
+        }
+      })
     })
 
     if (logPayload.length > 0) {

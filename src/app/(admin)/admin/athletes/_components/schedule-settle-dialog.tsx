@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { FeeType } from "@prisma/client"
+import type { FeeType, PaymentMethod } from "@prisma/client"
 
 import {
   Dialog,
@@ -39,6 +39,9 @@ interface ScheduleSettleDialogProps {
   athleteId: string
   athleteFirstName: string
   athleteLastName: string
+  // Ultimo metodo usato dalla famiglia: una casella in meno da toccare allo
+  // sportello. Assente nella scheda allieva, che resta com'era.
+  defaultMethod?: PaymentMethod | null
   athletesForPaymentForm: AthleteWithFormRelations[]
   openSchedulesByAthlete: Record<string, OpenScheduleOption[]>
   onSuccess?: () => void
@@ -57,6 +60,7 @@ function formatDate(date: Date): string {
 function paymentDefaults(
   schedule: SettleSchedule,
   athleteId: string,
+  defaultMethod?: PaymentMethod | null,
 ): Partial<PaymentCreateValues> {
   return {
     athleteId,
@@ -65,6 +69,7 @@ function paymentDefaults(
     feeType: schedule.feeType,
     amountEur: schedule.amountCents / 100,
     paymentDate: new Date(),
+    ...(defaultMethod ? { method: defaultMethod } : {}),
   }
 }
 
@@ -75,6 +80,7 @@ export function ScheduleSettleDialog({
   athleteId,
   athleteFirstName,
   athleteLastName,
+  defaultMethod,
   athletesForPaymentForm,
   openSchedulesByAthlete,
   onSuccess,
@@ -124,7 +130,7 @@ export function ScheduleSettleDialog({
             <PaymentForm
               athletes={athletesForPaymentForm}
               openSchedulesByAthlete={openSchedulesByAthlete}
-              defaultValues={paymentDefaults(schedule, athleteId)}
+              defaultValues={paymentDefaults(schedule, athleteId, defaultMethod)}
               onSuccess={(paymentId) => {
                 setRegistered(true)
                 onSuccess?.()
