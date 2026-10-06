@@ -298,14 +298,20 @@ export async function getNavCounters(): Promise<NavCounters> {
   await requireAdmin()
 
   const seasonYear = await getCurrentSeasonYear()
-  const [scadenzeInRitardo, certificati, daTesserare] = await Promise.all([
-    prisma.paymentSchedule.count({ where: scadenzeWhere({ stato: "IN_RITARDO" }) }),
-    getCertificateStatusCounts(),
-    countTesseramentoQueue(AffiliationEntity.ENDAS, seasonYear),
-  ])
+  const [scadenzeInRitardo, daConsegnare, certificati, daTesserare] =
+    await Promise.all([
+      prisma.paymentSchedule.count({
+        where: scadenzeWhere({ stato: "IN_RITARDO" }),
+      }),
+      // Stesso anno con cui si apre l'elenco Ricevute, come il riquadro
+      countReceiptsToDeliver(todayInRome().getUTCFullYear()),
+      getCertificateStatusCounts(),
+      countTesseramentoQueue(AffiliationEntity.ENDAS, seasonYear),
+    ])
 
   return navCounters({
     scadenzeInRitardo: { count: scadenzeInRitardo, amountCents: 0 },
+    ricevuteDaConsegnare: daConsegnare,
     certificatiScaduti: certificati.expired,
     certificatiAssenti: certificati.missing,
     tessereDaFare: { count: daTesserare, seasonYear },

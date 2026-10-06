@@ -1,7 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { MoreHorizontal, Printer, Send, UserCircle, X } from "lucide-react"
+import {
+  HelpCircle,
+  MoreHorizontal,
+  Printer,
+  Send,
+  UserCircle,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -172,9 +178,12 @@ export function ReceiptRow({
               </a>
             </DropdownMenuItem>
             {!cancelled ? (
-              <DropdownMenuItem variant="destructive" onSelect={onAnnulla}>
-                <X className="h-4 w-4" />
-                Annulla ricevuta
+              // "Come si annulla" e non "Annulla ricevuta": la voce non
+              // annulla niente, spiega che si storna il pagamento. Un nome
+              // che promette un'azione che non fa è peggio di nessun nome.
+              <DropdownMenuItem onSelect={onAnnulla}>
+                <HelpCircle className="h-4 w-4" />
+                Come si annulla
               </DropdownMenuItem>
             ) : null}
             {r.payment?.athleteId ? (

@@ -178,6 +178,7 @@ describe("todoGroups", () => {
 describe("navCounters", () => {
   const INPUT = {
     scadenzeInRitardo: { count: 0, amountCents: 0 },
+    ricevuteDaConsegnare: 0,
     certificatiScaduti: 0,
     certificatiAssenti: 0,
     tessereDaFare: { count: 0, seasonYear: 2026 },
@@ -196,10 +197,17 @@ describe("navCounters", () => {
     expect(counters["/admin/scadenze"]).toEqual({ count: 28, tone: "amber" })
   })
 
+  it("le ricevute da consegnare hanno il loro badge, in ambra", () => {
+    const counters = navCounters({ ...INPUT, ricevuteDaConsegnare: 49 })
+    expect(Object.keys(counters)).toEqual(["/admin/receipts"])
+    expect(counters["/admin/receipts"]).toEqual({ count: 49, tone: "amber" })
+  })
+
   it("certificati = scaduti + assenti, ed è l'unico rosso", () => {
     const counters = navCounters({
       ...INPUT,
       scadenzeInRitardo: { count: 2, amountCents: 100 },
+      ricevuteDaConsegnare: 49,
       certificatiScaduti: 3,
       certificatiAssenti: 56,
       tessereDaFare: { count: 1, seasonYear: 2026 },
@@ -220,6 +228,7 @@ describe("navCounters", () => {
     const todo: TodoCounters = {
       ...ZERO,
       scadenzeInRitardo: { count: 28, amountCents: 103500 },
+      ricevuteDaConsegnare: 49,
       certificatiScaduti: 3,
       certificatiAssenti: 56,
       tessereDaFare: { count: 1, seasonYear: 2026 },
@@ -231,6 +240,9 @@ describe("navCounters", () => {
       tiles.find((t) => t.id === id)?.count ?? 0
 
     expect(menu["/admin/scadenze"].count).toBe(tileCount("scadenze-in-ritardo"))
+    expect(menu["/admin/receipts"].count).toBe(
+      tileCount("ricevute-da-consegnare"),
+    )
     expect(menu["/admin/medical-certificates"].count).toBe(
       tileCount("certificati-scaduti") + tileCount("certificati-assenti"),
     )
@@ -240,6 +252,7 @@ describe("navCounters", () => {
   it("ogni chiave è l'href di una voce del menu", () => {
     const counters = navCounters({
       scadenzeInRitardo: { count: 1, amountCents: 1 },
+      ricevuteDaConsegnare: 1,
       certificatiScaduti: 1,
       certificatiAssenti: 0,
       tessereDaFare: { count: 1, seasonYear: 2026 },
