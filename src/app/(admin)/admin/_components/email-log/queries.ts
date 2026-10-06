@@ -3,6 +3,7 @@ import "server-only"
 import { Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { requireAdmin } from "@/lib/auth/require-admin"
 
 const emailLogRowArgs = Prisma.validator<Prisma.EmailLogDefaultArgs>()({
   select: {
@@ -40,6 +41,8 @@ export type EmailLogRow = Prisma.EmailLogGetPayload<typeof emailLogRowArgs>
 export async function getAthleteEmailLog(
   athleteId: string,
 ): Promise<EmailLogRow[]> {
+  await requireAdmin()
+
   return prisma.emailLog.findMany({
     where: { athleteId },
     orderBy: { sentAt: "desc" },
@@ -50,6 +53,8 @@ export async function getAthleteEmailLog(
 export async function getParentEmailLog(
   parentId: string,
 ): Promise<EmailLogRow[]> {
+  await requireAdmin()
+
   return prisma.emailLog.findMany({
     where: { parentId },
     orderBy: { sentAt: "desc" },

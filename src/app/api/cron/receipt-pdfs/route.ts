@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 
+import { authorizeCron } from "@/lib/auth/cron-auth"
 import { prisma } from "@/lib/prisma"
 import { archiveReceiptPdf } from "@/lib/receipts/receipt-pdf-store"
 
@@ -15,29 +16,24 @@ const BATCH_SIZE = 25
 // notturno (01:37 UTC) così i file entrano nella copia della stessa notte.
 // Idempotente: una ricevuta con file archiviato non viene mai rigenerata.
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const authHeader = req.headers.get("authorization")
-  const isVercelCron = req.headers.get("x-vercel-cron") === "1"
-  const secret = process.env.CRON_SECRET
-  const isDev = process.env.NODE_ENV === "development"
-
-  // Dev bypass come negli altri cron: in production serve x-vercel-cron OR
-  // Bearer ${CRON_SECRET}
-  if (!isDev) {
-    if (!secret) {
-      console.error(`${LOG_PREFIX} CRON_SECRET not configured`)
-      return NextResponse.json(
-        { ok: false, error: "CRON_SECRET not configured" },
-        { status: 500 },
-      )
-    }
-
-    const authorized = isVercelCron || authHeader === `Bearer ${secret}`
-    if (!authorized) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized" },
-        { status: 401 },
-      )
-    }
+  // Solo Bearer CRON_SECRET, confronto a tempo costante (cron-auth.ts).
+  // In locale si chiama con lo stesso header: nessuna scorciatoia.
+  const auth = authorizeCron(
+    req.headers.get("authorization"),
+    process.env.CRON_SECRET,
+  )
+  if (auth === "unconfigured") {
+    console.error(`${LOG_PREFIX} CRON_SECRET not configured`)
+    return NextResponse.json(
+      { ok: false, error: "CRON_SECRET not configured" },
+      { status: 500 },
+    )
+  }
+  if (auth === "unauthorized") {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized" },
+      { status: 401 },
+    )
   }
 
   const pending = await prisma.receipt.findMany({

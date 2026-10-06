@@ -4,6 +4,7 @@ import { EmailStatus, EmailTrigger, UserRole } from "@prisma/client"
 
 import { syncFiscalYears } from "@/lib/fiscal-years"
 import { prisma } from "@/lib/prisma"
+import { authorizeCron } from "@/lib/auth/cron-auth"
 import { sendEmail } from "@/lib/resend/send-email"
 import {
   isSchoolYearStarted,
@@ -62,31 +63,24 @@ type NextAcademicYearStep =
     }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const authHeader = req.headers.get("authorization")
-  const isVercelCron = req.headers.get("x-vercel-cron") === "1"
-  const secret = process.env.CRON_SECRET
-  const isDev = process.env.NODE_ENV === "development"
-
-  // Dev bypass: in sviluppo locale (NODE_ENV=development) accettiamo
-  // chiamate senza auth header per facilitare test da browser/curl.
-  // In production il bypass è inattivo: serve sempre x-vercel-cron OR
-  // Bearer ${CRON_SECRET}.
-  if (!isDev) {
-    if (!secret) {
-      console.error(`${LOG_PREFIX} CRON_SECRET not configured`)
-      return NextResponse.json(
-        { ok: false, error: "CRON_SECRET not configured" },
-        { status: 500 },
-      )
-    }
-
-    const authorized = isVercelCron || authHeader === `Bearer ${secret}`
-    if (!authorized) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized" },
-        { status: 401 },
-      )
-    }
+  // Solo Bearer CRON_SECRET, confronto a tempo costante (cron-auth.ts).
+  // In locale si chiama con lo stesso header: nessuna scorciatoia.
+  const auth = authorizeCron(
+    req.headers.get("authorization"),
+    process.env.CRON_SECRET,
+  )
+  if (auth === "unconfigured") {
+    console.error(`${LOG_PREFIX} CRON_SECRET not configured`)
+    return NextResponse.json(
+      { ok: false, error: "CRON_SECRET not configured" },
+      { status: 500 },
+    )
+  }
+  if (auth === "unauthorized") {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized" },
+      { status: 401 },
+    )
   }
 
   // Giorno di calendario a Roma (non UTC: tra mezzanotte e le 2 sarebbe ieri)

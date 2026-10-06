@@ -1,8 +1,11 @@
 import { cache } from "react"
 
 import { prisma } from "@/lib/prisma"
+import { requireAdmin } from "@/lib/auth/require-admin"
 
 export const getBrandSettings = cache(async () => {
+  await requireAdmin()
+
   const settings = await prisma.brandSettings.findUnique({ where: { id: 1 } })
   if (!settings) {
     throw new Error("BrandSettings non trovato (seed non eseguito?)")
@@ -11,6 +14,8 @@ export const getBrandSettings = cache(async () => {
 })
 
 export const getReceiptSettings = cache(async () => {
+  await requireAdmin()
+
   const settings = await prisma.receiptSettings.findUnique({ where: { id: 1 } })
   if (!settings) {
     throw new Error("ReceiptSettings non trovato (seed non eseguito?)")
@@ -19,6 +24,8 @@ export const getReceiptSettings = cache(async () => {
 })
 
 export const getUserProfile = cache(async (userId: string) => {
+  await requireAdmin()
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -37,6 +44,8 @@ export const getUserProfile = cache(async (userId: string) => {
 })
 
 export const getAdminUsers = cache(async () => {
+  await requireAdmin()
+
   return prisma.user.findMany({
     where: { role: "ADMIN", deletedAt: null },
     select: {
@@ -65,6 +74,8 @@ export type AuditLogRow = {
 export async function getSettingsAuditLog(
   limit = 50,
 ): Promise<AuditLogRow[]> {
+  await requireAdmin()
+
   const rows = await prisma.auditLog.findMany({
     where: {
       entityType: { in: ["BrandSettings", "ReceiptSettings", "User"] },

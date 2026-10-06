@@ -7,6 +7,7 @@ import {
   UserRole,
 } from "@prisma/client"
 
+import { authorizeCron } from "@/lib/auth/cron-auth"
 import { prisma } from "@/lib/prisma"
 import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { renderTemplate } from "@/lib/resend/render-template"
@@ -67,21 +68,23 @@ type CronStats = {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const authHeader = req.headers.get("authorization")
-  const isVercelCron = req.headers.get("x-vercel-cron") === "1"
-  const secret = process.env.CRON_SECRET
-
-  if (!secret) {
+  // Solo Bearer CRON_SECRET, confronto a tempo costante (cron-auth.ts)
+  const auth = authorizeCron(
+    req.headers.get("authorization"),
+    process.env.CRON_SECRET,
+  )
+  if (auth === "unconfigured") {
     console.error("[cron/reminders] CRON_SECRET not configured")
     return NextResponse.json(
       { ok: false, error: "CRON_SECRET not configured" },
       { status: 500 },
     )
   }
-
-  const authorized = isVercelCron || authHeader === `Bearer ${secret}`
-  if (!authorized) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 })
+  if (auth === "unauthorized") {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized" },
+      { status: 401 },
+    )
   }
 
   const cfg = await prisma.reminderConfig.upsert({

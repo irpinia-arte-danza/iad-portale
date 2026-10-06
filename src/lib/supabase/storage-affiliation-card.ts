@@ -1,3 +1,5 @@
+import "server-only"
+
 import { createAdminClient } from "./admin-client"
 import { SIGNED_URL_TTL_SECONDS } from "./signed-url"
 import { CARD_ALLOWED_MIME, CARD_MAX_BYTES } from "@/lib/affiliations/file-rules"

@@ -3,8 +3,11 @@ import "server-only"
 import { Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { requireAdmin } from "@/lib/auth/require-admin"
 
 export async function getCurrentShowcase() {
+  await requireAdmin()
+
   const ay = await prisma.academicYear.findFirst({
     where: { isCurrent: true },
     select: { id: true, label: true },
@@ -159,6 +162,8 @@ export type ShowcaseWithDetails = Prisma.ShowcaseGetPayload<
 export async function getShowcaseById(
   id: string,
 ): Promise<ShowcaseWithDetails | null> {
+  await requireAdmin()
+
   return prisma.showcase.findUnique({
     where: { id },
     ...showcaseDetailArgs,
@@ -168,6 +173,8 @@ export async function getShowcaseById(
 export async function listShowcaseCostumes(
   showcaseId: string,
 ): Promise<CostumeWithAssignments[]> {
+  await requireAdmin()
+
   return prisma.costume.findMany({
     where: { showcaseId, deletedAt: null },
     ...costumesArgs,
@@ -176,6 +183,8 @@ export async function listShowcaseCostumes(
 }
 
 export async function listShowcaseEnrollableAthletes(showcaseId: string) {
+  await requireAdmin()
+
   // Allieve attive (non soft-deleted) non già partecipanti
   const showcase = await prisma.showcase.findUnique({
     where: { id: showcaseId },

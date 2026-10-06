@@ -1,6 +1,7 @@
 import "server-only"
 
 import { prisma } from "@/lib/prisma"
+import { requireAdmin } from "@/lib/auth/require-admin"
 
 export type StageListItem = {
   id: string
@@ -22,6 +23,8 @@ export async function listStages(options?: {
   academicYearId?: string
   includeDeleted?: boolean
 }): Promise<StageListItem[]> {
+  await requireAdmin()
+
   const stages = await prisma.stage.findMany({
     where: {
       ...(options?.includeDeleted ? {} : { deletedAt: null }),
@@ -54,6 +57,8 @@ export async function listStages(options?: {
 }
 
 export async function getStageById(id: string) {
+  await requireAdmin()
+
   return prisma.stage.findUnique({
     where: { id },
     include: {
@@ -119,6 +124,8 @@ export type StageWithDetails = NonNullable<
 >
 
 export async function listStageEnrollableAthletes(stageId: string) {
+  await requireAdmin()
+
   // Allieve attive (non eliminate) non ancora iscritte a questo stage
   const enrolled = await prisma.stageEnrollment.findMany({
     where: { stageId },
@@ -140,6 +147,8 @@ export async function listStageEnrollableAthletes(stageId: string) {
 }
 
 export async function getStageEmailLogs(stageId: string) {
+  await requireAdmin()
+
   // Email logs collegate alle allieve iscritte allo stage (template stage-invite)
   const enrollments = await prisma.stageEnrollment.findMany({
     where: { stageId },

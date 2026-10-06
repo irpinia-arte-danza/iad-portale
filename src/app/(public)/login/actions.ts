@@ -4,25 +4,13 @@ import { redirect } from "next/navigation";
 
 import { resolveAccountState } from "@/lib/auth/account-state";
 import { getDashboardPath } from "@/lib/auth/dashboard-path";
+import { loginErrorMessage } from "@/lib/auth/login-error";
 import { createClient } from "@/lib/supabase/server";
 
 type LoginValues = {
   email: string;
   password: string;
 };
-
-function mapAuthError(message: string): string {
-  if (message.includes("Invalid login credentials")) {
-    return "Email o password non corretti";
-  }
-  if (message.includes("Email not confirmed")) {
-    return "Accesso non ancora attivato: usa il link ricevuto via email oppure «Password dimenticata»";
-  }
-  if (message.includes("Too many requests")) {
-    return "Troppi tentativi, riprova tra qualche minuto";
-  }
-  return "Errore durante l'accesso, riprova";
-}
 
 export async function login(
   values: LoginValues
@@ -35,7 +23,7 @@ export async function login(
   });
 
   if (error) {
-    return { error: mapAuthError(error.message) };
+    return { error: loginErrorMessage(error.message) };
   }
 
   // Credenziali valide ma account non utilizzabile (utente disattivato,
