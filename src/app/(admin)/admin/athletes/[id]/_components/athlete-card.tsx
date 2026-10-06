@@ -260,6 +260,30 @@ export async function AthleteCard({ athleteId, tab: rawTab, variant }: AthleteCa
       </ul>
     )
 
+  // Le altre figlie di ciascun genitore: un modulo firmato spesso vale per
+  // tutte, e il dialog dei consensi le propone
+  const siblingLinks =
+    athlete.parentRelations.length > 0
+      ? await prisma.athleteParent.findMany({
+          where: {
+            parentId: { in: athlete.parentRelations.map((r) => r.parent.id) },
+            athleteId: { not: athlete.id },
+            athlete: { deletedAt: null },
+          },
+          select: {
+            parentId: true,
+            athlete: { select: { id: true, firstName: true, lastName: true } },
+          },
+          orderBy: { athlete: { firstName: "asc" } },
+        })
+      : []
+  const sistersByParent = new Map<string, { id: string; name: string }[]>()
+  for (const link of siblingLinks) {
+    const list = sistersByParent.get(link.parentId) ?? []
+    list.push({ id: link.athlete.id, name: fullName(link.athlete) })
+    sistersByParent.set(link.parentId, list)
+  }
+
   const accessStatus = canHaveOwnAccess
     ? await getAccessStatus("ATHLETE", {
         id: athlete.id,
@@ -370,6 +394,7 @@ export async function AthleteCard({ athleteId, tab: rawTab, variant }: AthleteCa
                         id: r.parent.id,
                         firstName: r.parent.firstName,
                         lastName: r.parent.lastName,
+                        sisters: sistersByParent.get(r.parent.id) ?? [],
                       }))}
                     />
                   </div>

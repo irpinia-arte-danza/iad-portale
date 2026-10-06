@@ -1104,6 +1104,11 @@ model Consent {
   notes     String?
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
+  // Il modulo firmato, facoltativo (bucket privato "consents"). Lo stesso
+  // file può stare su più consensi: un modulo copre privacy e liberatorie,
+  // e spesso più sorelle. Non è unico di proposito.
+  filePath String? @map("file_path")
+
   athlete Athlete? @relation(fields: [athleteId], references: [id])
   parent  Parent?  @relation(fields: [parentId], references: [id])
 
@@ -1111,6 +1116,7 @@ model Consent {
 
   @@index([athleteId, type])
   @@index([parentId, type])
+  @@index([filePath])
   @@map("consents")
 }
 

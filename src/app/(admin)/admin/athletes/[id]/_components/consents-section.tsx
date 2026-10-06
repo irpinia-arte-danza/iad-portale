@@ -1,7 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, ShieldCheck, Trash2, Undo2 } from "lucide-react"
+import {
+  Download,
+  Loader2,
+  Paperclip,
+  ShieldCheck,
+  Trash2,
+  Undo2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -35,7 +42,11 @@ import { statusTone, TONE_BADGE } from "@/lib/status/tone"
 import { formatDateShort } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
-import { restoreConsent, softDeleteConsent } from "../consent-actions"
+import {
+  getConsentFileUrl,
+  restoreConsent,
+  softDeleteConsent,
+} from "../consent-actions"
 import { ConsentFormDialog, type ConsentSigner } from "./consent-form-dialog"
 
 export type ConsentItem = {
@@ -44,6 +55,8 @@ export type ConsentItem = {
   acceptedAt: Date
   documentVersion: string
   notes: string | null
+  // Il modulo firmato, se allegato
+  filePath: string | null
   deletedAt: Date | null
   // Chi ha firmato: un genitore, oppure nessuno = l'allieva stessa
   parent: { id: string; firstName: string; lastName: string } | null
@@ -54,7 +67,13 @@ type Props = {
   athleteFirstName: string
   isAdult: boolean
   consents: ConsentItem[]
-  parents: { id: string; firstName: string; lastName: string }[]
+  parents: {
+    id: string
+    firstName: string
+    lastName: string
+    // Le altre figlie collegate a questo genitore
+    sisters: { id: string; name: string }[]
+  }[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -75,6 +94,7 @@ export function ConsentsSection({
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
   const [busyId, setBusyId] = React.useState<string | null>(null)
   const [trashOpen, setTrashOpen] = React.useState(false)
+  const [downloadingId, setDownloadingId] = React.useState<string | null>(null)
 
   const active = consents.filter((c) => c.deletedAt === null)
   const trashed = consents.filter((c) => c.deletedAt !== null)
@@ -92,9 +112,16 @@ export function ConsentsSection({
     ...parents.map((p) => ({
       value: p.id,
       label: `${p.firstName} ${p.lastName} (genitore)`,
+      sisters: p.sisters,
     })),
     ...(isAdult
-      ? [{ value: SIGNED_BY_ATHLETE, label: `${athleteFirstName} (l'allieva)` }]
+      ? [
+          {
+            value: SIGNED_BY_ATHLETE,
+            label: `${athleteFirstName} (l'allieva)`,
+            sisters: [],
+          },
+        ]
       : []),
   ]
 
@@ -111,6 +138,22 @@ export function ConsentsSection({
       toast.error(result.error)
     }
     setBusyId(null)
+  }
+
+  // Il link nasce qui, al clic, e vive cinque minuti
+  async function onDownload(id: string) {
+    setDownloadingId(id)
+    try {
+      const result = await getConsentFileUrl(id)
+      const target = result.ok ? result.data?.signedUrl : null
+      if (!target) {
+        toast.error(result.ok ? "Link non disponibile" : result.error)
+        return
+      }
+      window.open(target, "_blank", "noopener,noreferrer")
+    } finally {
+      setDownloadingId(null)
+    }
   }
 
   async function onRestore(id: string) {
@@ -155,7 +198,14 @@ export function ConsentsSection({
                     </p>
                     {current ? (
                       <Badge variant="outline">Firmato</Badge>
-                    ) : (
+                    ) : null}
+                    {current?.filePath ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Paperclip className="h-3.5 w-3.5" aria-hidden="true" />
+                        Modulo allegato
+                      </span>
+                    ) : null}
+                    {current ? null : (
                       <Badge
                         variant="outline"
                         className={cn(TONE_BADGE[tone])}
@@ -176,6 +226,23 @@ export function ConsentsSection({
                   ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
+                  {current?.filePath ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11"
+                      onClick={() => onDownload(current.id)}
+                      disabled={downloadingId !== null}
+                    >
+                      {downloadingId === current.id ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-1 h-4 w-4" />
+                      )}
+                      Scarica
+                    </Button>
+                  ) : null}
                   {current ? (
                     <Button
                       type="button"
@@ -287,7 +354,8 @@ export function ConsentsSection({
             <AlertDialogTitle>Spostare il consenso nel cestino?</AlertDialogTitle>
             <AlertDialogDescription>
               Il consenso non conterà più per questa allieva. Si può
-              ripristinare da «Nel cestino» in questa sezione.
+              ripristinare da «Nel cestino» in questa sezione; il modulo
+              allegato resta al suo posto.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

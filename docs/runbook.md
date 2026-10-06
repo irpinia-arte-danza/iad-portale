@@ -728,7 +728,7 @@ casella `info@`; le operazioni nel portale finiscono in `audit_logs`.
 | `payments`, `receipts` | pagamenti e ricevute (la ricevuta porta nome e CF del pagante e dell'allieva, congelati) |
 | `medical_certificates` | tipo, date, medico, `file_path` → bucket **`medical-certificates`** (`{athleteId}/…`) |
 | `affiliations` | tesseramenti Endas/CSEN, `file_path` → bucket **`affiliation-cards`** (`{athleteId}/…`) |
-| `consents` | informativa privacy e liberatorie foto/video (chi ha firmato, quando, note) |
+| `consents` | informativa privacy e liberatorie foto/video (chi ha firmato, quando, note); `file_path` → bucket **`consents`**: il modulo firmato, se allegato. Lo stesso file può stare su più righe (più consensi, più sorelle) |
 | `stage_enrollments`, `showcase_participations`, `costume_assignments` | stage, saggio, costumi |
 | `documents`, `insurances`, `athlete_status_history` | eventuali scansioni e storico stato |
 | `email_logs` (`athlete_id`) | email mandate alla famiglia per lei: destinatario, oggetto, corpo, esito |
@@ -756,7 +756,14 @@ voce o per altro canale:
 3. **Certificati medici e tessere**: i file dei bucket `medical-certificates` e
    `affiliation-cards` nella cartella `{athleteId}/` (Brain Digital, dalla
    dashboard Supabase o con `supabase storage` CLI).
-4. **Estrazione dal database** in CSV o JSON delle righe delle tabelle sopra,
+4. **Moduli firmati dei consensi**: i file del bucket `consents` puntati da
+   `consents.file_path` per quell'allieva (Giuseppina li scarica uno a uno da
+   Documenti › Consensi; Brain Digital dal bucket, con
+   `select distinct file_path from consents where athlete_id = '<athleteId>'
+   and file_path is not null`). Un modulo che copre anche una sorella va nel
+   fascicolo così com'è solo se chi chiede è il genitore di entrambe;
+   altrimenti si oscurano i dati dell'altra.
+5. **Estrazione dal database** in CSV o JSON delle righe delle tabelle sopra,
    filtrate per `athlete_id` / `parent_id` (Brain Digital). Per esempio:
 
 ```sql
@@ -798,8 +805,12 @@ cancellazione** (art. 17.3.b GDPR; art. 2220 c.c. e normativa fiscale,
   ricevuta** (`receipts.payer_name`, `payer_fiscal_code`, `athlete_name`,
   `athlete_fiscal_code`): fanno parte del documento fiscale;
 - `payment_schedules` pagate, in quanto collegate ai pagamenti;
-- `consents`: la prova che un consenso c'era (e quando è stato revocato) va
-  tenuta finché può servire a dimostrare la liceità del trattamento;
+- `consents` e i **moduli firmati nel bucket `consents`**: la prova che un
+  consenso c'era (e quando è stato revocato) va tenuta finché può servire a
+  dimostrare la liceità del trattamento. Il Cestino di un consenso non tocca
+  il file; con la cancellazione definitiva di un'allieva o di un genitore il
+  file viene tolto **solo se nessun'altra riga lo punta** (per esempio la
+  sorella): lo fa il codice (`src/lib/consents/shared-file.ts`);
 - `audit_logs`: registro di controllo, non si modifica.
 
 Il codice applica già il blocco: `hardDeleteAthlete` e `hardDeleteParent`
@@ -846,6 +857,16 @@ chiama**: si eseguono a mano, da Brain Digital, solo per una richiesta GDPR.
 loro durata (vedi «Backup notturno»). Non si modificano: nella risposta alla
 persona si dice che i dati restano nelle copie di sicurezza, non consultabili
 nell'uso ordinario, fino alla loro rotazione.
+
+### Bucket `consents` (moduli firmati)
+
+Privato, PDF/JPEG/PNG, massimo 3 MB. **Non va creato a mano**: nasce al primo
+modulo allegato (`src/lib/supabase/storage-consent.ts`), come `receipts` e
+`affiliation-cards`; se esiste ma è pubblico, il caricamento si ferma. Nessuna
+policy RLS: si legge e si scrive solo lato server con la service role. Percorso
+`<uuid>.<ext>`, senza id dell'allieva perché un modulo può valere per più
+consensi. Link firmato di 5 minuti, generato al clic su «Scarica». Entra nel
+backup notturno da solo (`storage-consents.tar.gpg`).
 
 ---
 

@@ -41,12 +41,18 @@ export function isConsentKind(value: string): value is ConsentKind {
 // se maggiorenne
 export const SIGNED_BY_ATHLETE = "athlete"
 
+// Un modulo firmato copre spesso più consensi (privacy + liberatorie) e più
+// sorelle: una registrazione sola, con lo stesso file su tutte le righe
 export const consentSchema = z.object({
-  kind: z.enum(CONSENT_KINDS, { message: "Tipo di consenso non valido" }),
+  kinds: z
+    .array(z.enum(CONSENT_KINDS, { message: "Tipo di consenso non valido" }))
+    .min(1, { message: "Scegli almeno un consenso" }),
   signedOn: z
     .date({ message: "Data non valida" })
     .max(endOfToday(), { message: "La firma non può essere nel futuro" }),
   signedBy: z.string().trim().min(1, { message: "Indica chi ha firmato" }),
+  // Sorelle (id allieva) a cui registrare lo stesso modulo
+  alsoFor: z.array(z.string().uuid()).max(10),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
 })
 

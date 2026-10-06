@@ -6,12 +6,14 @@ import { AuditAction, Prisma, UserRole } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { unreferencedConsentFiles } from "@/lib/consents/shared-file"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
 import {
   deleteAffiliationCardFile,
   deleteAllAffiliationCardFilesForAthlete,
 } from "@/lib/supabase/storage-affiliation-card"
+import { deleteConsentFiles } from "@/lib/supabase/storage-consent"
 import {
   deleteAllMedicalCertFilesForAthlete,
   deleteMedicalCertFile,
@@ -330,6 +332,37 @@ const COMPLIANCE_BLOCK_COMPENSATION =
   "Impossibile eliminare definitivamente: esiste storico compensi sportivi. " +
   "I dati fiscali devono essere conservati per legge."
 
+// I moduli firmati dei consensi che stanno per sparire, letti PRIMA della
+// transazione
+async function consentFilePaths(
+  where: { athleteId: string } | { parentId: string },
+): Promise<(string | null)[]> {
+  const rows = await prisma.consent.findMany({
+    where: { ...where, filePath: { not: null } },
+    select: { filePath: true },
+  })
+  return rows.map((r) => r.filePath)
+}
+
+// …e tolti dallo Storage DOPO, solo se nessun'altra riga li punta ancora:
+// lo stesso modulo può valere per una sorella (vedi shared-file.ts)
+async function removeUnreferencedConsentFiles(
+  removed: (string | null)[],
+): Promise<{ removed: number; error: string | null }> {
+  const paths = removed.filter((p): p is string => !!p)
+  if (paths.length === 0) return { removed: 0, error: null }
+  const still = await prisma.consent.findMany({
+    where: { filePath: { in: paths } },
+    select: { filePath: true },
+  })
+  return deleteConsentFiles(
+    unreferencedConsentFiles(
+      paths,
+      still.map((r) => r.filePath),
+    ),
+  )
+}
+
 export async function hardDeleteAthlete(
   athleteId: string,
   confirmName: string,
@@ -375,6 +408,7 @@ export async function hardDeleteAthlete(
       where: { athleteId: athlete.id },
       select: { filePath: true },
     })
+    const consentFiles = await consentFilePaths({ athleteId: athlete.id })
 
     await prisma.$transaction([
       prisma.attendance.deleteMany({ where: { athleteId: athlete.id } }),
@@ -415,6 +449,7 @@ export async function hardDeleteAthlete(
     const cardStorage = await deleteAllAffiliationCardFilesForAthlete(
       athlete.id,
     )
+    const consentStorage = await removeUnreferencedConsentFiles(consentFiles)
 
     await prisma.auditLog.create({
       data: {
@@ -429,6 +464,8 @@ export async function hardDeleteAthlete(
           dbCertCount: certs.length,
           cardFilesRemoved: cardStorage.removed,
           cardFilesError: cardStorage.error,
+          consentFilesRemoved: consentStorage.removed,
+          consentFilesError: consentStorage.error,
         },
       },
     })
@@ -483,6 +520,8 @@ export async function hardDeleteParent(
       return { ok: false, error: COMPLIANCE_BLOCK_PAYMENT }
     }
 
+    const consentFiles = await consentFilePaths({ parentId: parent.id })
+
     await prisma.$transaction([
       // Genitori finiti nel cestino prima dello sprint onboarding possono
       // avere ancora l'utente attivo: senza profilo non deve poter entrare.
@@ -499,13 +538,19 @@ export async function hardDeleteParent(
       prisma.parent.delete({ where: { id: parent.id } }),
     ])
 
+    const consentStorage = await removeUnreferencedConsentFiles(consentFiles)
+
     await prisma.auditLog.create({
       data: {
         userId,
         action: AuditAction.HARD_DELETE_PARENT,
         entityType: "Parent",
         entityId: parent.id,
-        changes: { name: expected },
+        changes: {
+          name: expected,
+          consentFilesRemoved: consentStorage.removed,
+          consentFilesError: consentStorage.error,
+        },
       },
     })
 
