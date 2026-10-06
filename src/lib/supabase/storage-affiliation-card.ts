@@ -1,4 +1,5 @@
 import { createAdminClient } from "./admin-client"
+import { SIGNED_URL_TTL_SECONDS } from "./signed-url"
 import { CARD_ALLOWED_MIME, CARD_MAX_BYTES } from "@/lib/affiliations/file-rules"
 import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 
@@ -6,8 +7,6 @@ import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 export const AFFILIATION_CARD_BUCKET = "affiliation-cards"
 
 const ALLOWED_MIME_SET = new Set<string>(CARD_ALLOWED_MIME)
-
-const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 // 24h
 
 let bucketReady = false
 
@@ -48,9 +47,10 @@ async function ensureAffiliationCardBucket(): Promise<void> {
   bucketReady = true
 }
 
+// Nessun link al caricamento: il link firmato nasce al clic su "Scarica"
+// (getAffiliationCardSignedUrl) e vive SIGNED_URL_TTL_SECONDS
 export type UploadedCard = {
   filePath: string
-  signedUrl: string
 }
 
 export async function uploadAffiliationCardFile(
@@ -80,20 +80,11 @@ export async function uploadAffiliationCardFile(
     throw new Error(`Upload fallito: ${uploadError.message}`)
   }
 
-  const { data, error: signedError } = await supabase.storage
-    .from(AFFILIATION_CARD_BUCKET)
-    .createSignedUrl(filePath, SIGNED_URL_TTL_SECONDS)
-  if (signedError || !data?.signedUrl) {
-    throw new Error(
-      `Generazione URL firmato fallita: ${signedError?.message ?? "unknown"}`,
-    )
-  }
-
-  return { filePath, signedUrl: data.signedUrl }
+  return { filePath }
 }
 
-// URL firmato fresco per un file già caricato: quello salvato in DB scade
-// dopo 24h.
+// Link firmato per un file già caricato, generato al momento in cui serve:
+// vive SIGNED_URL_TTL_SECONDS e non si salva.
 export async function getAffiliationCardSignedUrl(
   filePath: string,
 ): Promise<string | null> {

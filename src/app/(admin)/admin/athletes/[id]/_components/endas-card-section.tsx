@@ -47,7 +47,6 @@ export type AthleteCardItem = {
   issueDate: Date | null
   expiryDate: Date | null
   filePath: string | null
-  fileUrl: string | null
   createdAt: Date
 }
 
@@ -103,11 +102,13 @@ export function EndasCardSection({ athleteId, entity, cards }: Props) {
     }
   }
 
-  async function onDownload(cardId: string, fallbackUrl: string | null) {
+  // Il link nasce qui, al clic, e vive cinque minuti: nessuna copia salvata
+  // da usare come ripiego
+  async function onDownload(cardId: string) {
     setDownloadingId(cardId)
     try {
       const result = await refreshCardSignedUrl(cardId)
-      const target = (result.ok ? result.data?.signedUrl : null) ?? fallbackUrl
+      const target = result.ok ? result.data?.signedUrl : null
       if (!target) {
         toast.error(result.ok ? "Link non disponibile" : result.error)
         return
@@ -263,7 +264,7 @@ function CardItem({
 }: {
   card: AthleteCardItem
   isLatest: boolean
-  onDownload: (cardId: string, fallbackUrl: string | null) => Promise<void>
+  onDownload: (cardId: string) => Promise<void>
   downloading: boolean
   onDelete: () => void
 }) {
@@ -304,7 +305,7 @@ function CardItem({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => onDownload(card.id, card.fileUrl)}
+              onClick={() => onDownload(card.id)}
               disabled={downloading}
               aria-label="Scarica la tessera"
             >

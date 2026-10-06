@@ -609,7 +609,10 @@ USING (
 - Il bucket deve essere **privato** (no public read).
 - File path convention: `{athleteId}/{certId}.{ext}` (vedi
   `src/lib/supabase/storage-medical-cert.ts`).
-- Signed URL TTL: 24h, refresh on demand via `refreshMedicalCertSignedUrl`.
+- Link firmato: **5 minuti** (`SIGNED_URL_TTL_SECONDS` in
+  `src/lib/supabase/signed-url.ts`, condivisa con le tessere), generato al
+  clic su «Scarica» (`refreshMedicalCertSignedUrl`) e mai salvato in DB. La
+  colonna `file_url` resta ma non viene più né scritta né letta.
 - Hard delete allieva (Fase 1.C `/admin/cestino`) chiama
   `deleteAllMedicalCertFilesForAthlete` per cleanup `{athleteId}/*`.
 

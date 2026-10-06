@@ -1,4 +1,5 @@
 import { createAdminClient } from "./admin-client"
+import { SIGNED_URL_TTL_SECONDS } from "./signed-url"
 import {
   MEDICAL_CERT_ALLOWED_MIME,
   MEDICAL_CERT_MAX_BYTES,
@@ -12,8 +13,6 @@ const ALLOWED_MIME_SET = new Set<string>(ALLOWED_MIME)
 
 const MAX_BYTES = MEDICAL_CERT_MAX_BYTES
 
-const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 // 24h
-
 function extForMime(mime: string): string {
   if (mime === "application/pdf") return "pdf"
   if (mime === "image/jpeg") return "jpg"
@@ -23,12 +22,12 @@ function extForMime(mime: string): string {
 
 export type UploadedMedicalCert = {
   filePath: string
-  signedUrl: string
 }
 
 // Upload del certificato. Path: {athleteId}/{certId}.{ext}.
-// Bucket privato (creato manualmente da admin). Signed URL TTL 24h,
-// refresh on demand via getMedicalCertSignedUrl.
+// Bucket privato (creato manualmente da admin). Non restituisce nessun link:
+// il link firmato nasce al clic su "Scarica" (getMedicalCertSignedUrl) e
+// vive SIGNED_URL_TTL_SECONDS.
 export async function uploadMedicalCertFile(
   athleteId: string,
   certId: string,
@@ -64,20 +63,11 @@ export async function uploadMedicalCertFile(
     throw new Error(`Upload fallito: ${uploadError.message}`)
   }
 
-  const { data, error: signedError } = await supabase.storage
-    .from(MEDICAL_CERT_BUCKET)
-    .createSignedUrl(filePath, SIGNED_URL_TTL_SECONDS)
-  if (signedError || !data?.signedUrl) {
-    throw new Error(
-      `Generazione URL firmato fallita: ${signedError?.message ?? "unknown"}`,
-    )
-  }
-
-  return { filePath, signedUrl: data.signedUrl }
+  return { filePath }
 }
 
-// Refresh signed URL per file già caricato (path noto da DB).
-// Usato per re-display certificato con TTL fresco.
+// Link firmato per un file già caricato (path noto da DB), generato al
+// momento in cui serve: vive SIGNED_URL_TTL_SECONDS e non si salva.
 export async function getMedicalCertSignedUrl(
   filePath: string,
 ): Promise<string | null> {

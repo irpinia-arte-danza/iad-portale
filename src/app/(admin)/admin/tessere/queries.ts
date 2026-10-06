@@ -26,7 +26,6 @@ export const CARD_SELECT = {
   expiryDate: true,
   notes: true,
   filePath: true,
-  fileUrl: true,
   createdAt: true,
 } as const
 

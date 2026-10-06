@@ -278,7 +278,7 @@ export async function importCardFile(
       )
       await prisma.affiliation.update({
         where: { id: created.id },
-        data: { filePath: uploaded.filePath, fileUrl: uploaded.signedUrl },
+        data: { filePath: uploaded.filePath },
       })
     } catch (uploadError) {
       // Senza il PDF la tessera non serve: si torna indietro del tutto
@@ -360,7 +360,8 @@ export async function softDeleteCard(cardId: string): Promise<ActionResult> {
   }
 }
 
-// URL firmato fresco: quello salvato in DB scade dopo 24h.
+// Il link al PDF, generato al clic su "Scarica": vive cinque minuti
+// (SIGNED_URL_TTL_SECONDS) e non si salva.
 export async function refreshCardSignedUrl(
   cardId: string,
 ): Promise<ActionResult<{ signedUrl: string }>> {
@@ -378,11 +379,6 @@ export async function refreshCardSignedUrl(
 
   const url = await getAffiliationCardSignedUrl(card.filePath)
   if (!url) return { ok: false, error: "Impossibile generare il link" }
-
-  await prisma.affiliation.update({
-    where: { id: card.id },
-    data: { fileUrl: url },
-  })
 
   return { ok: true, data: { signedUrl: url } }
 }
