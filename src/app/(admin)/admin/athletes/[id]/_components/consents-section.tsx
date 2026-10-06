@@ -67,13 +67,7 @@ type Props = {
   athleteFirstName: string
   isAdult: boolean
   consents: ConsentItem[]
-  parents: {
-    id: string
-    firstName: string
-    lastName: string
-    // Le altre figlie collegate a questo genitore
-    sisters: { id: string; name: string }[]
-  }[]
+  parents: { id: string; firstName: string; lastName: string }[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -112,16 +106,9 @@ export function ConsentsSection({
     ...parents.map((p) => ({
       value: p.id,
       label: `${p.firstName} ${p.lastName} (genitore)`,
-      sisters: p.sisters,
     })),
     ...(isAdult
-      ? [
-          {
-            value: SIGNED_BY_ATHLETE,
-            label: `${athleteFirstName} (l'allieva)`,
-            sisters: [],
-          },
-        ]
+      ? [{ value: SIGNED_BY_ATHLETE, label: `${athleteFirstName} (l'allieva)` }]
       : []),
   ]
 

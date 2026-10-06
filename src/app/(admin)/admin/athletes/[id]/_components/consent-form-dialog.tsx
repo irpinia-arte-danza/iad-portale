@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useForm, useWatch } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Camera, FileUp, Loader2, X } from "lucide-react"
 import { toast } from "sonner"
@@ -47,15 +47,8 @@ import { toDateInputValue } from "@/lib/utils/format"
 
 import { registerConsents } from "../consent-actions"
 
-// Chi può aver firmato: i genitori collegati e, se maggiorenne, l'allieva.
-// Con un genitore arrivano le altre figlie collegate a lui: lo stesso modulo
-// spesso le copre tutte.
-export type ConsentSister = { id: string; name: string }
-export type ConsentSigner = {
-  value: string
-  label: string
-  sisters: ConsentSister[]
-}
+// Chi può aver firmato: i genitori collegati e, se maggiorenne, l'allieva
+export type ConsentSigner = { value: string; label: string }
 
 // "Scatta una foto": fotocamera posteriore. "Scegli un file": galleria o
 // file, PDF compresi. Come per il certificato medico.
@@ -124,10 +117,6 @@ export function ConsentFormDialog({
     onOpenChange(next)
   }
 
-  // Le sorelle dipendono da chi firma: sono le altre figlie di quel genitore
-  const signedBy = useWatch({ control: form.control, name: "signedBy" })
-  const sisters = signers.find((s) => s.value === signedBy)?.sisters ?? []
-
   // Stessa preparazione del certificato medico: la foto si riduce sul
   // dispositivo (lato lungo 2000 px, JPEG), il PDF passa intatto
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -163,10 +152,8 @@ export function ConsentFormDialog({
     setBusy(true)
     const fd = new FormData()
     for (const k of values.kinds) fd.append("kinds", k)
-    // Solo le sorelle del genitore che firma adesso
-    for (const id of values.alsoFor) {
-      if (sisters.some((s) => s.id === id)) fd.append("alsoFor", id)
-    }
+    // Niente alsoFor: ogni sorella ha il proprio modulo, e si registra dalla
+    // sua scheda. L'azione lo saprebbe fare, il dialog non lo propone.
     fd.append("signedOn", values.signedOn.toISOString())
     fd.append("signedBy", values.signedBy)
     if (values.notes) fd.append("notes", values.notes)
@@ -357,45 +344,6 @@ export function ConsentFormDialog({
             </FormItem>
           )}
         />
-
-        {sisters.length > 0 ? (
-          <FormField
-            control={form.control}
-            name="alsoFor"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Registra anche per</FormLabel>
-                <div className="grid gap-1">
-                  {sisters.map((sister) => {
-                    const checked = field.value.includes(sister.id)
-                    return (
-                      <label
-                        key={sister.id}
-                        className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border px-3 text-sm"
-                      >
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(next) =>
-                            field.onChange(
-                              next === true
-                                ? [...field.value, sister.id]
-                                : field.value.filter((v) => v !== sister.id),
-                            )
-                          }
-                        />
-                        {sister.name}
-                      </label>
-                    )
-                  })}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Stessi consensi, stessa firma, stesso modulo: un file solo.
-                </p>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        ) : null}
 
         <FormField
           control={form.control}

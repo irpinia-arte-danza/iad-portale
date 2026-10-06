@@ -91,8 +91,10 @@ async function validateFile(file: File): Promise<string | null> {
   return validateFileSignature(file, CONSENT_FILE_ALLOWED_MIME)
 }
 
-// Una registrazione: uno o più consensi, per l'allieva ed eventualmente per
-// le sorelle, con lo stesso modulo firmato. Il file si carica una volta sola
+// Una registrazione: uno o più consensi della stessa allieva, con lo stesso
+// modulo firmato. `alsoFor` (stesso modulo anche a una sorella) resta
+// supportato qui ma nessuna interfaccia lo manda: ogni sorella ha il suo
+// modulo e si registra dalla propria scheda. Il file si carica una volta sola
 // e tutte le righe ne portano il percorso.
 export async function registerConsents(
   athleteId: string,
