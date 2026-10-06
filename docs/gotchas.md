@@ -33,6 +33,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.27 Lazy client init per env safety
   - §17.34 `redirect()` in server action + try/catch lato client → `unstable_rethrow`
   - §17.47 Scheda in pannello dalle liste: intercepting route, e cosa non fa da sola
+  - §17.48 Richieste alla famiglia: una traccia per allieva, e la foto ridotta prima dell'upload
 - [Zod / RHF](#zod--rhf)
   - §17.11 Zod `.default()` + RHF generic mismatch
   - §17.12 Zod `z.coerce.date()` input/output mismatch
@@ -219,6 +220,14 @@ Applicato a `src/lib/resend/client.ts`. Stesso pattern preventivo per ogni SDK n
 - **scorre il corpo, non il pannello**: se `SheetContent` è il contenitore che scorre, la X (assoluta) se ne va con il contenuto.
 
 Per provarlo in locale senza toccare la produzione: Postgres locale, `next dev` con `DATABASE_URL` e le variabili Supabase sovrascritte nel processo (vincono su `.env.local`), e due stub temporanei non committati in `current-account.ts` e `supabase/middleware.ts` che restituiscono un admin finto. Scoperto: PR #47, ottobre 2026.
+
+**§17.48 Richieste alla famiglia (certificati) — una traccia per allieva, e la foto ridotta prima dell'upload**: tre cose che non si vedono dal codice finché non si sbaglia.
+
+- **`EmailLog` ha un'allieva sola per riga, un'email può riguardarne due.** I certificati mancanti di due sorelle partono in una sola email (`planCertRequests`): la riga di `EmailLog` porta la prima, e "Ultima richiesta" letta da lì direbbe "Mai chiesto" per la seconda. Per questo la traccia si legge da `AuditLog` (`MEDICAL_CERT_EMAIL_SENT`, una riga **per allieva**), non da `EmailLog`. Lo stesso vale per il limite di 3 richieste al giorno.
+- **`REMINDER_WHATSAPP_OPENED` serve due cose**: i solleciti dei contributi (`entityType: "PaymentSchedule"`) e le richieste del certificato (`entityType: "Athlete"`). Le distingue `changes.ambito` (`"contributo"` / `"certificato"`), non un valore nuovo dell'enum: aggiungere un valore a un enum Postgres vuole una migration tutta sua (§17.5). Chi legge deve filtrare sull'ambito; le righe vecchie senza ambito sono contributi.
+- **La foto si riduce nel browser, prima dell'upload** (`photo-resize.ts`: lato lungo 2000 px, JPEG 0,8). Una foto da iPad pesa 4-6 MB e il limite del portale è 3: senza riduzione "Scatta una foto" fallirebbe quasi sempre. Il controllo dei 3 MB va fatto **dopo** la riduzione, non sul file scelto. HEIC: Safari lo decodifica da solo e il canvas lo riscrive in JPEG; dove `createImageBitmap` fallisce si mostra un messaggio e non si carica niente. `capture="environment"` apre la fotocamera solo su dispositivi che ne hanno una: su desktop è un normale selettore di file.
+
+I testi delle email vivono nel database (`email_templates`) e ci arrivano con migration additive (`ON CONFLICT (slug) DO NOTHING`), così quello che Giuseppina ha modificato non viene sovrascritto. Attenzione: `cert-reminder` è solo in `prisma/seed.ts`, non in una migration. Scoperto: PR #48, ottobre 2026.
 
 **§17.34 Next.js 16 — `redirect()` in una server action + try/catch lato client = falso errore**: quando una server action chiama `redirect()`, lato client la promise della chiamata viene **rifiutata** con l'errore di redirect (vedi `server-action-reducer.js`, `reject(redirectError)`) mentre Next esegue comunque la navigazione. Un `try/catch` nel client component lo tratta come fallimento: compare il toast "salvataggio non riuscito" e intanto la pagina cambia. Vale anche per i `redirect()` impliciti di `requireAdmin()` / `requireParent()` a sessione scaduta. Pattern corretto:
 ```tsx

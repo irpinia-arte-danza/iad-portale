@@ -5,6 +5,7 @@ import { parseAthleteTab, type AthleteTabId } from "@/lib/athletes/athlete-tabs"
 import { athleteSetupChecklist } from "@/lib/athletes/setup-checklist"
 import { getAccessStatus } from "@/lib/auth/access-status"
 import { athleteAccessEligibility } from "@/lib/auth/athlete-access"
+import { getCertRequestSummaries } from "@/lib/medical-certificates/request-status"
 import { prisma } from "@/lib/prisma"
 import { DAY_OF_WEEK_LABELS } from "@/lib/schemas/course-schedule"
 import { computeAge } from "@/lib/utils/date-helpers"
@@ -79,6 +80,7 @@ export async function AthleteCard({ athleteId, tab: rawTab, variant }: AthleteCa
     openSchedulesByAthlete,
     lastMethod,
     recentPayments,
+    certRequests,
   ] = await Promise.all([
     getAthleteById(resolvedParams.id),
     getAthleteForPDF(resolvedParams.id),
@@ -107,6 +109,7 @@ export async function AthleteCard({ athleteId, tab: rawTab, variant }: AthleteCa
     listOpenSchedulesByAthlete(resolvedParams.id),
     getAthleteLastPaymentMethod(resolvedParams.id),
     getAthleteRecentPayments(resolvedParams.id, 3),
+    getCertRequestSummaries([resolvedParams.id]),
   ])
 
   if (!athlete) {
@@ -341,6 +344,7 @@ export async function AthleteCard({ athleteId, tab: rawTab, variant }: AthleteCa
                   <MedicalCertSection
                     athleteId={athlete.id}
                     certificates={athlete.medicalCertificates}
+                    lastRequest={certRequests[resolvedParams.id]}
                   />
                   <div id={CARD_SECTION_ID} className="scroll-mt-20">
                     <EndasCardSection

@@ -2,22 +2,13 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
-import { ExternalLink, Loader2, Mail, Search } from "lucide-react"
-import { toast } from "sonner"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { Camera, MessageCircle, Search, UserPlus, X } from "lucide-react"
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
 import { AthleteCardLink } from "@/components/athletes/athlete-card-link"
+import { EmptyState } from "@/components/empty-state"
+import { CertStatusBadge } from "@/components/medical-certificates/cert-status-badge"
+import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import {
@@ -28,378 +19,448 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { CertStatusBadge } from "@/components/medical-certificates/cert-status-badge"
-import type { CertStatus } from "@/lib/medical-certificates/certificate-status"
+  CERT_FILTER_LABELS,
+  CERT_FILTER_ORDER,
+  type CertFilterCounts,
+  type CertListFilter,
+} from "@/lib/medical-certificates/list-filters"
+import { planCertRequests } from "@/lib/medical-certificates/request-plan"
+import { certRequestLabel } from "@/lib/medical-certificates/request-trace"
 import {
   MEDICAL_CERT_TYPE_LABELS,
   normalizeCertType,
 } from "@/lib/schemas/medical-certificate"
+import { statusTone, TONE_BADGE, TONE_TEXT } from "@/lib/status/tone"
 import { formatDateShort } from "@/lib/utils/format"
+import { cn } from "@/lib/utils"
 
-import {
-  sendCertReminders,
-  type CertReminderResult,
-} from "../actions"
+import { MedicalCertFormDialog } from "../../athletes/[id]/_components/medical-cert-form-dialog"
 import type { AthleteCertRow } from "../queries"
+import { CertRequestDialog } from "./cert-request-dialog"
 
-type StatusFilter = "all" | CertStatus
+const ALL = "__all__"
 
-const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "Tutti gli stati" },
-  { value: "expired", label: "Scaduti" },
-  { value: "expiring", label: "In scadenza" },
-  { value: "missing", label: "Mancanti" },
-  { value: "valid", label: "Validi" },
-]
+// ─────────────────────────────────────────────────────────────────────────
+// L'elenco dei certificati: una riga per allieva, con le due cose che si
+// fanno da qui — caricare il certificato e chiederlo alla famiglia.
+//
+// Prima era una tabella con Tipo, Emesso e Scadenza: tre trattini per decine
+// di righe, perché la maggior parte dei certificati mancava. "Promemoria"
+// era spento proprio su quelle. E per caricare bisognava passare da scheda →
+// Documenti → Aggiungi.
+//
+// La riga è una sola e si ridispone, come in Scadenze (#38): card sul
+// telefono, due righe su tablet, una riga da 1280.
+// ─────────────────────────────────────────────────────────────────────────
 
-const ACTIONABLE_STATUSES = new Set<CertStatus>([
-  "expired",
-  "expiring",
-])
+const GRID = cn(
+  "grid items-center gap-x-3 gap-y-2",
+  // Telefono: card, con i due tasti larghi in fondo
+  "grid-cols-[auto_minmax(0,1fr)]",
+  "[grid-template-areas:'sel_nome'_'vuoto_stato'_'vuoto_dest'_'vuoto_rich'_'azioni_azioni']",
+  // Tablet e laptop: due righe, i tasti a destra
+  "md:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto]",
+  "md:[grid-template-areas:'sel_nome_stato_azioni'_'sel_dest_rich_azioni']",
+  // Da 1280: una riga
+  "xl:grid-cols-[auto_minmax(0,13rem)_minmax(0,1fr)_minmax(0,15rem)_minmax(0,12rem)_auto]",
+  "xl:[grid-template-areas:'sel_nome_dest_stato_rich_azioni']",
+)
 
-export function MedicalCertsClient({ rows }: { rows: AthleteCertRow[] }) {
-  const searchParams = useSearchParams()
-  const initialStatus = (searchParams.get("status") as StatusFilter) || "all"
+type Props = {
+  rows: AthleteCertRow[]
+  filter: CertListFilter
+  counts: CertFilterCounts
+  courseId?: string
+  courses: { id: string; name: string }[]
+}
 
-  const [status, setStatus] = React.useState<StatusFilter>(
-    STATUS_OPTIONS.some((o) => o.value === initialStatus)
-      ? initialStatus
-      : "all",
-  )
-  const [search, setSearch] = React.useState("")
-  const [selected, setSelected] = React.useState<Set<string>>(new Set())
-  const [busy, setBusy] = React.useState(false)
-  const [confirmTarget, setConfirmTarget] = React.useState<
-    | { kind: "single"; athleteId: string; label: string }
-    | { kind: "bulk"; athleteIds: string[] }
-    | null
-  >(null)
-
-  const filtered = React.useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter((r) => {
-      if (status !== "all" && r.status !== status) return false
-      if (!q) return true
-      return r.athleteName.toLowerCase().includes(q)
-    })
-  }, [rows, status, search])
-
-  const actionableSelected = React.useMemo(() => {
-    return Array.from(selected).filter((id) => {
-      const row = rows.find((r) => r.athleteId === id)
-      return row && ACTIONABLE_STATUSES.has(row.status)
-    })
-  }, [selected, rows])
-
-  function toggleRow(athleteId: string) {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(athleteId)) next.delete(athleteId)
-      else next.add(athleteId)
-      return next
-    })
+function StatusCell({ row }: { row: AthleteCertRow }) {
+  // Mancante: una cella sola, non tre trattini
+  if (!row.cert) {
+    return (
+      <span className="flex min-w-0 items-center gap-1.5">
+        <CertStatusBadge status={row.status} />
+        <span className="truncate text-xs text-muted-foreground">
+          Nessun certificato
+        </span>
+      </span>
+    )
   }
-
-  function toggleAllVisible(checked: boolean) {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      for (const r of filtered) {
-        if (!ACTIONABLE_STATUSES.has(r.status)) continue
-        if (checked) next.add(r.athleteId)
-        else next.delete(r.athleteId)
-      }
-      return next
-    })
-  }
-
-  async function runSend(athleteIds: string[]) {
-    setBusy(true)
-    try {
-      const res = await sendCertReminders(athleteIds)
-      reportSummary(res.results, res.summary, res.transportError)
-      setSelected(new Set())
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Errore nell'invio del promemoria",
-      )
-    } finally {
-      setBusy(false)
-      setConfirmTarget(null)
-    }
-  }
-
-  const visibleActionableCount = filtered.filter((r) =>
-    ACTIONABLE_STATUSES.has(r.status),
-  ).length
-  const allVisibleSelected =
-    visibleActionableCount > 0 &&
-    filtered
-      .filter((r) => ACTIONABLE_STATUSES.has(r.status))
-      .every((r) => selected.has(r.athleteId))
-
+  const expired = row.status === "expired"
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-          <Select
-            value={status}
-            onValueChange={(v) => setStatus(v as StatusFilter)}
-          >
-            <SelectTrigger className="w-full sm:w-56">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cerca per nome..."
-              className="pl-8"
-              inputMode="search"
-            />
-          </div>
-        </div>
-        <Button
-          size="sm"
-          disabled={actionableSelected.length === 0 || busy}
-          onClick={() =>
-            setConfirmTarget({
-              kind: "bulk",
-              athleteIds: actionableSelected,
-            })
-          }
-        >
-          <Mail className="mr-1 h-4 w-4" />
-          Invia promemoria ai selezionati
-          {actionableSelected.length > 0
-            ? ` (${actionableSelected.length})`
-            : ""}
-        </Button>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="rounded-md border border-dashed py-12 text-center text-sm text-muted-foreground">
-          Nessuna allieva corrisponde ai filtri.
-        </div>
-      ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={allVisibleSelected}
-                    onCheckedChange={(v) => toggleAllVisible(v === true)}
-                    disabled={visibleActionableCount === 0}
-                    aria-label="Seleziona tutti"
-                  />
-                </TableHead>
-                <TableHead>Allieva</TableHead>
-                <TableHead>Genitore</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Emesso</TableHead>
-                <TableHead>Scadenza</TableHead>
-                <TableHead>Stato</TableHead>
-                <TableHead className="w-44 text-right">Azioni</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((r) => {
-                const actionable = ACTIONABLE_STATUSES.has(r.status)
-                const certTypeLabel = r.cert
-                  ? MEDICAL_CERT_TYPE_LABELS[normalizeCertType(r.cert.type)]
-                  : "—"
-                return (
-                  <TableRow key={r.athleteId}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selected.has(r.athleteId)}
-                        onCheckedChange={() => toggleRow(r.athleteId)}
-                        disabled={!actionable}
-                        aria-label={`Seleziona ${r.athleteName}`}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {/* Il nome apre la scheda sui Documenti: nel pannello
-                          da 1024 in su, alla pagina sotto */}
-                      <AthleteCardLink
-                        athleteId={r.athleteId}
-                        tab="documenti"
-                        className="hover:underline"
-                      >
-                        {r.athleteName}
-                      </AthleteCardLink>
-                    </TableCell>
-                    <TableCell>
-                      {r.parentName ? (
-                        <div className="flex flex-col">
-                          <span className="text-sm">{r.parentName}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {r.parentEmail ?? "Nessuna email"}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          Nessun genitore
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>{certTypeLabel}</TableCell>
-                    <TableCell>
-                      {r.cert
-                        ? formatDateShort(new Date(r.cert.issueDate))
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {r.cert ? (
-                        <div className="flex flex-col">
-                          <span>
-                            {formatDateShort(new Date(r.cert.expiryDate))}
-                          </span>
-                          {r.daysToExpiry !== null ? (
-                            <span className="text-xs text-muted-foreground">
-                              {r.daysToExpiry === 0
-                                ? "scade oggi"
-                                : r.daysToExpiry < 0
-                                  ? `scaduto da ${Math.abs(r.daysToExpiry)}gg`
-                                  : `tra ${r.daysToExpiry}gg`}
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <CertStatusBadge status={r.status} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/admin/athletes/${r.athleteId}`}>
-                            <ExternalLink className="h-4 w-4" />
-                            <span className="sr-only">Apri scheda</span>
-                          </Link>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={
-                            actionable ? "default" : "outline"
-                          }
-                          disabled={
-                            !actionable || !r.parentEmail || busy
-                          }
-                          onClick={() =>
-                            setConfirmTarget({
-                              kind: "single",
-                              athleteId: r.athleteId,
-                              label: r.athleteName,
-                            })
-                          }
-                        >
-                          <Mail className="mr-1 h-4 w-4" />
-                          Promemoria
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      <AlertDialog
-        open={confirmTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setConfirmTarget(null)
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirmTarget?.kind === "bulk"
-                ? `Inviare ${confirmTarget.athleteIds.length} promemoria?`
-                : `Inviare il promemoria a ${confirmTarget?.kind === "single" ? confirmTarget.label : ""}?`}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Il genitore riceverà un&apos;email con i dettagli del
-              certificato in scadenza. Le allieve senza certificato o con
-              certificato valido (&gt;30 giorni) verranno saltate. Limite 3
-              promemoria per allieva nelle ultime 24 ore.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Annulla</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={busy}
-              onClick={() => {
-                if (!confirmTarget) return
-                if (confirmTarget.kind === "single") {
-                  runSend([confirmTarget.athleteId])
-                } else {
-                  runSend(confirmTarget.athleteIds)
-                }
-              }}
-            >
-              {busy ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Invio in corso...
-                </>
-              ) : (
-                <>
-                  <Mail className="mr-2 h-4 w-4" />
-                  Invia
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+    <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+      <CertStatusBadge status={row.status} />
+      <span className="truncate text-xs text-muted-foreground">
+        {MEDICAL_CERT_TYPE_LABELS[normalizeCertType(row.cert.type)]} ·{" "}
+        {expired ? "scaduto il" : "scade il"}{" "}
+        <span className="font-mono">
+          {formatDateShort(new Date(row.cert.expiryDate))}
+        </span>
+      </span>
+    </span>
   )
 }
 
-function reportSummary(
-  results: CertReminderResult[],
-  summary: { sent: number; failed: number; skipped: number },
-  transportError: string | undefined,
-) {
-  if (transportError) {
-    toast.error(`Errore trasporto Resend: ${transportError}`)
-    return
+function RecipientCell({ row }: { row: AthleteCertRow }) {
+  const { recipient } = row
+  if (recipient.kind === "NONE") {
+    return (
+      <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+        <span className={cn("truncate text-sm", TONE_TEXT.block)}>
+          Nessun genitore
+        </span>
+        <Link
+          href={`/admin/athletes/${row.athleteId}?tab=anagrafica`}
+          className="inline-flex min-h-11 shrink-0 items-center gap-1 text-xs underline underline-offset-2 md:min-h-0"
+        >
+          <UserPlus className="h-3 w-3" />
+          Collega
+        </Link>
+      </span>
+    )
   }
-  const parts: string[] = []
-  if (summary.sent > 0) parts.push(`${summary.sent} inviati`)
-  if (summary.failed > 0) parts.push(`${summary.failed} falliti`)
-  if (summary.skipped > 0) parts.push(`${summary.skipped} saltati`)
-  const msg = parts.length > 0 ? parts.join(" · ") : "Nessun invio"
+  return (
+    <span className="flex min-w-0 flex-col">
+      <span className="truncate text-sm">
+        {recipient.name}
+        {recipient.kind === "ATHLETE" ? (
+          <span className="text-muted-foreground"> (lei stessa)</span>
+        ) : null}
+      </span>
+      <span className="truncate text-xs text-muted-foreground">
+        {[recipient.phone, recipient.email].filter(Boolean).join(" · ") ||
+          "senza email né telefono"}
+      </span>
+    </span>
+  )
+}
 
-  if (summary.failed > 0 || summary.skipped > 0) {
-    const reasons = results
-      .filter((r) => r.status !== "SENT" && r.reason)
-      .slice(0, 3)
-      .map((r) => `${r.athleteName}: ${r.reason}`)
-      .join("\n")
-    toast.warning(msg, { description: reasons || undefined })
-  } else {
-    toast.success(msg)
+// Perché "Chiedi al genitore" è spento, se lo è
+function requestBlocker(row: AthleteCertRow): string | null {
+  if (row.status === "valid") return "Il certificato è valido"
+  if (row.recipient.kind === "NONE") {
+    return "Minorenne senza genitore collegato"
   }
+  if (!row.recipient.phone && !row.recipient.email) {
+    return "Nessun telefono né email in anagrafica"
+  }
+  return null
+}
+
+export function MedicalCertsClient({
+  rows,
+  filter,
+  counts,
+  courseId,
+  courses,
+}: Props) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const [, startTransition] = React.useTransition()
+
+  const [search, setSearch] = React.useState("")
+  const [selected, setSelected] = React.useState<Set<string>>(new Set())
+  const [uploadFor, setUploadFor] = React.useState<AthleteCertRow | null>(null)
+  const [request, setRequest] = React.useState<{
+    targets: AthleteCertRow[]
+    key: number
+  } | null>(null)
+
+  function updateParam(key: string, value: string | null) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === null || value === ALL) params.delete(key)
+    else params.set(key, value)
+    const query = params.toString()
+    startTransition(() => {
+      router.push(query ? `${pathname}?${query}` : pathname)
+    })
+  }
+
+  const visible = React.useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return q
+      ? rows.filter((r) => r.athleteName.toLowerCase().includes(q))
+      : rows
+  }, [rows, search])
+
+  // Si seleziona chi ha qualcosa da chiedere: le valide no
+  const selectableIds = React.useMemo(
+    () => visible.filter((r) => r.status !== "valid").map((r) => r.athleteId),
+    [visible],
+  )
+  const selectedRows = React.useMemo(
+    () => visible.filter((r) => selected.has(r.athleteId)),
+    [visible, selected],
+  )
+  // Quante famiglie riceverebbero l'email: lo stesso piano che usa l'invio
+  const selectedPlan = React.useMemo(
+    () =>
+      planCertRequests(
+        selectedRows
+          .filter((r) => r.emailBlocker === null)
+          .map((r) => ({
+            athleteId: r.athleteId,
+            athleteName: r.athleteFullName,
+            status: r.status,
+            recipientKey: r.recipientKey,
+          })),
+      ),
+    [selectedRows],
+  )
+
+  const allSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selected.has(id))
+  const headerChecked: boolean | "indeterminate" = allSelected
+    ? true
+    : selectedRows.length > 0
+      ? "indeterminate"
+      : false
+
+  function toggle(id: string, checked: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  function openRequest(targets: AthleteCertRow[]) {
+    setRequest((prev) => ({ targets, key: (prev?.key ?? 0) + 1 }))
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Chip col numero: mancanti e scaduti in rosso (bloccano la lezione),
+          in scadenza in ambra. Il numero è quello delle righe che aprono. */}
+      <div
+        role="group"
+        aria-label="Filtra i certificati per stato"
+        className="flex flex-wrap gap-2"
+      >
+        {CERT_FILTER_ORDER.map((value) => {
+          const active = value === filter
+          const tone =
+            value === "all"
+              ? "neutral"
+              : statusTone({ kind: "certificate", status: value })
+          return (
+            <Button
+              key={value}
+              type="button"
+              variant={active ? "default" : "outline"}
+              aria-pressed={active}
+              className={cn(
+                "h-11 gap-2 rounded-full px-4",
+                !active && counts[value] > 0 && TONE_BADGE[tone],
+              )}
+              onClick={() => updateParam("status", value)}
+            >
+              <span>{CERT_FILTER_LABELS[value]}</span>
+              <span className="font-mono text-xs opacity-80">
+                {counts[value]}
+              </span>
+            </Button>
+          )
+        })}
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Select
+          value={courseId ?? ALL}
+          onValueChange={(value) => updateParam("corso", value)}
+        >
+          <SelectTrigger className="h-11 w-full sm:w-[200px]">
+            <SelectValue placeholder="Corso" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Tutti i corsi</SelectItem>
+            {courses.map((course) => (
+              <SelectItem key={course.id} value={course.id}>
+                {course.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="pointer-events-none absolute top-3.5 left-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cerca per nome…"
+            className="h-11 pl-9"
+            inputMode="search"
+          />
+        </div>
+      </div>
+
+      {visible.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          title={
+            search
+              ? "Nessuna allieva con questo nome"
+              : `Nessun certificato fra «${CERT_FILTER_LABELS[filter]}»`
+          }
+          description={
+            search
+              ? "Prova con un altro nome o togli il filtro"
+              : "Qui compaiono le allieve attive con il certificato in questo stato"
+          }
+        />
+      ) : (
+        <>
+          {selectableIds.length > 0 ? (
+            <label className="flex min-h-11 items-center gap-2 text-sm">
+              <Checkbox
+                checked={headerChecked}
+                onCheckedChange={(c) =>
+                  setSelected(c === true ? new Set(selectableIds) : new Set())
+                }
+                aria-label="Seleziona tutte"
+                className="size-5"
+              />
+              Seleziona tutte ({selectableIds.length})
+            </label>
+          ) : null}
+
+          <ul className="rounded-md border">
+            {visible.map((row) => {
+              const blocker = requestBlocker(row)
+              const selectable = row.status !== "valid"
+              const isSelected = selectable && selected.has(row.athleteId)
+              return (
+                <li
+                  key={row.athleteId}
+                  data-state={isSelected ? "selected" : undefined}
+                  className={cn(
+                    GRID,
+                    "border-b px-3 py-3 last:border-b-0 data-[state=selected]:bg-muted/50",
+                  )}
+                >
+                  <div className="self-start [grid-area:sel] md:self-center">
+                    {selectable ? (
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(c) =>
+                          toggle(row.athleteId, c === true)
+                        }
+                        aria-label={`Seleziona ${row.athleteName}`}
+                        className="size-5"
+                      />
+                    ) : (
+                      <span className="block size-5" aria-hidden />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 [grid-area:nome]">
+                    {/* Unico link della riga: apre la scheda sui Documenti,
+                        nel pannello da 1024 in su */}
+                    <AthleteCardLink
+                      athleteId={row.athleteId}
+                      tab="documenti"
+                      className="block truncate font-medium hover:underline"
+                    >
+                      {row.athleteName}
+                    </AthleteCardLink>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {row.courses.length > 0
+                        ? row.courses.map((c) => c.name).join(" · ")
+                        : "Nessun corso quest'anno"}
+                    </p>
+                  </div>
+
+                  <div className="min-w-0 [grid-area:dest]">
+                    <RecipientCell row={row} />
+                  </div>
+
+                  <div className="min-w-0 [grid-area:stato]">
+                    <StatusCell row={row} />
+                  </div>
+
+                  <div className="min-w-0 [grid-area:rich]">
+                    <p className="truncate text-xs text-muted-foreground">
+                      {certRequestLabel(row.lastRequest)}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2 [grid-area:azioni] sm:flex-row md:flex-col md:items-stretch xl:flex-row">
+                    <Button
+                      className="h-11"
+                      variant={row.status === "valid" ? "outline" : "default"}
+                      onClick={() => setUploadFor(row)}
+                    >
+                      <Camera className="h-4 w-4" />
+                      Carica
+                    </Button>
+                    {/* Spento solo con un motivo, e il motivo si legge */}
+                    <Button
+                      variant="outline"
+                      className="h-11"
+                      disabled={blocker !== null}
+                      title={blocker ?? undefined}
+                      onClick={() => openRequest([row])}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Chiedi al genitore
+                    </Button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      )}
+
+      {/* Di gruppo: una richiesta per famiglia, solo per email */}
+      {selectedRows.length > 0 ? (
+        <div className="sticky bottom-4 z-10 mx-auto flex w-full max-w-2xl flex-wrap items-center justify-between gap-3 rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <span className="text-sm text-muted-foreground">
+            {selectedRows.length}{" "}
+            {selectedRows.length === 1 ? "selezionata" : "selezionate"}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button className="h-11" onClick={() => openRequest(selectedRows)}>
+              <MessageCircle className="h-4 w-4" />
+              Chiedi a {selectedPlan.families}{" "}
+              {selectedPlan.families === 1 ? "famiglia" : "famiglie"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelected(new Set())}
+              aria-label="Annulla la selezione"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Lo stesso modulo della scheda: così la fotocamera arriva anche lì */}
+      {uploadFor ? (
+        <MedicalCertFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setUploadFor(null)
+          }}
+          mode="create"
+          athleteId={uploadFor.athleteId}
+        />
+      ) : null}
+
+      {request ? (
+        <CertRequestDialog
+          key={request.key}
+          open
+          onOpenChange={(open) => {
+            if (!open) setRequest(null)
+          }}
+          targets={request.targets}
+          onSent={() => setSelected(new Set())}
+        />
+      ) : null}
+    </div>
+  )
 }

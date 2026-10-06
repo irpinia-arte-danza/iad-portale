@@ -223,6 +223,20 @@ A.S.D. IAD Irpinia Arte Danza`,
 <p><small>A.S.D. IAD Irpinia Arte Danza</small></p>`,
     },
     {
+      // Stesso testo della migration 20261007090000_cert_missing_email_template
+      slug: "certificato-mancante",
+      name: "Certificato medico mancante",
+      description:
+        "Richiesta alla famiglia quando per l'allieva non c'è nessun certificato medico",
+      category: EmailCategory.PROMEMORIA,
+      subject: "Certificato medico di {allieva_nome}",
+      bodyHtml: `<p>Gentile {genitore_nome},</p>
+<p>per <strong>{allieva_nome}</strong> non abbiamo ancora il certificato medico.</p>
+<p>Senza certificato non può fare lezione: può portarlo in sala o inviarcelo.</p>
+<p>Grazie,<br>IAD Irpinia Arte Danza</p>`,
+      bodyText: `Gentile {genitore_nome}, per {allieva_nome} non abbiamo ancora il certificato medico. Senza certificato non può fare lezione: può portarlo in sala o inviarcelo. Grazie, IAD Irpinia Arte Danza`,
+    },
+    {
       slug: "cert-reminder",
       name: "Promemoria certificato medico",
       description:

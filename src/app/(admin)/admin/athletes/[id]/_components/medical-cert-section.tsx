@@ -41,6 +41,10 @@ import {
   normalizeCertType,
   type MedicalCertType,
 } from "@/lib/schemas/medical-certificate"
+import {
+  certRequestLabel,
+  type CertRequestSummary,
+} from "@/lib/medical-certificates/request-trace"
 import { formatDateShort } from "@/lib/utils/format"
 
 import {
@@ -64,9 +68,16 @@ type CertItem = {
 type Props = {
   athleteId: string
   certificates: CertItem[]
+  // Quando è stato chiesto alla famiglia: lo stesso dato dell'elenco
+  // Certificati
+  lastRequest?: CertRequestSummary
 }
 
-export function MedicalCertSection({ athleteId, certificates }: Props) {
+export function MedicalCertSection({
+  athleteId,
+  certificates,
+  lastRequest,
+}: Props) {
   const [formOpen, setFormOpen] = React.useState(false)
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
@@ -138,6 +149,7 @@ export function MedicalCertSection({ athleteId, certificates }: Props) {
             {latest
               ? `Ultimo emesso il ${formatDateShort(new Date(latest.issueDate))}`
               : "Nessun certificato registrato"}
+            {lastRequest ? ` · ${certRequestLabel(lastRequest)}` : ""}
           </CardDescription>
         </div>
         {latest ? null : (
