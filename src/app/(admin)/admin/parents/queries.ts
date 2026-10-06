@@ -14,14 +14,12 @@ type ListFilters = {
 // mostrarli tutti per selezionarli nell'invio multiplo degli accessi.
 const DEFAULT_LIMIT = 200
 
-// Filtro dell'elenco, condiviso con il riquadro della dashboard
-export const PARENTS_WITHOUT_ACCESS_FILTER = "senza-accesso"
-
-export function parseParentsFilter(
-  value: string | undefined,
-): typeof PARENTS_WITHOUT_ACCESS_FILTER | null {
-  return value === PARENTS_WITHOUT_ACCESS_FILTER ? value : null
-}
+// I filtri dell'elenco vivono in lib/parents/list-filters (funzioni pure,
+// condivise con i chip e con il riquadro della dashboard)
+export {
+  PARENTS_WITHOUT_ACCESS_FILTER,
+  parseParentsFilter,
+} from "@/lib/parents/list-filters"
 
 export async function listParents(filters: ListFilters = {}) {
   await requireAdmin()

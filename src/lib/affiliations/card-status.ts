@@ -44,3 +44,10 @@ export const compareByCardExpiry = compareByExpiry
 export function seasonYearFromAcademicYearStart(startDate: Date): number {
   return new Date(startDate).getUTCFullYear()
 }
+
+// La stagione a cui appartiene un anno sociale, scritta come l'anno
+// accademico: l'anno sociale 2026 è la stagione 2026-2027. Si ricava dallo
+// stesso numero che usa il resto del portale, senza un calcolo a parte.
+export function seasonLabel(seasonYear: number): string {
+  return `${seasonYear}-${seasonYear + 1}`
+}

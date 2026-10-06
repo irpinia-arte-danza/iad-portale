@@ -42,20 +42,16 @@ const SORT_LABEL: Record<ScadenzeSort, string> = {
 interface ScadenzeFiltersProps {
   stato: ScadenzeStatoFilter
   courseId?: string
-  academicYearId?: string
   sortBy: ScadenzeSort
   courses: Array<{ id: string; name: string }>
-  academicYears: Array<{ id: string; label: string; isCurrent: boolean }>
   counts: ScadenzeCount[]
 }
 
 export function ScadenzeFilters({
   stato,
   courseId,
-  academicYearId,
   sortBy,
   courses,
-  academicYears,
   counts,
 }: ScadenzeFiltersProps) {
   const router = useRouter()
@@ -128,24 +124,7 @@ export function ScadenzeFilters({
           </SelectContent>
         </Select>
 
-        <Select
-          value={academicYearId ?? ALL}
-          onValueChange={(v) => updateParam("academicYearId", v)}
-        >
-          <SelectTrigger className="h-11 w-full sm:w-[160px]">
-            <SelectValue placeholder="Anno" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Tutti gli anni</SelectItem>
-            {academicYears.map((ay) => (
-              <SelectItem key={ay.id} value={ay.id}>
-                {ay.label}
-                {ay.isCurrent ? " (corrente)" : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
+        {/* L'anno accademico sta accanto al titolo (YearSelector) */}
         <Select
           value={sortBy}
           onValueChange={(v) =>

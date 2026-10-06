@@ -14,6 +14,10 @@ interface ResourceHeaderProps {
   title: string
   description?: string
   action?: React.ReactNode
+  // Accanto al titolo: il selettore dell'anno, dove la pagina ne ha uno
+  titleAddon?: React.ReactNode
+  // Sotto il titolo: la fascia "Stai guardando il …"
+  notice?: React.ReactNode
   className?: string
 }
 
@@ -22,6 +26,8 @@ export function ResourceHeader({
   title,
   description,
   action,
+  titleAddon,
+  notice,
   className,
 }: ResourceHeaderProps) {
   return (
@@ -54,13 +60,17 @@ export function ResourceHeader({
 
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            {titleAddon}
+          </div>
           {description && (
             <p className="text-sm text-muted-foreground">{description}</p>
           )}
         </div>
         {action && <div>{action}</div>}
       </div>
+      {notice}
     </header>
   )
 }

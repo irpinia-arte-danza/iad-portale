@@ -17,6 +17,9 @@ import {
   type ScadenzeSort,
   type ScadenzeStatoFilter,
 } from "./queries"
+import { YearNotice } from "@/components/year-notice"
+import { YearSelector } from "@/components/year-selector"
+
 import { ScadenzeFilters } from "./_components/scadenze-filters"
 import { ScadenzeList } from "./_components/scadenze-list"
 import { ScadenzeSearch } from "./_components/scadenze-search"
@@ -81,12 +84,43 @@ export default async function ScadenzePage({ searchParams }: PageProps) {
       listOpenSchedulesByAthlete(),
     ])
 
+  const selectedAyLabel =
+    academicYears.find((ay) => ay.id === academicYearId)?.label ?? null
+  // L'indirizzo dell'anno corrente: gli stessi filtri, senza l'anno
+  const backParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(resolved)) {
+    if (key !== "academicYearId" && typeof value === "string" && value) {
+      backParams.set(key, value)
+    }
+  }
+  const backQuery = backParams.toString()
+  const backHref = backQuery ? `/admin/scadenze?${backQuery}` : "/admin/scadenze"
+
   return (
     <>
       <ResourceHeader
         breadcrumbs={[{ label: "Scadenze" }]}
         title="Scadenze"
         description="Contributi aperti: in ritardo, in scadenza nei prossimi 7 giorni, o tutti."
+        titleAddon={
+          <YearSelector
+            kind="academic"
+            value={academicYearId ?? null}
+            options={academicYears.map((ay) => ({
+              value: ay.id,
+              label: ay.label,
+            }))}
+            apply={{ mode: "param", name: "academicYearId" }}
+            currentValue={currentAY?.id ?? null}
+          />
+        }
+        notice={
+          <YearNotice
+            selected={selectedAyLabel}
+            current={currentAY?.label ?? null}
+            backHref={backHref}
+          />
+        }
       />
       <ResourceContent>
         <ScheduleSettleProvider
@@ -97,10 +131,8 @@ export default async function ScadenzePage({ searchParams }: PageProps) {
             <ScadenzeFilters
               stato={stato}
               courseId={courseId}
-              academicYearId={academicYearId}
               sortBy={sortBy}
               courses={courses}
-              academicYears={academicYears}
               counts={counts}
             />
             <ScadenzeSearch defaultValue={search ?? ""} />

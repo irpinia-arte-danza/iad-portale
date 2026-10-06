@@ -1,6 +1,7 @@
 import { AffiliationEntity } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
+import { seasonLabel } from "@/lib/affiliations/card-status"
 import { requireAdmin } from "@/lib/auth/require-admin"
 
 import { ResourceContent } from "../_components/resource-content"
@@ -37,7 +38,9 @@ export default async function TesserePage() {
       <ResourceHeader
         breadcrumbs={[{ label: `Tessere ${ENTITY}` }]}
         title={`Tessere ${ENTITY}`}
-        description="La tessera dell'ente è anche la copertura assicurativa dell'allieva. Qui si prepara l'elenco per il referente e si caricano i PDF che torna indietro."
+        // La stagione, non "gennaio–dicembre": la tessera non segue l'anno
+        // solare, e quanto vale lo dice la data stampata su ciascuna
+        description={`Tessere della stagione ${seasonLabel(seasonYear)} · la validità è quella stampata su ogni tessera`}
       />
       <ResourceContent>
         <div className="flex flex-col gap-6">

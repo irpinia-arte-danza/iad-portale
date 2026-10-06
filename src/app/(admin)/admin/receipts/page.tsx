@@ -1,3 +1,5 @@
+import { YearNotice } from "@/components/year-notice"
+import { YearSelector } from "@/components/year-selector"
 import { todayInRome } from "@/lib/receipts/numbering"
 import { getDailyEmailQuota } from "@/lib/resend/daily-quota"
 import { formatEuro } from "@/lib/utils/format"
@@ -28,7 +30,8 @@ function parseYear(value: string | undefined, fallback: number): number {
 
 export default async function ReceiptsPage({ searchParams }: PageProps) {
   const resolved = await searchParams
-  const year = parseYear(resolved.year, todayInRome().getUTCFullYear())
+  const currentYear = todayInRome().getUTCFullYear()
+  const year = parseYear(resolved.year, currentYear)
   const stato = parseReceiptDeliveryFilter(resolved.stato)
   const search = resolved.search ?? ""
 
@@ -38,18 +41,43 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
     getDailyEmailQuota(),
   ])
 
+  // L'indirizzo dell'anno corrente: lo stesso, senza ?year
+  const backParams = new URLSearchParams()
+  if (resolved.stato) backParams.set("stato", resolved.stato)
+  if (search) backParams.set("search", search)
+  const backQuery = backParams.toString()
+  const yearOptions = (years.includes(year) ? years : [year, ...years]).map(
+    (y) => ({ value: String(y), label: String(y) }),
+  )
+
   return (
     <>
       <ResourceHeader
         breadcrumbs={[{ label: "Ricevute" }]}
         title="Ricevute"
         description="Registro delle ricevute emesse, in ordine di numero. Le ricevute annullate restano nell'elenco con il loro numero."
+        titleAddon={
+          <YearSelector
+            kind="fiscal"
+            value={String(year)}
+            options={yearOptions}
+            apply={{ mode: "param", name: "year" }}
+            currentValue={String(currentYear)}
+          />
+        }
+        notice={
+          <YearNotice
+            selected={String(year)}
+            current={String(currentYear)}
+            backHref={
+              backQuery ? `/admin/receipts?${backQuery}` : "/admin/receipts"
+            }
+          />
+        }
       />
       <ResourceContent>
         <div className="flex flex-col gap-4">
           <ReceiptsFilters
-            years={years.includes(year) ? years : [year, ...years]}
-            year={year}
             stato={stato}
             counts={counts}
           />

@@ -13,6 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import type { AccessInvitePreview } from "@/lib/auth/access-emails"
+import {
+  INVITE_SKIP_LABELS,
+  skippedSummary,
+  type InvitePlan,
+} from "@/lib/auth/access-invite-plan"
 import type { AccessInviteResult } from "@/lib/auth/access-status-types"
 
 import { sendAccessInvite } from "../../parents/actions"
@@ -23,7 +29,6 @@ import { sendAccessInvite } from "../../parents/actions"
 // basta riselezionarlo e rilanciare.
 const THROTTLE_MS = 1000
 
-type Target = { id: string; name: string }
 type Failure = { name: string; error: string }
 type Phase = "confirm" | "running" | "done"
 
@@ -34,16 +39,22 @@ function sleep(ms: number): Promise<void> {
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  targets: Target[]
+  // Chi riceve e chi viene saltato, già deciso da planAccessInvites
+  plan: InvitePlan
+  // Il testo dell'invito, dal modello: nome e link sono segnaposto
+  preview: AccessInvitePreview
   onFinished: () => void
 }
 
 export function BulkAccessInviteDialog({
   open,
   onOpenChange,
-  targets,
+  plan,
+  preview,
   onFinished,
 }: Props) {
+  const targets = plan.recipients
+  const { skipped } = plan
   const router = useRouter()
   const [phase, setPhase] = useState<Phase>("confirm")
   const [processed, setProcessed] = useState(0)
@@ -118,6 +129,8 @@ export function BulkAccessInviteDialog({
         onPointerDownOutside={blockWhileRunning}
         onInteractOutside={blockWhileRunning}
       >
+        {/* Anteprima: chi riceve, chi no e perché, e cosa c'è scritto.
+            Niente parte finché non si preme Invia. */}
         {phase === "confirm" ? (
           <>
             <DialogHeader>
@@ -125,22 +138,85 @@ export function BulkAccessInviteDialog({
                 Invia accesso a {total} {total === 1 ? "genitore" : "genitori"}
               </DialogTitle>
               <DialogDescription>
-                Ognuno riceverà un&apos;email con il link personale per
-                scegliere la password. Chi era già stato invitato riceve un
-                link nuovo e quello vecchio smette di funzionare.
+                Ognuno riceve un&apos;email con il link personale per scegliere
+                la password. Chi era già stato invitato riceve un link nuovo e
+                quello vecchio smette di funzionare.
               </DialogDescription>
             </DialogHeader>
-            <p className="text-sm text-muted-foreground">
-              Le email partono una alla volta (circa un secondo ciascuna):
-              tieni aperta questa finestra finché non compare il riepilogo.
-            </p>
+
+            <div className="space-y-4 text-sm">
+              {total > 0 ? (
+                <div>
+                  <p className="mb-1 font-medium">
+                    Destinatari ({total})
+                  </p>
+                  <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2">
+                    {targets.map((target) => (
+                      <li key={target.id} className="flex justify-between gap-2">
+                        <span className="truncate">{target.name}</span>
+                        {target.reinvite ? (
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            reinvio
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="rounded-md border border-status-fix-border bg-status-fix-bg p-3 text-status-fix">
+                  Nessuno dei selezionati può ricevere l&apos;invito.
+                </p>
+              )}
+
+              {skipped.length > 0 ? (
+                <div>
+                  <p className="mb-1 font-medium">
+                    Saltati ({skipped.length}): {skippedSummary(skipped)}
+                  </p>
+                  <ul className="max-h-32 space-y-1 overflow-y-auto rounded-md border p-2 text-muted-foreground">
+                    {skipped.map((entry) => (
+                      <li key={entry.id} className="flex justify-between gap-2">
+                        <span className="truncate">{entry.name}</span>
+                        <span className="shrink-0 text-xs">
+                          {INVITE_SKIP_LABELS[entry.reason]}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {total > 0 ? (
+                <details className="rounded-md border p-2">
+                  <summary className="cursor-pointer font-medium">
+                    Testo dell&apos;email
+                  </summary>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Oggetto: {preview.subject}
+                  </p>
+                  <pre className="mt-2 max-h-48 overflow-y-auto font-sans text-xs whitespace-pre-wrap text-muted-foreground">
+                    {preview.text}
+                  </pre>
+                </details>
+              ) : null}
+
+              {total > 0 ? (
+                <p className="text-muted-foreground">
+                  Le email partono una alla volta (circa un secondo ciascuna):
+                  tieni aperta questa finestra finché non compare il riepilogo.
+                </p>
+              ) : null}
+            </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => handleOpenChange(false)}>
                 Annulla
               </Button>
               <Button onClick={run} disabled={total === 0}>
                 <Send className="h-4 w-4" />
-                Invia
+                Invia {total > 0 ? total : ""}{" "}
+                {total === 1 ? "invito" : "inviti"}
               </Button>
             </DialogFooter>
           </>
