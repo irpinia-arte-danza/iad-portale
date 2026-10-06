@@ -39,8 +39,10 @@ export function ReceiptCancelDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
+          {/* Non una domanda: il dialog non annulla niente, spiega dove si
+              fa. Stesso nome della voce di menu che lo apre. */}
           <AlertDialogTitle>
-            Annullare la ricevuta n. {receiptNumber}?
+            Come si annulla la ricevuta n. {receiptNumber}
           </AlertDialogTitle>
           <AlertDialogDescription>
             Una ricevuta si annulla stornando il pagamento a cui è legata
