@@ -5,6 +5,7 @@ import { EmailStatus, EmailTrigger, UserRole } from "@prisma/client"
 import { syncFiscalYears } from "@/lib/fiscal-years"
 import { prisma } from "@/lib/prisma"
 import { authorizeCron } from "@/lib/auth/cron-auth"
+import { purgeOldLoginAttempts } from "@/lib/auth/login-attempts"
 import { sendEmail } from "@/lib/resend/send-email"
 import {
   isSchoolYearStarted,
@@ -96,8 +97,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const nextAcademicYear = await runStep("next-academic-year", () =>
     notifyMissingNextAcademicYear(today, actorId),
   )
+  // Il contatore dei tentativi di accesso non è uno storico: via le righe
+  // più vecchie di 24 ore
+  const loginAttempts = await runStep("login-attempts", async () => ({
+    action: "purged" as const,
+    deleted: await purgeOldLoginAttempts(),
+  }))
 
-  const ok = [academicYear, fiscalYear, nextAcademicYear].every(
+  const ok = [academicYear, fiscalYear, nextAcademicYear, loginAttempts].every(
     (step) => step.action !== "error",
   )
 
@@ -108,6 +115,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       academicYear,
       fiscalYear,
       nextAcademicYear,
+      loginAttempts,
     },
     { status: ok ? 200 : 500 },
   )

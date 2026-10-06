@@ -1499,3 +1499,32 @@ model AuditLog {
   @@index([userId, createdAt])
   @@map("audit_logs")
 }
+
+// ============================================================================
+// SECURITY: tentativi di accesso (limite ai tentativi, lato portale)
+// ============================================================================
+
+enum LoginAttemptKind {
+  // Modulo di accesso: email + password
+  LOGIN
+  // «Password dimenticata»: conta per IP, l'email può non esistere
+  RESET
+}
+
+// Una riga per tentativo. Dopo 5 falliti in 10 minuti (per email o per IP)
+// il portale rifiuta per 15 minuti. Il cron notturno cancella le righe più
+// vecchie di 24 ore: non è uno storico, è un contatore.
+model LoginAttempt {
+  id      String           @id @default(uuid()) @db.Uuid
+  kind    LoginAttemptKind
+  // Normalizzata (minuscola, senza spazi); null se non c'è
+  email   String?
+  ip      String
+  success Boolean
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+  @@map("login_attempts")
+}
