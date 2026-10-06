@@ -1,7 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, ShieldCheck, Trash2, Undo2 } from "lucide-react"
+import {
+  Download,
+  Loader2,
+  Paperclip,
+  ShieldCheck,
+  Trash2,
+  Undo2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -35,7 +42,15 @@ import { statusTone, TONE_BADGE } from "@/lib/status/tone"
 import { formatDateShort } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
-import { restoreConsent, softDeleteConsent } from "../consent-actions"
+import {
+  getConsentFileUrl,
+  restoreConsent,
+  softDeleteConsent,
+} from "../consent-actions"
+import {
+  ConsentAttachDialog,
+  type AttachableConsent,
+} from "./consent-attach-dialog"
 import { ConsentFormDialog, type ConsentSigner } from "./consent-form-dialog"
 
 export type ConsentItem = {
@@ -44,6 +59,8 @@ export type ConsentItem = {
   acceptedAt: Date
   documentVersion: string
   notes: string | null
+  // Il modulo firmato, se allegato
+  filePath: string | null
   deletedAt: Date | null
   // Chi ha firmato: un genitore, oppure nessuno = l'allieva stessa
   parent: { id: string; firstName: string; lastName: string } | null
@@ -75,6 +92,8 @@ export function ConsentsSection({
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
   const [busyId, setBusyId] = React.useState<string | null>(null)
   const [trashOpen, setTrashOpen] = React.useState(false)
+  const [attachingId, setAttachingId] = React.useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = React.useState<string | null>(null)
 
   const active = consents.filter((c) => c.deletedAt === null)
   const trashed = consents.filter((c) => c.deletedAt !== null)
@@ -87,6 +106,15 @@ export function ConsentsSection({
       currentByKind.set(c.type, c)
     }
   }
+
+  // Per «Allega modulo»: i consensi correnti di questa allieva ancora senza
+  // foglio. Un modulo ne copre spesso più d'uno.
+  const withoutFile: AttachableConsent[] = CONSENT_KINDS.flatMap((kind) => {
+    const current = currentByKind.get(kind)
+    return current && !current.filePath
+      ? [{ id: current.id, label: CONSENT_KIND_LABELS[kind] }]
+      : []
+  })
 
   const signers: ConsentSigner[] = [
     ...parents.map((p) => ({
@@ -111,6 +139,22 @@ export function ConsentsSection({
       toast.error(result.error)
     }
     setBusyId(null)
+  }
+
+  // Il link nasce qui, al clic, e vive cinque minuti
+  async function onDownload(id: string) {
+    setDownloadingId(id)
+    try {
+      const result = await getConsentFileUrl(id)
+      const target = result.ok ? result.data?.signedUrl : null
+      if (!target) {
+        toast.error(result.ok ? "Link non disponibile" : result.error)
+        return
+      }
+      window.open(target, "_blank", "noopener,noreferrer")
+    } finally {
+      setDownloadingId(null)
+    }
   }
 
   async function onRestore(id: string) {
@@ -155,7 +199,14 @@ export function ConsentsSection({
                     </p>
                     {current ? (
                       <Badge variant="outline">Firmato</Badge>
-                    ) : (
+                    ) : null}
+                    {current?.filePath ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Paperclip className="h-3.5 w-3.5" aria-hidden="true" />
+                        Modulo allegato
+                      </span>
+                    ) : null}
+                    {current ? null : (
                       <Badge
                         variant="outline"
                         className={cn(TONE_BADGE[tone])}
@@ -176,6 +227,36 @@ export function ConsentsSection({
                   ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
+                  {current?.filePath ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11"
+                      onClick={() => onDownload(current.id)}
+                      disabled={downloadingId !== null}
+                    >
+                      {downloadingId === current.id ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-1 h-4 w-4" />
+                      )}
+                      Scarica
+                    </Button>
+                  ) : current ? (
+                    // Registrato senza foglio: il modulo si allega dopo
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11"
+                      onClick={() => setAttachingId(current.id)}
+                      disabled={busyId !== null}
+                    >
+                      <Paperclip className="mr-1 h-4 w-4" />
+                      Allega modulo
+                    </Button>
+                  ) : null}
                   {current ? (
                     <Button
                       type="button"
@@ -266,6 +347,13 @@ export function ConsentsSection({
         ) : null}
       </CardContent>
 
+      <ConsentAttachDialog
+        consentId={attachingId}
+        onClose={() => setAttachingId(null)}
+        athleteId={athleteId}
+        candidates={withoutFile}
+      />
+
       <ConsentFormDialog
         open={formKind !== null}
         onOpenChange={(next) => {
@@ -287,7 +375,8 @@ export function ConsentsSection({
             <AlertDialogTitle>Spostare il consenso nel cestino?</AlertDialogTitle>
             <AlertDialogDescription>
               Il consenso non conterà più per questa allieva. Si può
-              ripristinare da «Nel cestino» in questa sezione.
+              ripristinare da «Nel cestino» in questa sezione; il modulo
+              allegato resta al suo posto.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

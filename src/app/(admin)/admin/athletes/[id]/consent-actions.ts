@@ -13,8 +13,18 @@ import {
   SIGNED_BY_ATHLETE,
   type ConsentValues,
 } from "@/lib/schemas/consent"
+import {
+  CONSENT_FILE_ALLOWED_MIME,
+  CONSENT_FILE_MAX_BYTES,
+} from "@/lib/consents/file-rules"
+import {
+  deleteConsentFiles,
+  getConsentFileSignedUrl,
+  uploadConsentFile,
+} from "@/lib/supabase/storage-consent"
 import { isMinorAt } from "@/lib/utils/age"
 import { toDateOnly } from "@/lib/utils/date-only"
+import { validateFileSignature } from "@/lib/utils/file-signature"
 
 // ─────────────────────────────────────────────────────────────────────────
 // Consensi cartacei: la segreteria registra la firma sul modulo di carta.
@@ -24,6 +34,12 @@ import { toDateOnly } from "@/lib/utils/date-only"
 // Cancellare vuol dire Cestino (deletedAt), con ripristino: un consenso
 // registrato per sbaglio si toglie, uno tolto per sbaglio si rimette, e
 // nessuna delle due cose cancella una riga.
+//
+// Il modulo firmato si può allegare (bucket privato "consents"). Il Cestino
+// non tocca mai il file: lo stesso modulo può stare su altri consensi, e il
+// consenso ripristinato deve ritrovarlo. Il file si toglie solo quando
+// nessuna riga lo punta più (cancellazione definitiva, vedi
+// src/lib/consents/shared-file.ts).
 // ─────────────────────────────────────────────────────────────────────────
 
 function mapPrismaError(error: unknown): string {
@@ -42,25 +58,64 @@ function revalidateAthlete(athleteId: string) {
   revalidatePath("/admin/dashboard")
 }
 
-export async function createConsent(
+function parseForm(formData: FormData): ConsentValues | { error: string } {
+  const text = (key: string) => {
+    const v = formData.get(key)
+    return typeof v === "string" ? v : ""
+  }
+  const signedOn = text("signedOn")
+  const parsed = consentSchema.safeParse({
+    kinds: formData.getAll("kinds").filter((v) => typeof v === "string"),
+    alsoFor: formData.getAll("alsoFor").filter((v) => typeof v === "string"),
+    signedOn: signedOn ? new Date(signedOn) : undefined,
+    signedBy: text("signedBy"),
+    notes: text("notes"),
+  })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dati non validi" }
+  }
+  return parsed.data
+}
+
+function fileFromForm(formData: FormData): File | null {
+  const f = formData.get("file")
+  if (!(f instanceof File) || f.size === 0) return null
+  return f
+}
+
+async function validateFile(file: File): Promise<string | null> {
+  if (file.size > CONSENT_FILE_MAX_BYTES) return "File troppo grande (max 3 MB)"
+  if (!(CONSENT_FILE_ALLOWED_MIME as readonly string[]).includes(file.type)) {
+    return `Formato non supportato (${file.type}). Ammessi: PDF, JPEG, PNG.`
+  }
+  return validateFileSignature(file, CONSENT_FILE_ALLOWED_MIME)
+}
+
+// Una registrazione: uno o più consensi della stessa allieva, con lo stesso
+// modulo firmato. `alsoFor` (stesso modulo anche a una sorella) resta
+// supportato qui ma nessuna interfaccia lo manda: ogni sorella ha il suo
+// modulo e si registra dalla propria scheda. Il file si carica una volta sola
+// e tutte le righe ne portano il percorso.
+export async function registerConsents(
   athleteId: string,
-  input: ConsentValues,
-): Promise<ActionResult<{ id: string }>> {
+  formData: FormData,
+): Promise<ActionResult<{ created: number }>> {
   const { userId } = await requireAdmin()
 
   const idParsed = uuidSchema.safeParse(athleteId)
   if (!idParsed.success) {
     return { ok: false, error: "Identificativo allieva non valido" }
   }
-  const parsed = consentSchema.safeParse(input)
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: parsed.error.issues[0]?.message ?? "Dati non validi",
-    }
-  }
-  const values = parsed.data
+  const values = parseForm(formData)
+  if ("error" in values) return { ok: false, error: values.error }
 
+  const file = fileFromForm(formData)
+  if (file) {
+    const fileError = await validateFile(file)
+    if (fileError) return { ok: false, error: fileError }
+  }
+
+  let filePath: string | null = null
   try {
     const athlete = await prisma.athlete.findUnique({
       where: { id: idParsed.data, deletedAt: null },
@@ -99,6 +154,30 @@ export async function createConsent(
       parentId = signer.data as string
     }
 
+    // Le sorelle: solo allieve collegate allo stesso genitore che ha
+    // firmato. Un'allieva che firma per sé non firma per altre.
+    const sisterIds = [...new Set(values.alsoFor)].filter(
+      (id) => id !== athlete.id,
+    )
+    if (sisterIds.length > 0) {
+      const sisters = parentId
+        ? await prisma.athlete.count({
+            where: {
+              id: { in: sisterIds },
+              deletedAt: null,
+              parentRelations: { some: { parentId } },
+            },
+          })
+        : 0
+      if (sisters !== sisterIds.length) {
+        return {
+          ok: false,
+          error:
+            "Il modulo si può registrare solo alle sorelle collegate allo stesso genitore",
+        }
+      }
+    }
+
     // La versione del documento: l'anno accademico in cui è stato firmato,
     // che è anche l'anno del modulo di iscrizione
     const signedOn = toDateOnly(values.signedOn)
@@ -107,39 +186,168 @@ export async function createConsent(
       select: { label: true },
     })
 
-    const consent = await prisma.consent.create({
-      data: {
-        athleteId: athlete.id,
+    if (file) filePath = await uploadConsentFile(file)
+
+    const athleteIds = [athlete.id, ...sisterIds]
+    const kinds = [...new Set(values.kinds)]
+    const rows = athleteIds.flatMap((id) =>
+      kinds.map((kind) => ({
+        athleteId: id,
         parentId,
-        type: values.kind as ConsentType,
+        type: kind as ConsentType,
         accepted: true,
         documentVersion: year?.label ?? String(signedOn.getUTCFullYear()),
         method: ConsentMethod.PAPER,
         acceptedAt: signedOn,
         notes: values.notes && values.notes !== "" ? values.notes : null,
-      },
-      select: { id: true },
-    })
+        filePath,
+      })),
+    )
 
-    await prisma.auditLog.create({
-      data: {
+    const created = await prisma.$transaction(
+      rows.map((data) =>
+        prisma.consent.create({ data, select: { id: true, athleteId: true } }),
+      ),
+    )
+
+    await prisma.auditLog.createMany({
+      data: created.map((consent, index) => ({
         userId,
-        action: "CREATE",
+        action: "CREATE" as const,
         entityType: "Consent",
         entityId: consent.id,
         changes: {
-          athleteId: athlete.id,
-          type: values.kind,
+          athleteId: consent.athleteId,
+          type: rows[index].type,
           signedBy: parentId ? "parent" : "athlete",
+          fileAttached: filePath !== null,
         },
-      },
+      })),
     })
 
-    revalidateAthlete(athlete.id)
-    return { ok: true, data: { id: consent.id } }
+    for (const id of athleteIds) revalidateAthlete(id)
+    return { ok: true, data: { created: created.length } }
   } catch (error) {
+    // Il file è salito ma le righe no: non deve restare un modulo che
+    // nessun consenso punta
+    if (filePath) await deleteConsentFiles([filePath])
+    if (error instanceof Error && /Upload fallito|Storage|Bucket/.test(error.message)) {
+      return { ok: false, error: error.message }
+    }
     return { ok: false, error: mapPrismaError(error) }
   }
+}
+
+// «Allega modulo»: il foglio arriva dopo la registrazione. Un caricamento,
+// e lo stesso percorso su tutti i consensi scelti — solo consensi di questa
+// allieva, non nel Cestino e ancora senza modulo: un modulo già allegato non
+// si sostituisce da qui.
+export async function attachConsentFile(
+  athleteId: string,
+  formData: FormData,
+): Promise<ActionResult<{ attached: number }>> {
+  const { userId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(athleteId)
+  if (!idParsed.success) {
+    return { ok: false, error: "Identificativo allieva non valido" }
+  }
+  const ids = [
+    ...new Set(
+      formData.getAll("consentIds").filter((v) => typeof v === "string"),
+    ),
+  ]
+  if (ids.length === 0 || ids.length > 10) {
+    return { ok: false, error: "Scegli almeno un consenso" }
+  }
+  if (ids.some((id) => !uuidSchema.safeParse(id).success)) {
+    return { ok: false, error: "Identificativo consenso non valido" }
+  }
+
+  const file = fileFromForm(formData)
+  if (!file) return { ok: false, error: "Scegli il modulo da allegare" }
+  const fileError = await validateFile(file)
+  if (fileError) return { ok: false, error: fileError }
+
+  let filePath: string | null = null
+  try {
+    const eligible = await prisma.consent.count({
+      where: {
+        id: { in: ids },
+        athleteId: idParsed.data,
+        deletedAt: null,
+        filePath: null,
+      },
+    })
+    if (eligible !== ids.length) {
+      return {
+        ok: false,
+        error:
+          "Il modulo si allega solo a consensi di questa allieva ancora senza modulo. Ricarica la pagina.",
+      }
+    }
+
+    filePath = await uploadConsentFile(file)
+
+    // filePath: null anche qui: se nel frattempo qualcuno ha allegato un
+    // altro modulo, non lo si sovrascrive
+    const updated = await prisma.consent.updateMany({
+      where: {
+        id: { in: ids },
+        athleteId: idParsed.data,
+        deletedAt: null,
+        filePath: null,
+      },
+      data: { filePath },
+    })
+    if (updated.count === 0) {
+      await deleteConsentFiles([filePath])
+      return { ok: false, error: "Consenso non trovato" }
+    }
+
+    await prisma.auditLog.createMany({
+      data: ids.map((id) => ({
+        userId,
+        action: "UPDATE" as const,
+        entityType: "Consent",
+        entityId: id,
+        changes: { athleteId: idParsed.data, fileAttached: true },
+      })),
+    })
+
+    revalidateAthlete(idParsed.data)
+    return { ok: true, data: { attached: updated.count } }
+  } catch (error) {
+    if (filePath) await deleteConsentFiles([filePath])
+    if (error instanceof Error && /Upload fallito|Storage|Bucket/.test(error.message)) {
+      return { ok: false, error: error.message }
+    }
+    return { ok: false, error: mapPrismaError(error) }
+  }
+}
+
+// Il link al modulo firmato, generato al clic su «Scarica»: vive cinque
+// minuti (SIGNED_URL_TTL_SECONDS) e non si salva. Vale anche per un consenso
+// nel Cestino: il file resta finché una riga lo punta.
+export async function getConsentFileUrl(
+  consentId: string,
+): Promise<ActionResult<{ signedUrl: string }>> {
+  await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(consentId)
+  if (!idParsed.success) {
+    return { ok: false, error: "Identificativo consenso non valido" }
+  }
+  const consent = await prisma.consent.findUnique({
+    where: { id: idParsed.data },
+    select: { filePath: true },
+  })
+  if (!consent) return { ok: false, error: "Consenso non trovato" }
+  if (!consent.filePath) return { ok: false, error: "Nessun modulo allegato" }
+
+  const url = await getConsentFileSignedUrl(consent.filePath)
+  if (!url) return { ok: false, error: "Impossibile generare il link" }
+  return { ok: true, data: { signedUrl: url } }
 }
 
 export async function softDeleteConsent(

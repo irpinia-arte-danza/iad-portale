@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -42,7 +43,8 @@ import {
 } from "@/lib/schemas/consent"
 import { toDateInputValue } from "@/lib/utils/format"
 
-import { createConsent } from "../consent-actions"
+import { registerConsents } from "../consent-actions"
+import { useConsentFilePicker } from "./consent-file-picker"
 
 // Chi può aver firmato: i genitori collegati e, se maggiorenne, l'allieva
 export type ConsentSigner = { value: string; label: string }
@@ -58,7 +60,7 @@ type Props = {
 
 const TITLE = "Registra un consenso cartaceo"
 const DESCRIPTION =
-  "Il modulo firmato resta in archivio: qui si segna che c'è, quando e da chi."
+  "Si segna quando è stato firmato e da chi. Il modulo si può allegare: foto o PDF."
 
 export function ConsentFormDialog({
   open,
@@ -68,12 +70,14 @@ export function ConsentFormDialog({
   signers,
 }: Props) {
   const [busy, setBusy] = React.useState(false)
+  const picker = useConsentFilePicker(busy)
   // Sotto 1024 il modulo sale dal basso: è il gesto di iPad e telefono
   const belowLg = useIsBelowLg()
 
   const defaults = React.useCallback(
     (): ConsentValues => ({
-      kind,
+      kinds: [kind],
+      alsoFor: [],
       signedOn: new Date(),
       signedBy: signers[0]?.value ?? "",
       notes: "",
@@ -91,12 +95,31 @@ export function ConsentFormDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, kind])
 
+  // Alla chiusura il file scelto si dimentica: alla prossima apertura il
+  // dialog riparte vuoto
+  function handleOpenChange(next: boolean) {
+    if (!next) picker.reset()
+    onOpenChange(next)
+  }
+
   async function onSubmit(values: ConsentValues) {
     setBusy(true)
-    const result = await createConsent(athleteId, values)
+    const fd = new FormData()
+    for (const k of values.kinds) fd.append("kinds", k)
+    // Niente alsoFor: ogni sorella ha il proprio modulo, e si registra dalla
+    // sua scheda. L'azione lo saprebbe fare, il dialog non lo propone.
+    fd.append("signedOn", values.signedOn.toISOString())
+    fd.append("signedBy", values.signedBy)
+    if (values.notes) fd.append("notes", values.notes)
+    if (picker.file) fd.append("file", picker.file)
+
+    const result = await registerConsents(athleteId, fd)
     if (result.ok) {
-      toast.success(`${CONSENT_KIND_LABELS[values.kind]}: consenso registrato`)
-      onOpenChange(false)
+      const n = result.data?.created ?? 1
+      toast.success(
+        n === 1 ? "Consenso registrato" : `${n} consensi registrati`,
+      )
+      handleOpenChange(false)
     } else {
       toast.error(result.error)
     }
@@ -110,30 +133,37 @@ export function ConsentFormDialog({
         className="space-y-4"
         noValidate
       >
+        {/* Il foglio prima di tutto, come per il certificato */}
+        {picker.element}
+
         <FormField
           control={form.control}
-          name="kind"
+          name="kinds"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Consenso</FormLabel>
-              <div
-                role="radiogroup"
-                aria-label="Tipo di consenso"
-                className="grid gap-2"
-              >
-                {CONSENT_KINDS.map((k) => (
-                  <Button
-                    key={k}
-                    type="button"
-                    role="radio"
-                    aria-checked={field.value === k}
-                    variant={field.value === k ? "default" : "outline"}
-                    className="h-11 justify-start whitespace-normal text-left leading-tight"
-                    onClick={() => field.onChange(k)}
-                  >
-                    {CONSENT_KIND_LABELS[k]}
-                  </Button>
-                ))}
+              <FormLabel>Consensi che il modulo copre</FormLabel>
+              <div className="grid gap-1">
+                {CONSENT_KINDS.map((k) => {
+                  const checked = field.value.includes(k)
+                  return (
+                    <label
+                      key={k}
+                      className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border px-3 text-sm"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(next) =>
+                          field.onChange(
+                            next === true
+                              ? [...field.value, k]
+                              : field.value.filter((v) => v !== k),
+                          )
+                        }
+                      />
+                      {CONSENT_KIND_LABELS[k]}
+                    </label>
+                  )
+                })}
               </div>
               <FormMessage />
             </FormItem>
@@ -225,7 +255,7 @@ export function ConsentFormDialog({
           <Button
             type="button"
             variant="ghost"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
             disabled={busy}
           >
             Annulla
@@ -233,7 +263,7 @@ export function ConsentFormDialog({
           <Button
             type="submit"
             className="h-11"
-            disabled={busy || signers.length === 0}
+            disabled={busy || picker.preparing || signers.length === 0}
           >
             {busy ? (
               <>
@@ -253,7 +283,7 @@ export function ConsentFormDialog({
   // basso sotto. Non due moduli.
   if (belowLg) {
     return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
+      <Sheet open={open} onOpenChange={handleOpenChange}>
         <SheetContent
           side="bottom"
           className="max-h-[92dvh] gap-0 overflow-y-auto p-0"
@@ -269,7 +299,7 @@ export function ConsentFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{TITLE}</DialogTitle>

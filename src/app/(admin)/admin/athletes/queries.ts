@@ -490,6 +490,7 @@ const athleteWithRelations = Prisma.validator<Prisma.AthleteDefaultArgs>()({
         documentVersion: true,
         method: true,
         notes: true,
+        filePath: true,
         deletedAt: true,
         parent: { select: { id: true, firstName: true, lastName: true } },
       },
