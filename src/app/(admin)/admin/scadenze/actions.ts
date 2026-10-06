@@ -12,7 +12,11 @@ import {
 } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
-import { REMINDER_TEMPLATE_CATEGORIES } from "@/lib/resend/template-usage"
+import { REQUEST_SCOPE_CONTRIBUTION } from "@/lib/medical-certificates/request-trace"
+import {
+  CERT_TEMPLATE_SLUGS,
+  REMINDER_TEMPLATE_CATEGORIES,
+} from "@/lib/resend/template-usage"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { resolveCommunicationRecipient } from "@/lib/communications/recipient"
 import { academicYearSlashLabel } from "@/lib/fees/association-fee"
@@ -201,6 +205,9 @@ export async function listReminderTemplates(): Promise<ReminderTemplateOption[]>
     where: {
       isActive: true,
       category: { in: REMINDER_TEMPLATE_CATEGORIES },
+      // I testi dei certificati sono promemoria anche loro, ma parlano
+      // d'altro: per un contributo non si propongono
+      slug: { notIn: CERT_TEMPLATE_SLUGS },
     },
     orderBy: [{ category: "asc" }, { name: "asc" }],
     select: {
@@ -328,6 +335,9 @@ export async function recordWhatsappReminder(
       entityType: "PaymentSchedule",
       entityId: idParsed.data,
       changes: {
+        // La stessa azione traccia anche le richieste del certificato: le
+        // distingue l'ambito (le righe vecchie, senza, sono contributi)
+        ambito: REQUEST_SCOPE_CONTRIBUTION,
         athleteId: athlete?.id ?? null,
         // Il nome di chi si è scelto di contattare, non il numero: a cosa è
         // servito si capisce, i dati di contatto restano in anagrafica

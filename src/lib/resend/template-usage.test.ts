@@ -45,7 +45,7 @@ describe("templateUsage", () => {
         slug: CERT_REMINDER_TEMPLATE_SLUG,
         category: "PROMEMORIA",
       }),
-    ).toBe("Certificati › Invia promemoria")
+    ).toBe("Certificati › Chiedi al genitore (in scadenza o scaduto)")
   })
 
   it("un modello che nessun invio usa lo dice: null", () => {

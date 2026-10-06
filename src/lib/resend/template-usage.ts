@@ -14,6 +14,16 @@ import type { EmailCategory } from "@prisma/client"
 // Slug dei modelli inviati da un punto preciso del portale
 export const STAGE_INVITE_TEMPLATE_SLUG = "stage-invite"
 export const CERT_REMINDER_TEMPLATE_SLUG = "cert-reminder"
+// Il certificato che non c'è proprio: un testo suo, perché quello sopra
+// parla di una scadenza che qui non esiste
+export const CERT_MISSING_TEMPLATE_SLUG = "certificato-mancante"
+
+// I testi che parlano di certificati: l'elenco Certificati li manda, e
+// "Sollecita" in Scadenze non li deve proporre
+export const CERT_TEMPLATE_SLUGS = [
+  CERT_REMINDER_TEMPLATE_SLUG,
+  CERT_MISSING_TEMPLATE_SLUG,
+]
 export const RECEIPT_EMAIL_TEMPLATE_SLUG = "ricevuta-emessa"
 export const ACCESS_TEMPLATE_SLUG = "accesso-portale"
 export const PASSWORD_RESET_TEMPLATE_SLUG = "recupero-password"
@@ -27,7 +37,9 @@ export const REMINDER_TEMPLATE_CATEGORIES: EmailCategory[] = [
 
 const USAGE_BY_SLUG: Record<string, string> = {
   [STAGE_INVITE_TEMPLATE_SLUG]: "Stage › Invita allieve",
-  [CERT_REMINDER_TEMPLATE_SLUG]: "Certificati › Invia promemoria",
+  [CERT_REMINDER_TEMPLATE_SLUG]:
+    "Certificati › Chiedi al genitore (in scadenza o scaduto)",
+  [CERT_MISSING_TEMPLATE_SLUG]: "Certificati › Chiedi al genitore (mancante)",
   [RECEIPT_EMAIL_TEMPLATE_SLUG]: "Ricevute › Consegna",
   [ACCESS_TEMPLATE_SLUG]: "Genitori e Insegnanti › Invia accesso",
   [PASSWORD_RESET_TEMPLATE_SLUG]: "Pagina «Password dimenticata»",
