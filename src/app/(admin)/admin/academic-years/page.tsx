@@ -25,12 +25,7 @@ export default async function AcademicYearsPage() {
     nextLabel !== null &&
     !years.some((y) => y.label === nextLabel) &&
     canPrepareNextAcademicYear(current.endDate, today)
-      ? {
-          label: nextLabel,
-          // L'anno corrente non è ancora finito: il cron notturno lo rimette
-          // corrente fino alla sua fine, e il pannello lo deve dire
-          currentStillRunning: current.endDate.getTime() >= today.getTime(),
-        }
+      ? { label: nextLabel }
       : null
 
   return (

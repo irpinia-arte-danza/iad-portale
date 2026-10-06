@@ -1,9 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { AlertTriangle, Loader2, Sparkles } from "lucide-react"
+import { Loader2, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -34,7 +34,9 @@ import {
   toDateInputValue,
 } from "@/lib/utils/format"
 
-import { createAndSetCurrentAcademicYear } from "../actions"
+import { todayDateOnly, toDateOnly } from "@/lib/utils/date-only"
+
+import { createAcademicYear } from "../actions"
 
 type CurrentSummary = {
   id: string
@@ -49,9 +51,6 @@ type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   current: CurrentSummary
-  // L'anno corrente non è ancora finito (giugno): cambia cosa succede
-  // stanotte, e il riepilogo lo deve dire
-  currentStillRunning: boolean
   suggestedLabel: string
   suggestedStart: Date
   suggestedEnd: Date
@@ -62,7 +61,6 @@ export function StartNewYearDialog({
   open,
   onOpenChange,
   current,
-  currentStillRunning,
   suggestedLabel,
   suggestedStart,
   suggestedEnd,
@@ -94,11 +92,30 @@ export function StartNewYearDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, suggestedLabel])
 
+  // Il passaggio avviene la notte del giorno di inizio; se la data scelta è
+  // oggi o già passata, il cron lo fa al prossimo giro
+  const startDate = useWatch({ control: form.control, name: "startDate" })
+  const becomesCurrent =
+    startDate && toDateOnly(startDate).getTime() > todayDateOnly().getTime()
+      ? `il ${formatDateShort(startDate)}`
+      : "stanotte"
+
+  // Il cron fa il passaggio solo se un anno solo copre la data: se il nuovo
+  // comincia prima che il vecchio finisca, per quei giorni ne trova due e
+  // non sceglie (lascia tutto com'è e scrive un avviso nei log)
+  const overlapsCurrent =
+    current !== null &&
+    startDate !== undefined &&
+    toDateOnly(startDate).getTime() <= toDateOnly(current.endDate).getTime()
+
   async function onSubmit(values: AcademicYearValues) {
     setBusy(true)
-    const result = await createAndSetCurrentAcademicYear(values)
+    // Solo creare: l'anno diventa corrente da solo, la notte in cui comincia
+    // (cron academic-year-rollover). Impostarlo corrente qui, a giugno,
+    // mostrerebbe a genitori e insegnanti un anno vuoto.
+    const result = await createAcademicYear(values)
     if (result.ok) {
-      toast.success(`Anno ${values.label} creato e impostato come corrente`)
+      toast.success(`Anno ${values.label} creato`)
       onOpenChange(false)
     } else {
       toast.error(result.error)
@@ -166,24 +183,29 @@ export function StartNewYearDialog({
             </div>
           </dl>
 
-          <div className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
-            <div className="space-y-1 text-amber-900 dark:text-amber-100">
-              <p>
-                Appena confermi, il {suggestedLabel} diventa l&apos;anno
-                corrente: le aree di genitori e insegnanti mostrano il nuovo
-                anno.
-              </p>
-              {current && currentStillRunning ? (
-                <p>
-                  Il {current.label} però non è finito (termina il{" "}
-                  {formatDateShort(current.endDate)}): stanotte il portale lo
-                  rimette come corrente da solo, e passa al {suggestedLabel}{" "}
-                  il {formatDateShort(suggestedStart)}.
-                </p>
-              ) : null}
-            </div>
-          </div>
+          {/* Quando diventa corrente: lo decide il cron notturno, il giorno
+              in cui l'anno comincia. La data è quella scritta qui sotto, e
+              cambia con lei. */}
+          <p className="rounded-md border bg-muted/30 p-3 text-sm">
+            L&apos;anno viene creato ora e diventa quello corrente
+            automaticamente {becomesCurrent}
+            {current ? (
+              <>
+                : fino ad allora genitori e insegnanti continuano a vedere{" "}
+                {current.label}
+              </>
+            ) : null}
+            .
+          </p>
+
+          {overlapsCurrent && current ? (
+            <p className="rounded-md border border-status-fix-border bg-status-fix-bg p-3 text-sm text-status-fix">
+              Il {current.label} finisce il {formatDateShort(current.endDate)}
+              : con un inizio precedente i due anni si sovrappongono e il
+              passaggio automatico non avviene. Scegli un inizio successivo a
+              quella data.
+            </p>
+          ) : null}
 
           <Form {...form}>
             <form

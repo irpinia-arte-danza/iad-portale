@@ -64,7 +64,7 @@ type Props = {
   years: AYRow[]
   // null = non è il momento di preparare l'anno successivo (vedi
   // canPrepareNextAcademicYear): il tasto non compare
-  prepareNext: { label: string; currentStillRunning: boolean } | null
+  prepareNext: { label: string } | null
 }
 
 
@@ -297,7 +297,6 @@ export function AcademicYearsClient({ years, prepareNext }: Props) {
         open={startNewOpen}
         onOpenChange={setStartNewOpen}
         current={currentSummary}
-        currentStillRunning={prepareNext?.currentStillRunning ?? false}
         suggestedLabel={suggestion.label}
         suggestedStart={suggestion.startDate}
         suggestedEnd={suggestion.endDate}
