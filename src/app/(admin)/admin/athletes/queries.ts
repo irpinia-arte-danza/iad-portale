@@ -13,10 +13,15 @@ import {
   CURRENT_CARD_ORDER,
 } from "@/lib/affiliations/card-status"
 import {
-  ATHLETE_LIST_FILTERS,
+  ATHLETE_STEP_FILTERS,
+  isStepFilter,
   type AthleteListFilter,
   type AthleteListFilterStep,
+  type AthleteListSort,
+  type AthleteStatusFilter,
 } from "@/lib/athletes/list-filters"
+import { GUARDIAN_GAP_FILTER } from "@/lib/athletes/guardian-gap"
+import { athleteListPayer } from "@/lib/athletes/payer"
 import { athleteSetupChecklist } from "@/lib/athletes/setup-checklist"
 import {
   classifyCert,
@@ -28,15 +33,24 @@ import { todayDateOnly } from "@/lib/utils/date-only"
 
 import { scadenzeWhere } from "../scadenze/queries"
 
-export type AthleteListSort = "name" | "certificate" | "card"
-
-export type { AthleteListFilter } from "@/lib/athletes/list-filters"
-export { parseAthleteListFilter } from "@/lib/athletes/list-filters"
+export type {
+  AthleteListFilter,
+  AthleteListSort,
+} from "@/lib/athletes/list-filters"
+export {
+  parseAthleteListFilter,
+  parseAthleteListSort,
+  parseAthleteStatusFilter,
+} from "@/lib/athletes/list-filters"
 
 type ListFilters = {
   search?: string
   sort?: AthleteListSort
   filter?: AthleteListFilter
+  // Corso dell'anno corrente: restringe a chi è iscritta là
+  courseId?: string
+  // Attive (default) o ritirate: due popolazioni separate
+  stato?: AthleteStatusFilter
   limit?: number
   offset?: number
 }
@@ -47,11 +61,16 @@ const DEFAULT_LIMIT = 50
 // tessera correnti per le colonne dell'elenco. Lo usano l'elenco allieve e il
 // conteggio della dashboard: una sola forma, un solo predicato.
 const athleteListInclude = Prisma.validator<Prisma.AthleteInclude>()({
-  _count: {
+  // I genitori collegati con quel poco che serve a dire chi paga: il
+  // conteggio (per i passi della scheda) si ricava da qui, non da un _count
+  // separato che potrebbe dire un numero diverso
+  parentRelations: {
+    where: { parent: { deletedAt: null } },
+    orderBy: [{ isPrimaryPayer: "desc" }, { isPrimaryContact: "desc" }],
     select: {
-      parentRelations: {
-        where: { parent: { deletedAt: null } },
-      },
+      isPrimaryPayer: true,
+      isPrimaryContact: true,
+      parent: { select: { id: true, firstName: true, lastName: true } },
     },
   },
   enrollments: {
@@ -60,6 +79,8 @@ const athleteListInclude = Prisma.validator<Prisma.AthleteInclude>()({
       academicYearId: true,
       withdrawalDate: true,
       deletedAt: true,
+      // Il corso dell'anno, sotto il nome, e il filtro per corso
+      course: { select: { id: true, name: true } },
     },
   },
   medicalCertificates: {
@@ -132,22 +153,45 @@ function toListRow(
   currentAcademicYear: ChecklistYear,
   overdue: Record<string, AthleteOverdue> = {},
 ) {
-  const { medicalCertificates, affiliations, enrollments, ...athlete } = record
+  const {
+    medicalCertificates,
+    affiliations,
+    enrollments,
+    parentRelations,
+    ...athlete
+  } = record
   const expiryDate = medicalCertificates[0]?.expiryDate ?? null
   const cardExpiry = affiliations[0]?.expiryDate ?? null
+
+  // I corsi dell'anno corrente: quello che va sotto il nome, e su cui filtra
+  // la select. Un'iscrizione ritirata resta qui: ha frequentato quel corso.
+  const currentCourses = currentAcademicYear
+    ? enrollments
+        .filter((e) => e.academicYearId === currentAcademicYear.id)
+        .map((e) => e.course)
+    : []
+
   return {
     ...athlete,
+    linkedParents: parentRelations.length,
     certificate: { expiryDate, status: classifyCert(expiryDate, today) },
     card: { expiryDate: cardExpiry, status: classifyCard(cardExpiry, today) },
-    // Quanto deve, in ritardo: sotto 768 è una delle due righe della card
+    // Quanto deve, in ritardo: la colonna Contributi e una delle due righe
+    // della card
     overdue: overdue[record.id] ?? NO_OVERDUE,
+    currentCourses,
+    // Chi paga, con la stessa regola della scheda allieva
+    payer: athleteListPayer(
+      { dateOfBirth: record.dateOfBirth, parentRelations },
+      today,
+    ),
     // Gli stessi passi che la scheda mostra in "Da completare"
     setupSteps: athleteSetupChecklist(
       {
         status: record.status,
         dateOfBirth: record.dateOfBirth,
         email: record.email,
-        linkedParents: record._count.parentRelations,
+        linkedParents: parentRelations.length,
         enrollments,
         certificates: medicalCertificates,
         cards: affiliations,
@@ -157,6 +201,28 @@ function toListRow(
   }
 }
 
+export type AthleteListRow = ReturnType<typeof toListRow>
+
+// ─────────────────────────────────────────────────────────────────────────
+// I filtri, applicati in memoria sulle stesse righe che l'elenco mostra.
+//
+// In memoria e non in SQL perché dipendono dalla minore età, dall'anno
+// accademico e dallo stato dei documenti: riscriverli in SQL vorrebbe dire
+// avere due definizioni dello stesso buco (ed è il motivo per cui prima il
+// riquadro in dashboard e l'elenco potevano dire numeri diversi). Sono
+// poche decine di allieve e la query è una sola.
+// ─────────────────────────────────────────────────────────────────────────
+function matchesFilter(row: AthleteListRow, filter: AthleteListFilter): boolean {
+  if (isStepFilter(filter)) {
+    return row.setupSteps.includes(ATHLETE_STEP_FILTERS[filter])
+  }
+  return row.overdue.count > 0
+}
+
+function matchesCourse(row: AthleteListRow, courseId: string): boolean {
+  return row.currentCourses.some((c) => c.id === courseId)
+}
+
 async function currentAcademicYearForChecklist(): Promise<ChecklistYear> {
   return prisma.academicYear.findFirst({
     where: { isCurrent: true },
@@ -164,13 +230,44 @@ async function currentAcademicYearForChecklist(): Promise<ChecklistYear> {
   })
 }
 
-export async function listAthletes(filters: ListFilters = {}) {
+export type AthleteListCounts = {
+  // Senza filtro: tutte le righe della popolazione scelta (attive o ritirate)
+  tutte: number
+  certificate: number
+  guardian: number
+  overdue: { count: number; amountCents: number }
+}
+
+export type AthleteListResult = {
+  items: AthleteListRow[]
+  totalCount: number
+  counts: AthleteListCounts
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// L'elenco allieve, in un numero fisso di query.
+//
+// Tre query e non una per riga: le allieve con i loro documenti, l'anno
+// accademico corrente e le rate in ritardo (una query sola, sommata in
+// memoria). Con 58 allieve o con 580 il numero di query non cambia.
+//
+// I conteggi dei chip si calcolano sulle **stesse righe** che l'elenco
+// mostrerebbe, con gli stessi predicati: il numero sul chip è per
+// costruzione le righe che apre, e senza filtro per corso coincide con i
+// riquadri della dashboard, che contano con le stesse funzioni
+// (athleteSetupChecklist, scadenzeWhere).
+// ─────────────────────────────────────────────────────────────────────────
+export async function listAthletes(
+  filters: ListFilters = {},
+): Promise<AthleteListResult> {
   await requireAdmin()
 
   const {
     search,
     sort = "name",
     filter,
+    courseId,
+    stato = "attive",
     limit = DEFAULT_LIMIT,
     offset = 0,
   } = filters
@@ -186,78 +283,68 @@ export async function listAthletes(filters: ListFilters = {}) {
           ],
         }
       : {}),
-    // Con un filtro attivo le ritirate restano fuori, come nella scheda: a
-    // chi ha smesso non si chiede di completare niente. Il resto del
-    // predicato NON si riscrive in SQL — lo decide athleteSetupChecklist in
-    // memoria, così elenco, scheda e dashboard usano la stessa regola. Sono
-    // poche decine di allieve.
-    ...(filter ? { status: { not: "WITHDRAWN" as const } } : {}),
+    // Attive e ritirate sono due elenchi diversi: "Attiva" su ogni riga non
+    // diceva niente, e chi ha smesso si guarda a parte
+    status:
+      stato === "ritirate" ? "WITHDRAWN" : { not: "WITHDRAWN" as const },
   }
 
-  const orderBy: Prisma.AthleteOrderByWithRelationInput[] = [
-    { lastName: "asc" },
-    { firstName: "asc" },
-  ]
+  const [athletes, currentAcademicYear, overdue] = await Promise.all([
+    prisma.athlete.findMany({
+      where,
+      include: athleteListInclude,
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    }),
+    currentAcademicYearForChecklist(),
+    overdueByAthlete(),
+  ])
 
-  const inMemory =
-    sort === "certificate" || sort === "card" || filter !== undefined
+  const all = athletes.map((athlete) =>
+    toListRow(athlete, today, currentAcademicYear, overdue),
+  )
 
-  if (inMemory) {
-    // Ordinamenti per certificato o tessera e filtri sui passi mancanti
-    // dipendono da relazioni, dalla minore età e dall'anno accademico: si
-    // lavora in memoria sull'elenco completo (poche decine di allieve) e poi
-    // si pagina. A parità di scadenza resta l'ordine per nome (sort stabile).
-    const [athletes, currentAcademicYear, overdue] = await Promise.all([
-      prisma.athlete.findMany({
-        where,
-        include: athleteListInclude,
-        orderBy,
+  // Il corso restringe tutto, chip compresi: i numeri dicono sempre quante
+  // righe aprirebbe quel chip con i filtri che sono attivi adesso
+  const inScope = courseId
+    ? all.filter((row) => matchesCourse(row, courseId))
+    : all
+
+  const counts: AthleteListCounts = {
+    tutte: inScope.length,
+    certificate: inScope.filter((row) =>
+      matchesFilter(row, "senza-certificato"),
+    ).length,
+    guardian: inScope.filter((row) => matchesFilter(row, GUARDIAN_GAP_FILTER))
+      .length,
+    overdue: inScope.reduce(
+      (acc, row) => ({
+        count: acc.count + (row.overdue.count > 0 ? 1 : 0),
+        amountCents: acc.amountCents + row.overdue.amountCents,
       }),
-      currentAcademicYearForChecklist(),
-      overdueByAthlete(),
-    ])
-    let rows = athletes.map((athlete) =>
-      toListRow(athlete, today, currentAcademicYear, overdue),
+      { count: 0, amountCents: 0 },
+    ),
+  }
+
+  const rows = filter
+    ? inScope.filter((row) => matchesFilter(row, filter))
+    : inScope
+
+  // A parità di chiave resta l'ordine per cognome: sort stabile
+  if (sort === "certificate") {
+    rows.sort((a, b) =>
+      compareByCertificateExpiry(a.certificate.expiryDate, b.certificate.expiryDate),
     )
-
-    if (filter) {
-      const step = ATHLETE_LIST_FILTERS[filter]
-      rows = rows.filter((row) => row.setupSteps.includes(step))
-    }
-
-    if (sort === "card" || sort === "certificate") {
-      rows.sort((a, b) =>
-        sort === "card"
-          ? compareByCardExpiry(a.card.expiryDate, b.card.expiryDate)
-          : compareByCertificateExpiry(
-              a.certificate.expiryDate,
-              b.certificate.expiryDate,
-            ),
-      )
-    }
-
-    return { items: rows.slice(offset, offset + limit), totalCount: rows.length }
+  } else if (sort === "card") {
+    rows.sort((a, b) => compareByCardExpiry(a.card.expiryDate, b.card.expiryDate))
+  } else if (sort === "overdue") {
+    // Prima chi deve di più: è l'ordine con cui si fanno le telefonate
+    rows.sort((a, b) => b.overdue.amountCents - a.overdue.amountCents)
   }
-
-  const [athletes, totalCount, currentAcademicYear, overdue] =
-    await Promise.all([
-      prisma.athlete.findMany({
-        where,
-        include: athleteListInclude,
-        orderBy,
-        take: limit,
-        skip: offset,
-      }),
-      prisma.athlete.count({ where }),
-      currentAcademicYearForChecklist(),
-      overdueByAthlete(),
-    ])
 
   return {
-    items: athletes.map((athlete) =>
-      toListRow(athlete, today, currentAcademicYear, overdue),
-    ),
-    totalCount,
+    items: rows.slice(offset, offset + limit),
+    totalCount: rows.length,
+    counts,
   }
 }
 
@@ -294,7 +381,12 @@ export async function countAthleteSteps(): Promise<AthleteStepCounts> {
     currentAcademicYearForChecklist(),
   ])
 
-  const counts: AthleteStepCounts = { guardian: 0, email: 0, course: 0 }
+  const counts: AthleteStepCounts = {
+    guardian: 0,
+    email: 0,
+    course: 0,
+    certificate: 0,
+  }
 
   for (const athlete of athletes) {
     const row = toListRow(athlete, today, currentAcademicYear)

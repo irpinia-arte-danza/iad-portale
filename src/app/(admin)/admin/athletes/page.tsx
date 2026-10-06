@@ -7,18 +7,23 @@ import {
 } from "../_components/list-pagination"
 import { ResourceContent } from "../_components/resource-content"
 import { ResourceHeader } from "../_components/resource-header"
+import { listCoursesForFilter } from "../scadenze/queries"
 
 import { GUARDIAN_GAP_FILTER } from "@/lib/athletes/guardian-gap"
-
 import {
-  countAthleteSteps,
-  listAthletes,
+  OVERDUE_FILTER,
+  athleteSortParam,
   parseAthleteListFilter,
+  parseAthleteListSort,
+  parseAthleteStatusFilter,
   type AthleteListFilter,
   type AthleteListSort,
-} from "./queries"
+  type AthleteStatusFilter,
+} from "@/lib/athletes/list-filters"
+
+import { listAthletes } from "./queries"
 import { AthleteCreateDialog } from "./_components/athlete-create-dialog"
-import { AthletesFilterChip } from "./_components/athletes-filter-chip"
+import { AthletesFilters } from "./_components/athletes-filters"
 import { AthletesSearch } from "./_components/athletes-search"
 import { AthletesTable } from "./_components/athletes-table"
 
@@ -42,14 +47,19 @@ const EMPTY_BY_FILTER: Record<
     title: "Nessuna maggiorenne senza email",
     hint: "Le allieve maggiorenni senza genitori collegati hanno tutte un'email.",
   },
+  "senza-certificato": {
+    title: "Nessuna allieva senza certificato valido",
+    hint: "Tutte hanno un certificato medico in corso di validità.",
+  },
+  [OVERDUE_FILTER]: {
+    title: "Nessun contributo in ritardo",
+    hint: "Tutte le rate scadute risultano incassate.",
+  },
 }
+
 // Una pagina contiene le iscritte di un anno (~64, obiettivo 100): oltre
 // scatta la paginazione, nessuna allieva resta nascosta.
 const PAGE_SIZE = 100
-// ?sort=certificato: prima chi non ha il certificato, poi per scadenza
-const CERTIFICATE_SORT_PARAM = "certificato"
-// ?sort=tessera: stessa regola per la tessera dell'ente
-const CARD_SORT_PARAM = "tessera"
 
 interface PageProps {
   searchParams: Promise<{
@@ -57,46 +67,52 @@ interface PageProps {
     page?: string
     sort?: string
     filtro?: string
+    corso?: string
+    stato?: string
   }>
 }
 
-function listParams(
-  search: string,
-  sort: AthleteListSort,
-  filter: AthleteListFilter | null,
-): Record<string, string> {
+// Tutti i filtri stanno nell'URL: la paginazione e i link se li portano
+// dietro, e l'indirizzo filtrato si può mandare a qualcuno
+function listParams(input: {
+  search: string
+  sort: AthleteListSort
+  filter: AthleteListFilter | null
+  courseId?: string
+  stato: AthleteStatusFilter
+}): Record<string, string> {
   const params: Record<string, string> = {}
-  if (search) params.search = search
-  if (sort === "certificate") params.sort = CERTIFICATE_SORT_PARAM
-  if (sort === "card") params.sort = CARD_SORT_PARAM
-  if (filter) params.filtro = filter
+  if (input.search) params.search = input.search
+  const sortParam = athleteSortParam(input.sort)
+  if (sortParam) params.sort = sortParam
+  if (input.filter) params.filtro = input.filter
+  if (input.courseId) params.corso = input.courseId
+  if (input.stato !== "attive") params.stato = input.stato
   return params
 }
 
 export default async function AthletesPage({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams
   const search = resolvedSearchParams.search ?? ""
-  const sort: AthleteListSort =
-    resolvedSearchParams.sort === CERTIFICATE_SORT_PARAM
-      ? "certificate"
-      : resolvedSearchParams.sort === CARD_SORT_PARAM
-        ? "card"
-        : "name"
-  const filter: AthleteListFilter | null = parseAthleteListFilter(
-    resolvedSearchParams.filtro,
-  )
+  const sort = parseAthleteListSort(resolvedSearchParams.sort)
+  const filter = parseAthleteListFilter(resolvedSearchParams.filtro)
+  const stato = parseAthleteStatusFilter(resolvedSearchParams.stato)
+  const courseId = resolvedSearchParams.corso?.trim() || undefined
   const page = parsePageParam(resolvedSearchParams.page)
-  const params = listParams(search, sort, filter)
+  const params = listParams({ search, sort, filter, courseId, stato })
 
-  const [{ items, totalCount }, stepCounts] = await Promise.all([
+  const [{ items, totalCount, counts }, courses] = await Promise.all([
     listAthletes({
       search,
       sort,
       filter: filter ?? undefined,
+      courseId,
+      stato,
       limit: PAGE_SIZE,
       offset: (page - 1) * PAGE_SIZE,
     }),
-    countAthleteSteps(),
+    // Gli stessi corsi della select di Scadenze: attivi e non cestinati
+    listCoursesForFilter(),
   ])
 
   // Pagina oltre la fine (link vecchio, allieve eliminate): all'ultima
@@ -115,44 +131,18 @@ export default async function AthletesPage({ searchParams }: PageProps) {
       />
       <ResourceContent>
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <AthletesSearch defaultValue={search} />
-            <AthletesFilterChip
-              activeFilter={filter}
-              withoutGuardianCount={stepCounts.guardian}
-              guardianHref={pageHref(
-                ATHLETES_PATH,
-                listParams(search, sort, GUARDIAN_GAP_FILTER),
-                1,
-              )}
-              offHref={pageHref(
-                ATHLETES_PATH,
-                listParams(search, sort, null),
-                1,
-              )}
-            />
-          </div>
+          <AthletesSearch defaultValue={search} />
+          <AthletesFilters
+            filter={filter}
+            stato={stato}
+            sort={sort}
+            courseId={courseId}
+            courses={courses}
+            counts={counts}
+          />
           <AthletesTable
             athletes={items}
             empty={filter ? EMPTY_BY_FILTER[filter] : undefined}
-            sort={sort}
-            sortHrefs={{
-              name: pageHref(
-                ATHLETES_PATH,
-                listParams(search, "name", filter),
-                1,
-              ),
-              certificate: pageHref(
-                ATHLETES_PATH,
-                listParams(search, "certificate", filter),
-                1,
-              ),
-              card: pageHref(
-                ATHLETES_PATH,
-                listParams(search, "card", filter),
-                1,
-              ),
-            }}
           />
           <ListPagination
             basePath={ATHLETES_PATH}

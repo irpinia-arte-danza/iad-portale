@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest"
 
 import {
-  ATHLETE_LIST_FILTERS,
+  ATHLETE_SORT_LABELS,
+  ATHLETE_STEP_FILTERS,
+  OVERDUE_FILTER,
+  athleteSortParam,
   athleteStepHref,
+  isStepFilter,
   parseAthleteListFilter,
-  type AthleteListFilter,
+  parseAthleteListSort,
+  parseAthleteStatusFilter,
   type AthleteListFilterStep,
+  type AthleteListSort,
+  type AthleteStepFilter,
 } from "./list-filters"
 import {
   athleteSetupChecklist,
@@ -69,6 +76,19 @@ const POPULATION: { name: string; athlete: ChecklistAthlete }[] = [
     athlete: athlete({ linkedParents: 0, email: "   " }),
   },
   {
+    // Il chip "Senza certificato": assente o scaduto, lo stesso predicato
+    // del passo della scheda e dei due riquadri in dashboard
+    name: "certificato scaduto",
+    athlete: athlete({
+      certificates: [
+        {
+          expiryDate: new Date("2026-09-01T00:00:00.000Z"),
+          createdAt: new Date("2025-09-01T00:00:00.000Z"),
+        },
+      ],
+    }),
+  },
+  {
     name: "iscritta solo l'anno scorso",
     athlete: athlete({
       enrollments: [
@@ -117,7 +137,7 @@ function steps(a: ChecklistAthlete): AthleteListFilterStep[] {
 }
 
 function countsByStep(): Record<AthleteListFilterStep, number> {
-  return { guardian: 0, email: 0, course: 0 }
+  return { guardian: 0, email: 0, course: 0, certificate: 0 }
 }
 
 describe("filtri dell'elenco allieve", () => {
@@ -133,7 +153,13 @@ describe("filtri dell'elenco allieve", () => {
       expect(rows.length, step).toBe(counts[step])
     }
 
-    expect(counts).toEqual({ guardian: 1, email: 2, course: 2 })
+    expect(counts).toEqual({
+      guardian: 1,
+      email: 2,
+      course: 2,
+      // Una sola senza certificato valido: quella a cui l'abbiamo togliuto
+      certificate: 1,
+    })
   })
 
   it("la ritirata non compare in nessun filtro", () => {
@@ -154,7 +180,8 @@ describe("filtri dell'elenco allieve", () => {
       const value = href.split("filtro=")[1]
       const parsed = parseAthleteListFilter(value)
       expect(parsed, href).not.toBeNull()
-      expect(ATHLETE_LIST_FILTERS[parsed as AthleteListFilter]).toBe(step)
+      expect(isStepFilter(parsed!)).toBe(true)
+      expect(ATHLETE_STEP_FILTERS[parsed as AthleteStepFilter]).toBe(step)
     }
   })
 
@@ -162,5 +189,55 @@ describe("filtri dell'elenco allieve", () => {
     expect(parseAthleteListFilter("senza-niente")).toBeNull()
     expect(parseAthleteListFilter(undefined)).toBeNull()
     expect(parseAthleteListFilter("")).toBeNull()
+  })
+
+  it("«in ritardo» è un filtro valido ma non è un passo della scheda", () => {
+    const parsed = parseAthleteListFilter(OVERDUE_FILTER)
+    expect(parsed).toBe(OVERDUE_FILTER)
+    expect(isStepFilter(parsed!)).toBe(false)
+  })
+
+  it("i filtri dei riquadri della dashboard restano validi", () => {
+    // #34: i riquadri linkano questi tre valori, e non devono smettere di
+    // funzionare perché l'elenco ne ha aggiunti altri
+    for (const value of ["senza-genitore", "senza-corso", "senza-email"]) {
+      expect(parseAthleteListFilter(value), value).toBe(value)
+    }
+  })
+})
+
+describe("attive e ritirate", () => {
+  it("il default è attive: chi ha smesso si guarda a parte", () => {
+    expect(parseAthleteStatusFilter(undefined)).toBe("attive")
+    expect(parseAthleteStatusFilter("")).toBe("attive")
+    expect(parseAthleteStatusFilter("qualsiasi")).toBe("attive")
+  })
+
+  it("le ritirate si chiedono per nome", () => {
+    expect(parseAthleteStatusFilter("ritirate")).toBe("ritirate")
+  })
+})
+
+describe("ordinamento", () => {
+  it("il cognome è il default e non finisce nell'URL", () => {
+    expect(parseAthleteListSort(undefined)).toBe("name")
+    expect(athleteSortParam("name")).toBeNull()
+  })
+
+  it("ogni ordinamento va e torna dall'URL", () => {
+    for (const sort of Object.keys(ATHLETE_SORT_LABELS) as AthleteListSort[]) {
+      const param = athleteSortParam(sort)
+      expect(parseAthleteListSort(param ?? undefined)).toBe(sort)
+    }
+  })
+
+  it("un ordinamento inventato ricade sul cognome", () => {
+    expect(parseAthleteListSort("per-altezza")).toBe("name")
+  })
+
+  it("le etichette sono corte: su iPad la select non va a capo", () => {
+    for (const label of Object.values(ATHLETE_SORT_LABELS)) {
+      expect(label.length, label).toBeLessThanOrEqual(22)
+    }
   })
 })
