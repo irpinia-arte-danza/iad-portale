@@ -1,172 +1,124 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  endOfMonth,
-  startOfMonth,
-  toDateInputValue,
-} from "@/lib/utils/format"
+  BILANCIO_PRESETS,
+  bilancioPresetRange,
+  matchBilancioPreset,
+  type BilancioPreset,
+} from "@/lib/bilancio/periods"
 
 interface BilancioFiltersProps {
-  defaultFrom: string
-  defaultTo: string
+  from: string
+  to: string
+  // Il giorno di Roma, dalla pagina: il chip acceso è lo stesso sul server e
+  // nel browser
+  todayIso: string
 }
 
-type Preset = "this-month" | "this-quarter" | "this-year" | "this-ay"
-
-function startOfAcademicYear(ref: Date = new Date()): Date {
-  const y =
-    ref.getMonth() >= 8 ? ref.getFullYear() : ref.getFullYear() - 1
-  return new Date(y, 8, 1)
-}
-
-function endOfAcademicYear(ref: Date = new Date()): Date {
-  const y =
-    ref.getMonth() >= 8 ? ref.getFullYear() + 1 : ref.getFullYear()
-  return new Date(y, 7, 31, 23, 59, 59, 999)
-}
-
-function computePreset(preset: Preset): { from: Date; to: Date } {
-  const now = new Date()
-  switch (preset) {
-    case "this-month":
-      return { from: startOfMonth(now), to: endOfMonth(now) }
-    case "this-quarter": {
-      const q = Math.floor(now.getMonth() / 3)
-      const from = new Date(now.getFullYear(), q * 3, 1)
-      const to = new Date(
-        now.getFullYear(),
-        q * 3 + 3,
-        0,
-        23,
-        59,
-        59,
-        999,
-      )
-      return { from, to }
-    }
-    case "this-year":
-      return {
-        from: new Date(now.getFullYear(), 0, 1),
-        to: new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999),
-      }
-    case "this-ay":
-      return { from: startOfAcademicYear(now), to: endOfAcademicYear(now) }
-  }
-}
-
-export function BilancioFilters({
-  defaultFrom,
-  defaultTo,
-}: BilancioFiltersProps) {
+// ─────────────────────────────────────────────────────────────────────────
+// Il periodo del Bilancio: quattro chip su una riga.
+//
+// Le due date libere stanno dietro "Altro periodo": prima erano sempre a
+// vista, sei controlli per una domanda che quasi sempre è "com'è andato
+// quest'anno".
+// ─────────────────────────────────────────────────────────────────────────
+export function BilancioFilters({ from, to, todayIso }: BilancioFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [, startTransition] = useTransition()
 
-  function pushWithParams(next: Record<string, string | null>) {
+  const activePreset = matchBilancioPreset({ from, to }, todayIso)
+  // "Altro periodo" è acceso quando l'intervallo non è uno dei tre, oppure
+  // quando lo si è appena scelto per cambiare le date
+  const [customOpen, setCustomOpen] = useState(false)
+  const showCustom = customOpen || activePreset === null
+
+  function push(next: { from: string; to: string }) {
     const params = new URLSearchParams(searchParams.toString())
-    for (const [key, value] of Object.entries(next)) {
-      if (value === null || value === "") {
-        params.delete(key)
-      } else {
-        params.set(key, value)
-      }
-    }
+    params.set("from", next.from)
+    params.set("to", next.to)
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)
     })
   }
 
-  function applyPreset(preset: Preset) {
-    const { from, to } = computePreset(preset)
-    pushWithParams({
-      from: toDateInputValue(from),
-      to: toDateInputValue(to),
-    })
-  }
-
-  function resetFilters() {
-    const { from, to } = computePreset("this-year")
-    pushWithParams({
-      from: toDateInputValue(from),
-      to: toDateInputValue(to),
-    })
+  function applyPreset(preset: BilancioPreset) {
+    setCustomOpen(false)
+    push(bilancioPresetRange(preset, todayIso))
   }
 
   function updateDate(key: "from" | "to", value: string) {
     if (!value) return
-    pushWithParams({ [key]: value })
+    push({ from, to, [key]: value })
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
-      <div className="flex flex-wrap gap-2">
+    <div className="flex flex-col gap-3">
+      <div
+        role="group"
+        aria-label="Periodo del bilancio"
+        className="flex flex-wrap gap-2"
+      >
+        {BILANCIO_PRESETS.map((preset) => {
+          const active = !showCustom && activePreset === preset.key
+          return (
+            <Button
+              key={preset.key}
+              type="button"
+              variant={active ? "default" : "outline"}
+              aria-pressed={active}
+              className="h-11 rounded-full px-4"
+              onClick={() => applyPreset(preset.key)}
+            >
+              {preset.label}
+            </Button>
+          )
+        })}
         <Button
           type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => applyPreset("this-month")}
+          variant={showCustom ? "default" : "outline"}
+          aria-pressed={showCustom}
+          aria-expanded={showCustom}
+          className="h-11 rounded-full px-4"
+          onClick={() => setCustomOpen(true)}
         >
-          Questo mese
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => applyPreset("this-quarter")}
-        >
-          Trimestre corrente
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => applyPreset("this-year")}
-        >
-          Anno fiscale
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => applyPreset("this-ay")}
-        >
-          Anno accademico
+          Altro periodo
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label htmlFor="from">Dal</Label>
-          <Input
-            id="from"
-            type="date"
-            value={defaultFrom}
-            onChange={(e) => updateDate("from", e.target.value)}
-          />
+      {showCustom ? (
+        <div className="grid gap-3 rounded-lg border bg-card p-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label htmlFor="bilancio-from">Dal</Label>
+            <Input
+              id="bilancio-from"
+              type="date"
+              className="h-11"
+              value={from}
+              max={to}
+              onChange={(e) => updateDate("from", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="bilancio-to">Al</Label>
+            <Input
+              id="bilancio-to"
+              type="date"
+              className="h-11"
+              value={to}
+              min={from}
+              onChange={(e) => updateDate("to", e.target.value)}
+            />
+          </div>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="to">Al</Label>
-          <Input
-            id="to"
-            type="date"
-            value={defaultTo}
-            onChange={(e) => updateDate("to", e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <Button type="button" variant="ghost" size="sm" onClick={resetFilters}>
-          Reset filtri
-        </Button>
-      </div>
+      ) : null}
     </div>
   )
 }

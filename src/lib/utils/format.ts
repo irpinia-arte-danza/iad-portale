@@ -71,6 +71,21 @@ export function formatEuro(cents: number): string {
   return CURRENCY_IT.format(cents / 100)
 }
 
+// Stesso formato, senza i centesimi: solo per le etichette degli assi dei
+// grafici, dove i valori sono tondi per costruzione e ",00" ripetuto su
+// ogni tacca è rumore. Un importo vero si scrive sempre con formatEuro.
+const CURRENCY_IT_WHOLE = new Intl.NumberFormat("it-IT", {
+  style: "currency",
+  currency: "EUR",
+  useGrouping: true,
+  maximumFractionDigits: 0,
+})
+
+/** Etichetta d'asse: importo in centesimi → "1.500 €" */
+export function formatEuroAxis(cents: number): string {
+  return CURRENCY_IT_WHOLE.format(cents / 100)
+}
+
 export function formatDateShort(date: Date): string {
   return DATE_SHORT_IT.format(date)
 }

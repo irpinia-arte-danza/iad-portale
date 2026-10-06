@@ -12,7 +12,8 @@ import {
 } from "recharts"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatEuro } from "@/lib/utils/format"
+import { niceAxisTicks } from "@/lib/bilancio/axis"
+import { formatEuro, formatEuroAxis } from "@/lib/utils/format"
 
 import type { BilancioMonthlyPoint } from "../queries"
 
@@ -23,12 +24,16 @@ interface BilancioTrendChartProps {
 const ENTRATE_COLOR = "hsl(142 76% 36%)"
 const USCITE_COLOR = "hsl(0 84% 60%)"
 
-function formatAxisEur(value: number): string {
-  if (value >= 1000_00) return `€${Math.round(value / 100 / 1000)}k`
-  return `€${Math.round(value / 100)}`
-}
-
 export function BilancioTrendChart({ data }: BilancioTrendChartProps) {
+  // Tacche tonde a passo costante (0 · 500 · 1.000 …) invece di quelle che
+  // il grafico ricavava dal massimo dei dati
+  const axis = niceAxisTicks(
+    data.reduce(
+      (max, point) => Math.max(max, point.entrateCents, point.usciteCents),
+      0,
+    ),
+  )
+
   return (
     <Card>
       <CardHeader>
@@ -65,8 +70,10 @@ export function BilancioTrendChart({ data }: BilancioTrendChartProps) {
                   fontSize={11}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={formatAxisEur}
-                  width={60}
+                  ticks={axis.ticks}
+                  domain={[0, axis.topCents]}
+                  tickFormatter={formatEuroAxis}
+                  width={72}
                 />
                 <Tooltip
                   formatter={(value) =>
