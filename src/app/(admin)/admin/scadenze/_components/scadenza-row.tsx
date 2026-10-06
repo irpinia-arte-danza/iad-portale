@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { associationFeeDescription } from "@/lib/fees/association-fee-label"
 import { dueLabel } from "@/lib/scadenze/due-label"
+import { TONE_BADGE } from "@/lib/status/tone"
 import { reminderSummaryLabel } from "@/lib/scadenze/reminder-trace"
 import { formatDateShort, formatEur } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
@@ -128,7 +129,8 @@ export function ScadenzaRow({
           </>
         ) : (
           <>
-            <p className="truncate text-sm text-amber-700 dark:text-amber-500">
+            {/* Rosso: senza genitore non si manda né ricevuta né sollecito */}
+            <p className="truncate text-sm text-status-block">
               Nessun genitore collegato
             </p>
             <Link
@@ -164,11 +166,7 @@ export function ScadenzaRow({
         </p>
         <Badge
           variant="outline"
-          className={cn(
-            "mt-0.5 font-normal",
-            due.tone === "amber" &&
-              "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-          )}
+          className={cn("mt-0.5 font-normal", TONE_BADGE[due.tone])}
         >
           {due.text}
         </Badge>

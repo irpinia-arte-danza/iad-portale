@@ -62,7 +62,7 @@ export function AccessStatusCard({ kind, profileId, status }: Props) {
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">{describe(kind, status)}</p>
           {status.kind === "INVITED" && status.deliveryProblem ? (
-            <p className="flex items-start gap-2 text-sm text-red-700 dark:text-red-400">
+            <p className="flex items-start gap-2 text-sm text-status-block">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               L&apos;ultima email risulta non consegnata: controlla che
               l&apos;indirizzo sia corretto prima di reinviare.

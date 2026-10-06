@@ -31,9 +31,9 @@ export function AthletePayerRow({ athleteId, payer }: AthletePayerRowProps) {
   if (!payer) {
     return (
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-dashed p-3 text-sm">
-        <span className="text-amber-700 dark:text-amber-500">
-          Nessun genitore collegato
-        </span>
+        {/* Rosso: non si emettono ricevute né solleciti, la famiglia è
+            irraggiungibile */}
+        <span className="text-status-block">Nessun genitore collegato</span>
         <Button asChild variant="outline" size="sm">
           <Link href={`/admin/athletes/${athleteId}?tab=anagrafica`}>
             <UserPlus className="h-4 w-4" />

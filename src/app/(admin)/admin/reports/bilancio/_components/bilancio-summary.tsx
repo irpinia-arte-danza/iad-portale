@@ -33,11 +33,13 @@ export function BilancioSummary({ totals }: BilancioSummaryProps) {
       <Card>
         <CardContent className="flex flex-col gap-1 px-4">
           <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
-            <TrendingDown className="h-4 w-4 text-rose-600 dark:text-rose-500" />
+            {/* Un'uscita non è un problema, è il mestiere: niente rosso,
+                il segno meno dice già che esce */}
+            <TrendingDown className="h-4 w-4 text-muted-foreground" />
             Uscite
           </div>
           <p className="font-mono text-2xl font-semibold">
-            {formatEur(totals.usciteCents)}
+            −{formatEur(totals.usciteCents)}
           </p>
           <p className="text-xs text-muted-foreground">
             {totals.countUscite}{" "}

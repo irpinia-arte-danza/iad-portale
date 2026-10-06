@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { listNeverInvitedIds } from "@/lib/auth/access-status"
 
 type ListFilters = {
   search?: string
@@ -12,6 +13,15 @@ type ListFilters = {
 // ~40 famiglie con entrambi i genitori superano 50 righe: la lista deve
 // mostrarli tutti per selezionarli nell'invio multiplo degli accessi.
 const DEFAULT_LIMIT = 200
+
+// Filtro dell'elenco, condiviso con il riquadro della dashboard
+export const PARENTS_WITHOUT_ACCESS_FILTER = "senza-accesso"
+
+export function parseParentsFilter(
+  value: string | undefined,
+): typeof PARENTS_WITHOUT_ACCESS_FILTER | null {
+  return value === PARENTS_WITHOUT_ACCESS_FILTER ? value : null
+}
 
 export async function listParents(filters: ListFilters = {}) {
   await requireAdmin()
@@ -65,4 +75,24 @@ export async function getParentById(id: string) {
       },
     },
   })
+}
+
+/**
+ * Quanti genitori non hanno mai ricevuto l'accesso.
+ *
+ * Conta sulla stessa base dell'elenco (genitori non nel Cestino) e con la
+ * stessa funzione che disegna la colonna "Accesso", così il numero del
+ * riquadro in dashboard è il numero di righe che si vedono aprendo
+ * `/admin/parents?filtro=senza-accesso`.
+ */
+export async function countParentsWithoutAccess(): Promise<number> {
+  await requireAdmin()
+
+  const parents = await prisma.parent.findMany({
+    where: { deletedAt: null },
+    select: { id: true, email: true, userId: true },
+  })
+
+  const neverInvited = await listNeverInvitedIds("PARENT", parents)
+  return neverInvited.length
 }

@@ -29,6 +29,7 @@ import {
   MIN_SEARCH_LENGTH,
   type PersonHit,
 } from "@/lib/search/person-search"
+import { statusTone, TONE_BADGE } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 
 import { searchPeople } from "./search-actions"
@@ -259,7 +260,10 @@ function AthleteRow({
         {meta.length > 0 ? <span className="truncate">{meta.join(" · ")}</span> : null}
         {hit.certificateMissing ? (
           <span
-            className={cn(BADGE, "bg-red-500/15 text-red-700 dark:text-red-300")}
+            className={cn(
+              BADGE,
+              TONE_BADGE[statusTone({ kind: "certificate", status: "missing" })],
+            )}
           >
             Certificato
           </span>
@@ -268,7 +272,7 @@ function AthleteRow({
           <span
             className={cn(
               BADGE,
-              "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+              TONE_BADGE[statusTone({ kind: "contributions", overdue: true })],
             )}
           >
             In ritardo

@@ -30,12 +30,17 @@ interface PaymentCreateDialogProps {
     athleteId: string
     method: PaymentMethod | null
   } | null
+  // In dashboard il tasto sta accanto a "Aggiungi allieva" e dice cosa si
+  // sta facendo lì: incassare. Nell'elenco Pagamenti resta "Registra
+  // pagamento", che è il nome dell'elenco.
+  triggerLabel?: string
 }
 
 export function PaymentCreateDialog({
   athletes,
   openSchedulesByAthlete,
   preselect,
+  triggerLabel = "Registra pagamento",
 }: PaymentCreateDialogProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -62,7 +67,7 @@ export function PaymentCreateDialog({
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4" />
-          Registra pagamento
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">

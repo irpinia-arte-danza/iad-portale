@@ -24,6 +24,7 @@ import {
   CARD_STATUS_LABELS,
   type CardStatus,
 } from "@/lib/affiliations/card-status"
+import { statusTone } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 import { formatDateShort } from "@/lib/utils/format"
 
@@ -112,8 +113,9 @@ export function CardsOverview({
                     key={row.athleteId}
                     className={cn(
                       "hover:bg-muted/50",
-                      row.status === "expired" &&
-                        "bg-red-50 hover:bg-red-100/70 dark:bg-red-950/30 dark:hover:bg-red-950/50",
+                      // Scaduta: senza assicurazione non si fa lezione
+                      statusTone({ kind: "card", status: row.status }) ===
+                        "block" && "bg-status-block-bg",
                     )}
                   >
                     <TableCell>

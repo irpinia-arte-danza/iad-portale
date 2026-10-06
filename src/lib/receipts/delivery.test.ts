@@ -23,7 +23,7 @@ describe("quando una ricevuta è consegnata", () => {
     expect(isToDeliver(state)).toBe(true)
     expect(deliveryLabel(state)).toEqual({
       text: "Da consegnare",
-      tone: "amber",
+      tone: "fix",
     })
   })
 
@@ -48,7 +48,7 @@ describe("quando una ricevuta è consegnata", () => {
   it("annullata: non è da consegnare, e si vede che è annullata", () => {
     const state = deliveryState({ ...NONE, status: "CANCELLED" })
     expect(isToDeliver(state)).toBe(false)
-    expect(deliveryLabel(state)).toEqual({ text: "Annullata", tone: "muted" })
+    expect(deliveryLabel(state)).toEqual({ text: "Annullata", tone: "neutral" })
   })
 
   it("annullata dopo essere stata inviata: resta annullata", () => {

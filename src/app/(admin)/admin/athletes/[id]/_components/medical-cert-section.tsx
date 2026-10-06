@@ -2,8 +2,6 @@
 
 import * as React from "react"
 import {
-  AlertTriangle,
-  CheckCircle2,
   Download,
   Loader2,
   Pencil,
@@ -26,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { CertStatusBadge } from "@/components/medical-certificates/cert-status-badge"
 import {
   Card,
   CardContent,
@@ -281,7 +280,11 @@ function CertCard({
                 Sostituito
               </Badge>
             ) : null}
-            {isLatest ? <StatusBadge status={status} /> : null}
+            {/* Lo stesso badge dell'elenco Certificati e della lista
+                allieve: niente colore deciso qui */}
+            {isLatest && status !== "missing" ? (
+              <CertStatusBadge status={status} />
+            ) : null}
           </div>
           <p className="text-xs text-muted-foreground">
             Emesso {formatDateShort(new Date(cert.issueDate))} · Scade{" "}
@@ -356,32 +359,3 @@ function CertCard({
   )
 }
 
-function StatusBadge({
-  status,
-}: {
-  status: ReturnType<typeof classifyCert>
-}) {
-  if (status === "missing") return null
-  if (status === "expired") {
-    return (
-      <Badge variant="destructive" className="gap-1">
-        <ShieldAlert className="h-3 w-3" />
-        Scaduto
-      </Badge>
-    )
-  }
-  if (status === "expiring") {
-    return (
-      <Badge className="gap-1 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-        <AlertTriangle className="h-3 w-3" />
-        In scadenza
-      </Badge>
-    )
-  }
-  return (
-    <Badge className="gap-1 bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100">
-      <CheckCircle2 className="h-3 w-3" />
-      Valido
-    </Badge>
-  )
-}

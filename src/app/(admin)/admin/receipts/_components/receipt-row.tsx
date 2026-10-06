@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { receiptPdfHref } from "@/lib/receipts/types"
+import { TONE_BADGE } from "@/lib/status/tone"
 import { formatDateShort, formatEur } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
@@ -44,12 +45,6 @@ const GRID = cn(
   "lg:grid-cols-[auto_minmax(0,10rem)_minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto]",
   "lg:[grid-template-areas:'sel_numero_allieva_pagante_importo_stato_azioni']",
 )
-
-const TONE: Record<string, string> = {
-  amber: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  neutral: "",
-  muted: "text-muted-foreground",
-}
 
 interface ReceiptRowProps {
   receipt: ReceiptListRow
@@ -142,7 +137,12 @@ export function ReceiptRow({
       <div className="[grid-area:stato] md:text-right">
         <Badge
           variant="outline"
-          className={cn("font-normal", TONE[r.deliveryLabel.tone])}
+          className={cn(
+            "font-normal",
+            TONE_BADGE[r.deliveryLabel.tone],
+            // Annullata: resta grigia, non è uno stato da sistemare
+            cancelled && "text-muted-foreground",
+          )}
         >
           {r.deliveryLabel.text}
         </Badge>

@@ -23,6 +23,7 @@ import {
 import { LogoutButton } from "@/components/auth/logout-button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import type { NavCounters } from "@/lib/dashboard/todo-tiles"
+import type { StatusTone } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 
 import { ADMIN_NAV, isNavItemActive } from "./admin-nav"
@@ -41,10 +42,13 @@ type AdminSidebarProps = {
   counters: NavCounters
 }
 
-const COUNTER_TONE = {
-  red: "bg-red-500/15 text-red-700 dark:text-red-300",
-  amber: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-} as const
+// Il tono arriva da statusTone come per i riquadri e i badge: qui si
+// traduce solo in classi
+const COUNTER_TONE: Record<StatusTone, string> = {
+  block: "bg-status-block-bg text-status-block",
+  fix: "bg-status-fix-bg text-status-fix",
+  neutral: "",
+}
 
 
 export function AdminSidebar({

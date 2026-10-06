@@ -2,26 +2,14 @@ import Link from "next/link"
 import { CreditCard, Stethoscope, Wallet } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import type { AthleteStatusItem, StatusTone } from "@/lib/athletes/athlete-status"
+import type { AthleteStatusItem } from "@/lib/athletes/athlete-status"
+import { TONE_SURFACE, TONE_TEXT } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 
 import { MedicalCertUploadButton } from "./medical-cert-upload-button"
 
 // Tre riquadri in testa alla scheda: si può fare lezione? si è in pari con i
 // contributi? si è tesserate? Su telefono uno sotto l'altro.
-
-const TONE: Record<StatusTone, string> = {
-  red: "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40",
-  amber:
-    "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40",
-  neutral: "border-border bg-muted/30",
-}
-
-const TONE_TEXT: Record<StatusTone, string> = {
-  red: "text-red-900 dark:text-red-200",
-  amber: "text-amber-900 dark:text-amber-200",
-  neutral: "text-foreground",
-}
 
 function StatusCard({
   item,
@@ -38,7 +26,7 @@ function StatusCard({
     <div
       className={cn(
         "flex items-start justify-between gap-3 rounded-lg border p-3",
-        TONE[item.tone],
+        TONE_SURFACE[item.tone],
       )}
     >
       <div className="flex min-w-0 items-start gap-2">

@@ -1,3 +1,4 @@
+import { statusTone, type StatusTone } from "@/lib/status/tone"
 import { toDateOnly } from "@/lib/utils/date-only"
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -9,12 +10,13 @@ import { toDateOnly } from "@/lib/utils/date-only"
 // sottrazione — altrimenti fra mezzanotte e le 2 il risultato cambia di un
 // giorno (vedi §17.40).
 //
-// Il rosso in questa pagina non si usa: un elenco di contributi in ritardo
-// sarebbe tutto rosso, e il rosso ovunque non dice più niente. L'ambra
-// segnala il ritardo, il neutro quello che deve ancora arrivare.
+// Il colore non si sceglie qui: un contributo in ritardo è "da sistemare"
+// (ambra) e lo dice statusTone, lo stesso che colora i riquadri e i badge.
+// Rosso mai: un elenco di contributi in ritardo sarebbe tutto rosso, e il
+// rosso ovunque non dice più niente.
 // ─────────────────────────────────────────────────────────────────────────
 
-export type DueTone = "amber" | "neutral"
+export type DueTone = StatusTone
 
 export type DueLabel = {
   text: string
@@ -38,11 +40,13 @@ function giorni(n: number): string {
 export function dueLabel(dueDate: Date, at: Date): DueLabel {
   const days = daysOverdue(dueDate, at)
 
+  const tone = statusTone({ kind: "contributions", overdue: days > 0 })
+
   if (days > 0) {
-    return { text: `in ritardo da ${giorni(days)}`, tone: "amber", days }
+    return { text: `in ritardo da ${giorni(days)}`, tone, days }
   }
   if (days === 0) {
-    return { text: "scade oggi", tone: "neutral", days }
+    return { text: "scade oggi", tone, days }
   }
-  return { text: `tra ${giorni(-days)}`, tone: "neutral", days }
+  return { text: `tra ${giorni(-days)}`, tone, days }
 }

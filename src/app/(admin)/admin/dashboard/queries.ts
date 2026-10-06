@@ -15,6 +15,7 @@ import { countReceiptsToDeliver } from "@/lib/receipts/delivery-status"
 import { todayInRome } from "@/lib/receipts/numbering"
 
 import { countPaymentsMissingReceipt } from "../payments/queries"
+import { countParentsWithoutAccess } from "../parents/queries"
 import { scadenzeWhere } from "../scadenze/queries"
 import {
   countTesseramentoQueue,
@@ -258,6 +259,7 @@ export async function getTodoCounters(): Promise<TodoCounters> {
     steps,
     certificati,
     daTesserare,
+    genitoriSenzaAccesso,
   ] = await Promise.all([
     getScadenzeKPI(),
     countPaymentsMissingReceipt(),
@@ -267,6 +269,7 @@ export async function getTodoCounters(): Promise<TodoCounters> {
     countAthleteSteps(),
     getCertificateStatusCounts(),
     countTesseramentoQueue(AffiliationEntity.ENDAS, seasonYear),
+    countParentsWithoutAccess(),
   ])
 
   return {
@@ -281,6 +284,7 @@ export async function getTodoCounters(): Promise<TodoCounters> {
     certificatiInScadenza: certificati.expiring,
     certificatiAssenti: certificati.missing,
     tessereDaFare: { count: daTesserare, seasonYear },
+    genitoriSenzaAccesso,
   }
 }
 

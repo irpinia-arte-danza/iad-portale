@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import type { AccessStatus } from "@/lib/auth/access-status-types"
+import { statusTone, TONE_BADGE } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 
 // Timezone esplicita: il badge è renderizzato sia sul server (UTC) sia nel
@@ -22,11 +23,13 @@ const LABELS: Record<AccessStatus["kind"], string> = {
   ACTIVE: "Attivo",
 }
 
+// Ambra solo su "mai invitato", ed è il token condiviso: è l'unico stato da
+// sistemare. Blu e verde dicono "informazione" e "a posto", non sono stati
+// di allerta.
 const CLASSES: Record<AccessStatus["kind"], string> = {
   NO_EMAIL:
     "border-gray-400/40 bg-gray-500/10 text-gray-700 dark:text-gray-300",
-  NEVER_INVITED:
-    "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300",
+  NEVER_INVITED: TONE_BADGE[statusTone({ kind: "access", invited: false })],
   INVITED:
     "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
   ACTIVE:
@@ -64,9 +67,8 @@ export function AccessStatusBadge({ status, showDetail = true, className }: Prop
         <span className="text-xs text-muted-foreground">{detail}</span>
       ) : null}
       {status.kind === "INVITED" && status.deliveryProblem ? (
-        <span className="text-xs text-red-600 dark:text-red-400">
-          email non consegnata
-        </span>
+        // Rosso: l'email è tornata indietro, la famiglia non è raggiungibile
+        <span className="text-xs text-status-block">email non consegnata</span>
       ) : null}
     </div>
   )

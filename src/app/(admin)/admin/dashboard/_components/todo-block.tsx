@@ -4,51 +4,45 @@ import { ArrowRight, Check } from "lucide-react"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { todoGroups, type TodoTile } from "@/lib/dashboard/todo-tiles"
+import { todoSections, type TodoTile } from "@/lib/dashboard/todo-tiles"
+import { TONE_SURFACE, TONE_TEXT } from "@/lib/status/tone"
 import { formatEur } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
 // ─────────────────────────────────────────────────────────────────────────
-// Il primo blocco della dashboard: cosa c'è da fare oggi, non com'è andato
-// l'anno. Ogni riquadro è un numero e un posto dove andare — cliccandolo si
-// apre l'elenco di quelle righe, già filtrato.
+// Il primo blocco della dashboard: cosa c'è da fare oggi.
+//
+// Due sezioni e non tre gruppi per argomento: "Blocca qualcosa" è quello che
+// impedisce di fare lezione o di emettere un documento, "Da sistemare" il
+// resto. Il colore non si decide qui: arriva dal tono del riquadro, che
+// arriva da statusTone.
 // ─────────────────────────────────────────────────────────────────────────
 
-const TONE = {
-  red: {
-    tile: "border-red-300 bg-red-50 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/40 dark:hover:bg-red-950/60",
-    count: "text-red-700 dark:text-red-300",
-    label: "text-red-900 dark:text-red-100",
-  },
-  amber: {
-    tile: "border-amber-300 bg-amber-50 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/40 dark:hover:bg-amber-950/60",
-    count: "text-amber-700 dark:text-amber-300",
-    label: "text-amber-900 dark:text-amber-100",
-  },
-} as const
-
 function TodoTileLink({ tile }: { tile: TodoTile }) {
-  const tone = TONE[tile.tone]
   return (
     <Link
       href={tile.href}
       className={cn(
-        "group flex min-h-[88px] flex-col justify-between gap-1 rounded-lg border p-3 transition-colors",
-        tone.tile,
+        "group flex min-h-[88px] flex-col justify-between gap-1 rounded-lg border p-3 transition-colors hover:brightness-[0.97] dark:hover:brightness-110",
+        TONE_SURFACE[tile.tone],
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className={cn("font-mono text-3xl leading-none font-bold", tone.count)}>
+        <span
+          className={cn(
+            "font-mono text-3xl leading-none font-bold",
+            TONE_TEXT[tile.tone],
+          )}
+        >
           {tile.count}
         </span>
         <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </div>
       <div className="space-y-0.5">
-        <p className={cn("text-sm leading-tight font-medium", tone.label)}>
+        <p className={cn("text-sm leading-tight font-medium", TONE_TEXT[tile.tone])}>
           {tile.label}
         </p>
         {tile.amountCents !== undefined ? (
@@ -65,47 +59,43 @@ function TodoTileLink({ tile }: { tile: TodoTile }) {
 }
 
 export function TodoBlock({ tiles }: { tiles: TodoTile[] }) {
-  const groups = todoGroups(tiles)
+  const sections = todoSections(tiles)
+
+  if (sections.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-3 py-6">
+          <Check className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div>
+            <p className="text-sm font-medium">Tutto in ordine</p>
+            <p className="text-sm text-muted-foreground">
+              Nessun contributo in ritardo, nessuna ricevuta da consegnare,
+              nessun documento scaduto.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Da fare</CardTitle>
-        <CardDescription>
-          {groups.length === 0
-            ? "Niente in sospeso."
-            : "Clicca un riquadro per aprire l'elenco di quelle righe."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {groups.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-lg border border-dashed p-6">
-            <Check className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-            <div>
-              <p className="text-sm font-medium">Tutto in ordine</p>
-              <p className="text-sm text-muted-foreground">
-                Nessun contributo in ritardo, nessuna ricevuta da emettere,
-                nessun documento scaduto.
-              </p>
+    <div className="flex flex-col gap-4">
+      {sections.map((section) => (
+        <Card key={section.id}>
+          <CardHeader>
+            <CardTitle className="text-base">{section.title}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* auto-fill: a 1440 i riquadri riempiono la riga, su iPad
+                verticale vanno a capo da soli */}
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3">
+              {section.tiles.map((tile) => (
+                <TodoTileLink key={tile.id} tile={tile} />
+              ))}
             </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-5">
-            {groups.map(({ group, tiles: groupTiles }) => (
-              <div key={group} className="space-y-2">
-                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                  {group}
-                </p>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                  {groupTiles.map((tile) => (
-                    <TodoTileLink key={tile.id} tile={tile} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   )
 }

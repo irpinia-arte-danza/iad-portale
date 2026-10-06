@@ -2,39 +2,36 @@ import { AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import type { CardStatus } from "@/lib/affiliations/card-status"
+import { statusTone, TONE_BADGE } from "@/lib/status/tone"
+import { cn } from "@/lib/utils"
 
-// Badge stato tessera dell'ente. Gemello di CertStatusBadge, con le parole al
-// femminile ("Valida") e senza rosso sull'assenza: una tessera che manca è un
-// tesseramento da fare, non un blocco all'accesso in sala come il certificato.
+// Gemello di CertStatusBadge, con le parole al femminile. La tessera assente
+// o scaduta è rossa quanto il certificato: senza tessera non c'è copertura
+// assicurativa, e senza copertura l'allieva non entra in sala.
 export function CardStatusBadge({ status }: { status: CardStatus }) {
+  const tone = statusTone({ kind: "card", status })
+
   if (status === "valid") {
     return (
-      <Badge className="gap-1 bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100">
+      <Badge variant="outline" className="gap-1">
         <CheckCircle2 className="h-3 w-3" />
         Valida
       </Badge>
     )
   }
-  if (status === "expiring") {
-    return (
-      <Badge className="gap-1 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-        <AlertTriangle className="h-3 w-3" />
-        In scadenza
-      </Badge>
-    )
-  }
-  if (status === "expired") {
-    return (
-      <Badge variant="destructive" className="gap-1">
-        <ShieldAlert className="h-3 w-3" />
-        Scaduta
-      </Badge>
-    )
-  }
+
   return (
-    <Badge variant="outline" className="gap-1">
-      <ShieldAlert className="h-3 w-3" />
-      Assente
+    <Badge variant="outline" className={cn("gap-1", TONE_BADGE[tone])}>
+      {status === "expiring" ? (
+        <AlertTriangle className="h-3 w-3" />
+      ) : (
+        <ShieldAlert className="h-3 w-3" />
+      )}
+      {status === "expiring"
+        ? "In scadenza"
+        : status === "expired"
+          ? "Scaduta"
+          : "Assente"}
     </Badge>
   )
 }

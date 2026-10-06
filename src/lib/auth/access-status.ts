@@ -119,3 +119,21 @@ export async function getAccessStatus(
   const statuses = await getAccessStatuses(kind, [profile])
   return statuses[profile.id] ?? { kind: "NO_EMAIL" }
 }
+
+/**
+ * Chi non ha mai ricevuto l'accesso.
+ *
+ * Stessa funzione che disegna la colonna "Accesso" dell'elenco genitori, così
+ * il riquadro della dashboard e l'elenco filtrato contano le stesse righe.
+ * Senza email non è "mai invitato": è un'anagrafica da completare, e vive nel
+ * suo passo.
+ */
+export async function listNeverInvitedIds(
+  kind: AccessProfileKind,
+  profiles: ProfileRef[],
+): Promise<string[]> {
+  const statuses = await getAccessStatuses(kind, profiles)
+  return profiles
+    .filter((p) => statuses[p.id]?.kind === "NEVER_INVITED")
+    .map((p) => p.id)
+}

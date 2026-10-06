@@ -10,7 +10,7 @@ describe("etichetta della scadenza", () => {
   it("ieri: in ritardo da 1 giorno, in ambra", () => {
     expect(dueLabel(giorno("2026-10-05"), OGGI)).toEqual({
       text: "in ritardo da 1 giorno",
-      tone: "amber",
+      tone: "fix",
       days: 1,
     })
   })

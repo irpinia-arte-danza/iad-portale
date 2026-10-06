@@ -39,6 +39,15 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* Stato: due soli colori con un significato, deciso con Giuseppina.
+     block = blocca la lezione o un documento. fix = da sistemare, ma la
+     lezione si fa lo stesso. Tutto il resto è neutro. */
+  --color-status-block: var(--status-block);
+  --color-status-block-bg: var(--status-block-bg);
+  --color-status-block-border: var(--status-block-border);
+  --color-status-fix: var(--status-fix);
+  --color-status-fix-bg: var(--status-fix-bg);
+  --color-status-fix-border: var(--status-fix-border);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -81,6 +90,15 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Tema chiaro: testo scuro su fondo tenue, come red-700/amber-700 su
+     red-50/amber-50 */
+  --status-block: oklch(0.505 0.213 27.518);
+  --status-block-bg: oklch(0.971 0.013 17.38);
+  --status-block-border: oklch(0.885 0.062 18.334);
+  --status-fix: oklch(0.555 0.163 48.998);
+  --status-fix-bg: oklch(0.987 0.022 95.277);
+  --status-fix-border: oklch(0.879 0.169 91.605);
 }
 
 .dark {
@@ -115,6 +133,15 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Tema scuro: testo chiaro su fondo appena tinto. Il fondo resta scuro
+     perché in sala di ballo si lavora con le luci basse. */
+  --status-block: oklch(0.808 0.114 19.571);
+  --status-block-bg: oklch(0.258 0.092 26.042 / 45%);
+  --status-block-border: oklch(0.396 0.133 25.723);
+  --status-fix: oklch(0.879 0.169 91.605);
+  --status-fix-bg: oklch(0.279 0.077 45.635 / 45%);
+  --status-fix-border: oklch(0.473 0.137 46.201);
 }
 
 @layer base {
