@@ -17,6 +17,7 @@ import {
   describeScheduleAdmin,
   paymentFeeTypeLabel,
 } from "@/lib/payments/schedule-lines"
+import { receiptPdfHref } from "@/lib/receipts/types"
 import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
 
 import type { PaymentListItem } from "../queries"
@@ -155,15 +156,22 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
                 <TableCell className="hidden md:table-cell">
                   {p.receipt ? (
                     <span className="flex flex-col">
-                      <span
+                      {/* Il numero apre la ricevuta: è il documento che la
+                          famiglia ha in mano, e da qui si controlla in un
+                          clic invece di cercarlo in Ricevute */}
+                      <a
+                        href={receiptPdfHref(p.receipt.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className={
                           receiptCancelled
-                            ? "font-mono text-xs text-muted-foreground line-through"
-                            : "font-mono text-xs"
+                            ? "font-mono text-xs text-muted-foreground line-through hover:underline"
+                            : "font-mono text-xs hover:underline"
                         }
                       >
                         {p.receipt.receiptNumber}
-                      </span>
+                      </a>
                       {receiptCancelled ? (
                         <span className="text-xs text-destructive">annullata</span>
                       ) : null}

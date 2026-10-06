@@ -38,6 +38,9 @@ export type TodoCounters = {
   // tutte in scadenza
   inScadenza7gg: number
   pagamentiSenzaRicevuta: number
+  // Ricevute emesse che non sono ancora arrivate alla famiglia: né email, né
+  // condivise, né consegnate a mano
+  ricevuteDaConsegnare: number
   allieveSenzaGenitore: number
   allieveSenzaCorso: number
   allieveSenzaEmail: number
@@ -57,6 +60,7 @@ export const CERT_STATUS_HREF = {
 
 export const SCADENZE_IN_RITARDO_HREF = "/admin/scadenze?stato=IN_RITARDO"
 export const PAGAMENTI_SENZA_RICEVUTA_HREF = "/admin/payments?ricevuta=mancante"
+export const RICEVUTE_DA_CONSEGNARE_HREF = "/admin/receipts?stato=da-consegnare"
 // La pagina Tessere apre già con l'elenco da mandare al referente: l'ancora
 // ci porta sopra senza inventare un filtro che non esiste
 export const TESSERE_DA_FARE_HREF = "/admin/tessere#da-tesserare"
@@ -99,6 +103,21 @@ export function todoTiles(counters: TodoCounters): TodoTile[] {
       ),
       count: counters.pagamentiSenzaRicevuta,
       href: PAGAMENTI_SENZA_RICEVUTA_HREF,
+      tone: "amber",
+    })
+  }
+
+  if (counters.ricevuteDaConsegnare > 0) {
+    tiles.push({
+      id: "ricevute-da-consegnare",
+      group: "Incassi",
+      label: plural(
+        counters.ricevuteDaConsegnare,
+        "Ricevuta da consegnare",
+        "Ricevute da consegnare",
+      ),
+      count: counters.ricevuteDaConsegnare,
+      href: RICEVUTE_DA_CONSEGNARE_HREF,
       tone: "amber",
     })
   }

@@ -1443,6 +1443,8 @@ enum AuditAction {
   // Condivisione del PDF dal foglio di iOS: si sa che è uscita dal
   // gestionale, non a chi è andata (il contatto si sceglie fuori dalla pagina)
   RECEIPT_SHARED
+  // Stampata e consegnata allo sportello: lo segna Giuseppina
+  RECEIPT_DELIVERED_BY_HAND
   // Sollecito aperto su WhatsApp: stessa regola, si sa che la chat è stata
   // aperta col messaggio già scritto, non che sia partito
   REMINDER_WHATSAPP_OPENED

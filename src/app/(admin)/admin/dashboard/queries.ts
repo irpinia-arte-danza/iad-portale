@@ -11,6 +11,9 @@ import { todayDateOnly } from "@/lib/utils/date-only"
 
 import { countAthleteSteps } from "../athletes/queries"
 import { getCertificateStatusCounts } from "../medical-certificates/queries"
+import { countReceiptsToDeliver } from "@/lib/receipts/delivery-status"
+import { todayInRome } from "@/lib/receipts/numbering"
+
 import { countPaymentsMissingReceipt } from "../payments/queries"
 import { scadenzeWhere } from "../scadenze/queries"
 import {
@@ -248,19 +251,29 @@ export async function getTodoCounters(): Promise<TodoCounters> {
 
   const seasonYear = await getCurrentSeasonYear()
 
-  const [scadenze, senzaRicevuta, steps, certificati, daTesserare] =
-    await Promise.all([
-      getScadenzeKPI(),
-      countPaymentsMissingReceipt(),
-      countAthleteSteps(),
-      getCertificateStatusCounts(),
-      countTesseramentoQueue(AffiliationEntity.ENDAS, seasonYear),
-    ])
+  const [
+    scadenze,
+    senzaRicevuta,
+    daConsegnare,
+    steps,
+    certificati,
+    daTesserare,
+  ] = await Promise.all([
+    getScadenzeKPI(),
+    countPaymentsMissingReceipt(),
+    // Anno solare corrente, lo stesso con cui si apre l'elenco Ricevute: il
+    // riquadro e il chip contano le stesse righe
+    countReceiptsToDeliver(todayInRome().getUTCFullYear()),
+    countAthleteSteps(),
+    getCertificateStatusCounts(),
+    countTesseramentoQueue(AffiliationEntity.ENDAS, seasonYear),
+  ])
 
   return {
     scadenzeInRitardo: scadenze.inRitardo,
     inScadenza7gg: scadenze.inScadenza7gg.count,
     pagamentiSenzaRicevuta: senzaRicevuta,
+    ricevuteDaConsegnare: daConsegnare,
     allieveSenzaGenitore: steps.guardian,
     allieveSenzaCorso: steps.course,
     allieveSenzaEmail: steps.email,
