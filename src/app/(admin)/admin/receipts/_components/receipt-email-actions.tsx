@@ -2,11 +2,21 @@
 
 import { unstable_rethrow } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Download, Loader2, Mail, Printer, RefreshCw } from "lucide-react"
+import { Download, HandCoins, Loader2, Mail, Printer, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import type { ReceiptStatus } from "@prisma/client"
 
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   NEVER_SENT,
   receiptEmailBlocker,
@@ -19,6 +29,7 @@ import { formatDateShort } from "@/lib/utils/format"
 
 import {
   getReceiptDeliveryInfo,
+  markReceiptDeliveredByHand,
   sendReceiptByEmail,
   type ReceiptDeliveryInfo,
 } from "../actions"
@@ -28,6 +39,7 @@ import { useFileShareSupport } from "./use-file-share-support"
 const NOTHING_YET: ReceiptDeliveryInfo = {
   email: NEVER_SENT,
   share: NEVER_SHARED,
+  handDeliveredAt: null,
 }
 
 type Props = {
@@ -57,6 +69,8 @@ export function ReceiptEmailActions({
 }: Props) {
   const [info, setInfo] = useState<ReceiptDeliveryInfo | null>(null)
   const [sending, setSending] = useState(false)
+  const [handOpen, setHandOpen] = useState(false)
+  const [marking, setMarking] = useState(false)
   const canShareFiles = useFileShareSupport()
 
   const blocker = receiptEmailBlocker({ status, payerName, payerEmail })
@@ -103,6 +117,25 @@ export function ReceiptEmailActions({
     }
   }
 
+  async function markByHand() {
+    setMarking(true)
+    try {
+      const result = await markReceiptDeliveredByHand(receiptId)
+      if (result.ok) {
+        toast.success(`Ricevuta n. ${receiptNumber} segnata come consegnata`)
+        setHandOpen(false)
+        reload()
+      } else {
+        toast.error(result.error)
+      }
+    } catch (error) {
+      unstable_rethrow(error)
+      toast.error("Non è stato possibile segnarla: riprova")
+    } finally {
+      setMarking(false)
+    }
+  }
+
   const email = info?.email ?? null
   const sent = email ? wasSent(email) : false
   // Riga a sé: dice quel poco che si sa di una condivisione, cioè che il
@@ -124,6 +157,11 @@ export function ReceiptEmailActions({
       </p>
       {shared ? (
         <p className="text-xs text-muted-foreground">{shared}</p>
+      ) : null}
+      {info?.handDeliveredAt ? (
+        <p className="text-xs text-muted-foreground">
+          Consegnata a mano il {formatDateShort(info.handDeliveredAt)}
+        </p>
       ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -164,6 +202,42 @@ export function ReceiptEmailActions({
           {sending ? "Invio…" : email ? sendButtonLabel(email) : "Invia per email"}
         </Button>
       </div>
+
+      {/* Vale per tutte, non solo per quelle senza email: una ricevuta
+          stampata e data allo sportello è consegnata, e il gestionale non
+          può saperlo da solo */}
+      {status !== "CANCELLED" ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="min-h-11 w-full text-muted-foreground"
+          onClick={() => setHandOpen(true)}
+        >
+          <HandCoins className="h-4 w-4" />
+          Consegnata a mano
+        </Button>
+      ) : null}
+
+      <AlertDialog open={handOpen} onOpenChange={setHandOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Hai consegnato la ricevuta n. {receiptNumber} a mano?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Resta scritto che è uscita dal gestionale oggi, e la ricevuta
+              esce dall&apos;elenco di quelle da consegnare. Il documento non
+              cambia.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={marking}>Annulla</AlertDialogCancel>
+            <AlertDialogAction onClick={markByHand} disabled={marking}>
+              {marking ? "Salvataggio…" : "Sì, consegnata"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

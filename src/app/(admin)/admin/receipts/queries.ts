@@ -3,21 +3,44 @@ import { Prisma, ReceiptStatus } from "@prisma/client"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { todayInRome } from "@/lib/receipts/numbering"
 import {
+  deliveryLabel,
+  isToDeliver,
+  type DeliveryState,
+} from "@/lib/receipts/delivery"
+import { getDeliveryStates } from "@/lib/receipts/delivery-status"
+import {
   receiptEmailBlocker,
-  wasSent,
   type ReceiptEmailState,
 } from "@/lib/receipts/receipt-email"
 import { getReceiptEmailStates } from "@/lib/receipts/receipt-email-status"
 import { prisma } from "@/lib/prisma"
 
-// "si" = solo già inviate, "no" = solo da inviare
-export type ReceiptSentFilter = "si" | "no"
+// Il chip attivo nell'elenco
+export type ReceiptDeliveryFilter =
+  | "da-consegnare"
+  | "consegnate"
+  | "annullate"
+  | "tutte"
+
+export const RECEIPT_DELIVERY_FILTERS: ReceiptDeliveryFilter[] = [
+  "da-consegnare",
+  "consegnate",
+  "annullate",
+  "tutte",
+]
+
+export function parseReceiptDeliveryFilter(
+  value: string | undefined,
+): ReceiptDeliveryFilter {
+  return RECEIPT_DELIVERY_FILTERS.includes(value as ReceiptDeliveryFilter)
+    ? (value as ReceiptDeliveryFilter)
+    : "da-consegnare"
+}
 
 export type ReceiptListFilters = {
   year: number
-  status?: ReceiptStatus
+  stato?: ReceiptDeliveryFilter
   search?: string
-  sent?: ReceiptSentFilter
 }
 
 const receiptListItem = Prisma.validator<Prisma.ReceiptDefaultArgs>()({
@@ -52,6 +75,22 @@ export type ReceiptListRow = ReceiptListItem & {
   // Motivo per cui non si può inviare (annullata, pagante senza email); null
   // se si può. Decide anche cosa è selezionabile per l'invio multiplo.
   emailBlocker: string | null
+  // Email, condivisione o consegna a mano: lo stesso predicato del riquadro
+  // in dashboard e del contatore del menu
+  delivery: DeliveryState
+  deliveryLabel: { text: string; tone: "amber" | "neutral" | "muted" }
+}
+
+function matchesDeliveryFilter(
+  row: { delivery: DeliveryState },
+  stato: ReceiptDeliveryFilter,
+): boolean {
+  if (stato === "tutte") return true
+  if (stato === "annullate") return row.delivery.cancelled
+  if (stato === "consegnate") {
+    return !row.delivery.cancelled && row.delivery.delivered
+  }
+  return isToDeliver(row.delivery)
 }
 
 // Registro ricevute di un anno solare (data di emissione), in ordine di
@@ -69,7 +108,6 @@ export async function listReceipts(filters: ReceiptListFilters) {
 
   const where: Prisma.ReceiptWhereInput = {
     ...yearWhere,
-    ...(filters.status ? { status: filters.status } : {}),
     ...(search
       ? {
           OR: [
@@ -101,31 +139,48 @@ export async function listReceipts(filters: ReceiptListFilters) {
     }),
   ])
 
-  const emailStates = await getReceiptEmailStates(items.map((r) => r.id))
+  const [emailStates, deliveryStates] = await Promise.all([
+    getReceiptEmailStates(items.map((r) => r.id)),
+    getDeliveryStates(items.map((r) => ({ id: r.id, status: r.status }))),
+  ])
 
-  const rows: ReceiptListRow[] = items.map((r) => ({
-    ...r,
-    emailState: emailStates[r.id],
-    emailBlocker: receiptEmailBlocker(r),
-  }))
+  const rows: ReceiptListRow[] = items.map((r) => {
+    const delivery = deliveryStates[r.id]
+    return {
+      ...r,
+      emailState: emailStates[r.id],
+      emailBlocker: receiptEmailBlocker(r),
+      delivery,
+      deliveryLabel: deliveryLabel(delivery),
+    }
+  })
 
-  // Il filtro "inviate / da inviare" si applica qui e non nella query: lo
-  // stato non è una colonna di receipts, si ricava da EmailLog. Le ricevute
-  // di un anno sono poche decine, la differenza non si nota.
-  const filtered = filters.sent
-    ? rows.filter((r) => wasSent(r.emailState) === (filters.sent === "si"))
-    : rows
+  // Lo stato di consegna non è una colonna: si ricava da EmailLog e
+  // AuditLog, quindi il filtro si applica qui. Le ricevute di un anno sono
+  // poche centinaia.
+  const stato = filters.stato ?? "da-consegnare"
+  const filtered = rows.filter((row) => matchesDeliveryFilter(row, stato))
+
+  const counts: Record<ReceiptDeliveryFilter, number> = {
+    "da-consegnare": 0,
+    consegnate: 0,
+    annullate: 0,
+    tutte: rows.length,
+  }
+  for (const row of rows) {
+    if (row.delivery.cancelled) counts.annullate += 1
+    else if (row.delivery.delivered) counts.consegnate += 1
+    else counts["da-consegnare"] += 1
+  }
 
   return {
     items: filtered,
+    counts,
     summary: {
       validCount: validTotals._count._all,
       validAmountCents: validTotals._sum.amountCents ?? 0,
       cancelledCount,
-      // Sul totale dell'anno, non sul filtro: dice quante restano da mandare
-      notSentCount: rows.filter(
-        (r) => !wasSent(r.emailState) && r.emailBlocker === null,
-      ).length,
+      toDeliverCount: counts["da-consegnare"],
     },
   }
 }

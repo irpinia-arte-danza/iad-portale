@@ -22,7 +22,7 @@ import type {
   IssueReceiptResult,
   ReceiptIssuePreview,
 } from "@/lib/receipts/types"
-import { uuidSchema } from "@/lib/schemas/common"
+import { uuidSchema, type ActionResult } from "@/lib/schemas/common"
 
 // Anteprima prima dell'emissione: intestatario scelto e dati mancanti, così
 // l'admin vede cosa verrà congelato sulla ricevuta prima che nasca il numero.
@@ -100,6 +100,8 @@ export async function sendReceiptByEmail(
 export type ReceiptDeliveryInfo = {
   email: ReceiptEmailState
   share: ReceiptShareState
+  // Consegnata a mano: data dell'ultima volta che è stata segnata
+  handDeliveredAt: Date | null
 }
 
 // Come la ricevuta è uscita dal gestionale: per email (si sa a chi) e per
@@ -113,11 +115,63 @@ export async function getReceiptDeliveryInfo(
   const idParsed = uuidSchema.safeParse(receiptId)
   if (!idParsed.success) return null
 
-  const [email, share] = await Promise.all([
+  const [email, share, hand] = await Promise.all([
     getReceiptEmailState(idParsed.data),
     getReceiptShareState(idParsed.data),
+    prisma.auditLog.findFirst({
+      where: {
+        action: AuditAction.RECEIPT_DELIVERED_BY_HAND,
+        entityType: "Receipt",
+        entityId: idParsed.data,
+      },
+      select: { createdAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
   ])
-  return { email, share }
+  return { email, share, handDeliveredAt: hand?.createdAt ?? null }
+}
+
+/**
+ * "Consegnata a mano": stampata e data allo sportello.
+ *
+ * Come la condivisione, registra che il documento è uscito dal gestionale e
+ * quando — qui però lo dichiara Giuseppina, perché il passaggio di mano il
+ * portale non può vederlo. Serve soprattutto alle ricevute senza email, che
+ * altrimenti resterebbero per sempre fra quelle da consegnare.
+ */
+export async function markReceiptDeliveredByHand(
+  receiptId: string,
+): Promise<ActionResult> {
+  const { userId } = await requireAdmin()
+
+  const idParsed = uuidSchema.safeParse(receiptId)
+  if (!idParsed.success) return { ok: false, error: "Ricevuta non valida" }
+
+  const receipt = await prisma.receipt.findUnique({
+    where: { id: idParsed.data },
+    select: { receiptNumber: true, status: true },
+  })
+  if (!receipt) return { ok: false, error: "Ricevuta non trovata" }
+  if (receipt.status === "CANCELLED") {
+    return {
+      ok: false,
+      error: "La ricevuta è annullata: non c'è niente da consegnare.",
+    }
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: AuditAction.RECEIPT_DELIVERED_BY_HAND,
+      entityType: "Receipt",
+      entityId: idParsed.data,
+      changes: { receiptNumber: receipt.receiptNumber },
+    },
+  })
+
+  revalidatePath("/admin/receipts")
+  revalidatePath("/admin/dashboard")
+  return { ok: true }
 }
 
 // Traccia una condivisione riuscita dal foglio di iOS. Registra che il

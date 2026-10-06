@@ -1,11 +1,9 @@
 "use client"
 
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Search, X } from "lucide-react"
-import type { ReceiptStatus } from "@prisma/client"
 
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -13,129 +11,99 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
+
+import type { ReceiptDeliveryFilter } from "../queries"
+
+const LABEL: Record<ReceiptDeliveryFilter, string> = {
+  "da-consegnare": "Da consegnare",
+  consegnate: "Consegnate",
+  annullate: "Annullate",
+  tutte: "Tutte",
+}
+
+const ORDER: ReceiptDeliveryFilter[] = [
+  "da-consegnare",
+  "consegnate",
+  "annullate",
+  "tutte",
+]
 
 interface ReceiptsFiltersProps {
   years: number[]
   year: number
-  status?: ReceiptStatus
-  search: string
-  sent?: "si" | "no"
+  stato: ReceiptDeliveryFilter
+  counts: Record<ReceiptDeliveryFilter, number>
 }
-
-const ALL = "__all__"
 
 export function ReceiptsFilters({
   years,
   year,
-  status,
-  search,
-  sent,
+  stato,
+  counts,
 }: ReceiptsFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [, startTransition] = useTransition()
-  const [value, setValue] = useState(search)
-  const isMounted = useRef(false)
 
-  function pushParams(params: URLSearchParams) {
+  function updateParam(key: string, value: string | null) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === null) params.delete(key)
+    else params.set(key, value)
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)
     })
   }
 
-  function updateParam(key: string, next: string | null) {
-    const params = new URLSearchParams(searchParams.toString())
-    if (next === null || next === ALL) params.delete(key)
-    else params.set(key, next)
-    pushParams(params)
-  }
-
-  // Ricerca con debounce (stesso schema della ricerca pagamenti)
-  useEffect(() => {
-    if (!isMounted.current) {
-      isMounted.current = true
-      return
-    }
-    const timer = setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString())
-      const trimmed = value.trim()
-      if (trimmed === (params.get("search") ?? "")) return
-      if (trimmed) params.set("search", trimmed)
-      else params.delete("search")
-      pushParams(params)
-    }, 300)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value])
-
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <div className="relative w-full sm:max-w-sm">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Cerca per numero, allieva o pagante…"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="pl-9 pr-9"
-        />
-        {value && (
-          <button
-            type="button"
-            aria-label="Cancella ricerca"
-            onClick={() => setValue("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row">
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        {/* Etichetta davanti: "2026" da solo non diceva di che cosa */}
+        <span className="text-sm text-muted-foreground">Anno fiscale</span>
         <Select
           value={String(year)}
-          onValueChange={(next) => updateParam("year", next)}
+          onValueChange={(v) => updateParam("year", v)}
         >
-          <SelectTrigger className="sm:w-32" aria-label="Anno di emissione">
+          <SelectTrigger className="h-11 w-[120px] font-mono">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {years.map((y) => (
-              <SelectItem key={y} value={String(y)}>
+              <SelectItem key={y} value={String(y)} className="font-mono">
                 {y}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+      </div>
 
-        <Select
-          value={status ?? ALL}
-          onValueChange={(next) => updateParam("status", next)}
-        >
-          <SelectTrigger className="sm:w-40" aria-label="Stato ricevuta">
-            <SelectValue placeholder="Tutte" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Tutte</SelectItem>
-            <SelectItem value="VALID">Valide</SelectItem>
-            <SelectItem value="CANCELLED">Annullate</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={sent ?? ALL}
-          onValueChange={(next) => updateParam("sent", next)}
-        >
-          <SelectTrigger className="sm:w-44" aria-label="Invio per email">
-            <SelectValue placeholder="Inviate e non" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Inviate e non</SelectItem>
-            <SelectItem value="no">Da inviare</SelectItem>
-            <SelectItem value="si">Già inviate</SelectItem>
-          </SelectContent>
-        </Select>
+      <div role="group" aria-label="Filtra le ricevute" className="flex flex-wrap gap-2">
+        {ORDER.map((value) => {
+          const active = value === stato
+          return (
+            <Button
+              key={value}
+              type="button"
+              variant={active ? "default" : "outline"}
+              aria-pressed={active}
+              className={cn(
+                "h-11 gap-2 rounded-full px-4",
+                // Il lavoro in sospeso è ambra, come in Scadenze
+                !active &&
+                  value === "da-consegnare" &&
+                  counts[value] > 0 &&
+                  "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200",
+              )}
+              onClick={() => updateParam("stato", value)}
+            >
+              <span>{LABEL[value]}</span>
+              <span className="font-mono text-xs opacity-80">
+                {counts[value]}
+              </span>
+            </Button>
+          )
+        })}
       </div>
     </div>
   )
