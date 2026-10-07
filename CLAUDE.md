@@ -316,7 +316,7 @@ Il target principale di queste due aree è lo **smartphone** (iPhone Safari + An
 - ✅ Validazione Zod su ogni input, client E server
 - ✅ Sanitizzazione HTML se renderizzi contenuto utente
 - ✅ CSP header via `next.config.ts`
-- ✅ 2FA disponibile (anche se opzionale) per admin
+- ✅ 2FA **obbligatoria** per admin: TOTP di Supabase Auth + 8 codici di recupero del portale; `requireAdmin()` e il proxy accettano solo sessioni aal2 (vedi `docs/gotchas.md` §17.49)
 
 ---
 

@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server"
 
+import { UserRole } from "@prisma/client"
+
 import { NO_ACCESS_ROUTE, resolveAccountState } from "@/lib/auth/account-state"
 import { getDashboardPath } from "@/lib/auth/dashboard-path"
+import { recoveryPassIsValid } from "@/lib/auth/mfa"
+import { adminGate, MFA_VERIFY_PATH } from "@/lib/auth/mfa-gate"
+import { RECOVERY_PASS_COOKIE } from "@/lib/auth/mfa-recovery-pass"
 // Aree per ruolo e matcher: in src/lib/auth/proxy-matcher.ts, con i test
 import { areaOf, wrongAreaRedirect } from "@/lib/auth/proxy-matcher"
 // Le pagine pubbliche (login, privacy, …) stanno in un modulo a parte, con
@@ -12,7 +17,7 @@ import { updateSession } from "@/lib/supabase/middleware"
 export async function proxy(request: NextRequest) {
   // Step 1: refresh session (critico — cookies Supabase hanno TTL
   // breve e devono essere refreshati sulle request)
-  const { supabaseResponse, user } = await updateSession(request)
+  const { supabaseResponse, user, level } = await updateSession(request)
 
   const pathname = request.nextUrl.pathname
 
@@ -58,6 +63,23 @@ export async function proxy(request: NextRequest) {
       url.pathname = target
       url.search = ""
       return NextResponse.redirect(url)
+    }
+
+    // Step 5: un admin con la sola password (aal1) non entra in /admin: va
+    // al secondo passaggio. Stessa regola di requireAdmin (adminGate); il
+    // lasciapassare del codice di recupero conta come aal2. Vedi
+    // docs/gotchas.md §17.49.
+    if (account.role === UserRole.ADMIN) {
+      const recoveryPass = recoveryPassIsValid(
+        request.cookies.get(RECOVERY_PASS_COOKIE)?.value,
+        account.userId,
+        level.sessionId,
+      )
+      if (adminGate({ role: account.role, aal: level.aal, recoveryPass }) !== "ok") {
+        url.pathname = MFA_VERIFY_PATH
+        url.search = ""
+        return NextResponse.redirect(url)
+      }
     }
   }
 

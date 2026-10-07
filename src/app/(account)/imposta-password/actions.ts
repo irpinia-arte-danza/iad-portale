@@ -8,6 +8,8 @@ import { createServerClient } from "@supabase/ssr"
 import { NO_ACCESS_ROUTE } from "@/lib/auth/account-state"
 import { getCurrentAccount } from "@/lib/auth/current-account"
 import { getDashboardPath } from "@/lib/auth/dashboard-path"
+import { getSessionLevel, hasRecoveryPass, verifiedTotpFactor } from "@/lib/auth/mfa"
+import { adminGate, MFA_VERIFY_PATH } from "@/lib/auth/mfa-gate"
 import { sendPasswordChangedNotice } from "@/lib/auth/password-changed-email"
 import { isRecentOtpSession } from "@/lib/auth/recent-otp"
 import { prisma } from "@/lib/prisma"
@@ -92,6 +94,18 @@ export async function setOwnPassword(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user?.email) return { ok: false, error: SESSION_EXPIRED }
+
+  // Un admin con il secondo fattore attivo cambia la password solo con una
+  // sessione aal2 (o il lasciapassare del codice di recupero). Un admin
+  // appena invitato, senza fattore, deve prima poter scegliere la password:
+  // il secondo fattore glielo chiede subito dopo.
+  if (account.role === "ADMIN" && (await verifiedTotpFactor(supabase))) {
+    const level = await getSessionLevel()
+    const recoveryPass = await hasRecoveryPass(account.userId, level.sessionId)
+    if (adminGate({ role: account.role, aal: level.aal, recoveryPass }) !== "ok") {
+      redirect(MFA_VERIFY_PATH)
+    }
+  }
 
   if (!(await sessionFromRecentLink())) {
     const current = parsed.data.currentPassword

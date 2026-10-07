@@ -12,6 +12,7 @@ import {
   TOO_MANY_ATTEMPTS_MESSAGE,
 } from "@/lib/auth/login-attempts";
 import { loginErrorMessage } from "@/lib/auth/login-error";
+import { MFA_VERIFY_PATH } from "@/lib/auth/mfa-gate";
 import { createClient } from "@/lib/supabase/server";
 
 type LoginValues = {
@@ -59,6 +60,10 @@ export async function login(
           : "Il tuo accesso all'area riservata non è attivo. Contatta la segreteria",
     };
   }
+
+  // Gli admin hanno il secondo fattore: la pagina decide se chiedere il
+  // codice o far fare l'iscrizione. Gli altri ruoli entrano come sempre.
+  if (account.role === "ADMIN") redirect(MFA_VERIFY_PATH);
 
   redirect(getDashboardPath(account.role));
 }

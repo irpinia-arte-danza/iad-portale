@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { AuditAction, Prisma, ReceiptCategory } from "@prisma/client"
 
+import { adminResetSecondFactor } from "@/lib/auth/mfa"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { prisma } from "@/lib/prisma"
 import { todayInRome } from "@/lib/receipts/numbering"
@@ -558,5 +559,44 @@ export async function inviteAdmin(
   } catch (error) {
     logError("[settings] inviteAdmin failed", error)
     return { ok: false, error: userFacingMessage(error) }
+  }
+}
+
+// ============================================================================
+// Secondo fattore: azzeramento per l'ALTRO admin (iPad perso, app cambiata)
+// ============================================================================
+export async function resetAdminSecondFactor(
+  targetUserId: string,
+): Promise<ActionResult<{ factorsRemoved: number; codesRemoved: number }>> {
+  const { userId } = await requireAdmin()
+
+  // Mai per sé stessi: il proprio fattore si sostituisce da /imposta-2fa
+  // dopo aver passato il secondo passaggio. Qui si aiuta un collega chiuso
+  // fuori, e resta scritto chi lo ha fatto.
+  if (targetUserId === userId) {
+    return { ok: false, error: "Il tuo secondo fattore lo sostituisci da «Collega di nuovo l'app»" }
+  }
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, role: true, deletedAt: true },
+  })
+  if (!target || target.deletedAt !== null || target.role !== "ADMIN") {
+    return { ok: false, error: "Amministratore non trovato" }
+  }
+
+  try {
+    const result = await adminResetSecondFactor(targetUserId)
+    await logSettingsChange({
+      userId,
+      action: AuditAction.MFA_RESET,
+      entityType: "User",
+      entityId: targetUserId,
+      changes: result,
+    })
+    revalidatePath("/admin/settings")
+    return { ok: true, data: result }
+  } catch (error) {
+    logError("[settings] resetAdminSecondFactor failed", error, { targetUserId })
+    return { ok: false, error: GENERIC_ERROR_MESSAGE }
   }
 }
