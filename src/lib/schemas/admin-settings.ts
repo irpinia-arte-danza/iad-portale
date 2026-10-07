@@ -7,7 +7,7 @@ import {
 } from "./common"
 import {
   hexColorSchema,
-  ibanSchema,
+  italianIbanSchema,
   italianVatSchema,
   organizationFiscalCodeSchema,
   pecSchema,
@@ -39,7 +39,13 @@ export const associationSchema = z
       .url({ message: "URL non valido (es. https://...)" })
       .optional()
       .or(z.literal("")),
-    asdIban: ibanSchema,
+    asdIban: italianIbanSchema,
+    bankAccountHolder: z
+      .string()
+      .trim()
+      .max(120, { message: "Intestatario max 120 caratteri" })
+      .optional()
+      .or(z.literal("")),
     asdSdiCode: sdiCodeSchema,
 
     // Indirizzo legale (tutti required)

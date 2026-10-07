@@ -970,6 +970,29 @@ l'iPad».
 
 ---
 
+## Area genitori — «Come pagare» e dati bancari
+
+Nell'area genitori la dashboard mostra, sotto le rate aperte, il riquadro
+**«Come pagare»** con tre tasti Copia: intestatario del conto, IBAN e la
+causale composta dal portale («Contributo ottobre 2026 · Nome Cognome», più
+mesi se le rate aperte sono più d'una). I dati vengono da
+**Impostazioni › Associazione**:
+
+- **IBAN**: solo italiano (IT + 25 caratteri), controllato con le cifre di
+  controllo: un IBAN sbagliato non si salva. Se il campo è vuoto, il riquadro
+  «Come pagare» **non compare** e le famiglie vedono solo «in contanti in
+  sala» e il contatto.
+- **Intestatario del conto**: quello che la famiglia scrive come beneficiario.
+  Se vuoto, il portale usa la denominazione dell'associazione.
+- **Email ufficiale**: compare nel footer dell'area genitori e insegnanti
+  come contatto.
+
+La causale la compone il portale dalle rate aperte di ciascuna allieva: se
+Giuseppina vuole un formato diverso, si cambia in
+`src/lib/payments/payment-reference.ts`, non nelle impostazioni.
+
+---
+
 ## Endas / CSEN — invio tesseramenti
 
 Non esiste API: il flusso resta manuale.

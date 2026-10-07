@@ -83,6 +83,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     asdPhone: brand.asdPhone ?? "",
     asdWebsite: brand.asdWebsite ?? "",
     asdIban: brand.asdIban ?? "",
+    bankAccountHolder: brand.bankAccountHolder ?? "",
     asdSdiCode: brand.asdSdiCode ?? "",
     addressStreet: brand.addressStreet ?? "",
     addressZip: brand.addressZip ?? "",
