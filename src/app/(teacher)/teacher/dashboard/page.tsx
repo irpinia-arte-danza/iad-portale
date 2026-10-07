@@ -1,17 +1,12 @@
 import Link from "next/link"
-import { CalendarClock, ChevronRight, Clock, Users } from "lucide-react"
+import { CalendarOff, ChevronRight, Users } from "lucide-react"
 
+import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { requireTeacher } from "@/lib/auth/require-teacher"
-import { formatDateShort, formatMeseIt } from "@/lib/utils/format"
+import { formatDateShort } from "@/lib/utils/format"
 
 import {
   getMyCourses,
@@ -20,7 +15,15 @@ import {
   getTodayLessons,
   getTodaySchedules,
   getUpcomingLessons,
+  type TodayLesson,
+  type TodaySchedule,
 } from "../_actions/queries"
+
+// ─────────────────────────────────────────────────────────────────────────
+// La home dell'insegnante, pensata per il telefono in sala: in cima i corsi
+// di oggi, ognuno con un solo tasto grande, «Segna le presenze». Il resto
+// (prossime lezioni, classi, presenze del mese) sta sotto, in una colonna.
+// ─────────────────────────────────────────────────────────────────────────
 
 const DAY_OF_WEEK_LABELS = [
   "Domenica",
@@ -33,16 +36,62 @@ const DAY_OF_WEEK_LABELS = [
 ]
 
 function todayLongLabel(): string {
-  const d = new Date()
   return new Intl.DateTimeFormat("it-IT", {
     weekday: "long",
     day: "numeric",
     month: "long",
-  }).format(d)
+    timeZone: "Europe/Rome",
+  }).format(new Date())
 }
 
-export default async function TeacherDashboardPage() {
+type TodayItem = {
+  scheduleId: string
+  courseName: string
+  startTime: string
+  endTime: string
+  location: string | null
+  lesson: { id: string; status: TodayLesson["status"]; attendances: number } | null
+}
+
+// Gli orari di oggi, con la lezione già aperta se c'è. Un orario senza
+// lezione si apre dal tasto (pagina ponte /teacher/sessions/new).
+function todayItems(lessons: TodayLesson[], schedules: TodaySchedule[]): TodayItem[] {
+  const lessonBySchedule = new Map(lessons.map((l) => [l.schedule.id, l]))
+  const items: TodayItem[] = schedules.map((s) => {
+    const lesson = lessonBySchedule.get(s.id)
+    return {
+      scheduleId: s.id,
+      courseName: s.course.name,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      location: s.location,
+      lesson: lesson
+        ? { id: lesson.id, status: lesson.status, attendances: lesson._count.attendances }
+        : null,
+    }
+  })
+  // Lezioni di oggi il cui orario non cade oggi (aperte dall'admin, orario
+  // cambiato): si mostrano comunque, non devono sparire
+  for (const l of lessons) {
+    if (!items.some((i) => i.scheduleId === l.schedule.id)) {
+      items.push({
+        scheduleId: l.schedule.id,
+        courseName: l.schedule.course.name,
+        startTime: l.startTime,
+        endTime: l.endTime,
+        location: l.schedule.location,
+        lesson: { id: l.id, status: l.status, attendances: l._count.attendances },
+      })
+    }
+  }
+  return items.sort((a, b) => a.startTime.localeCompare(b.startTime))
+}
+
+type PageProps = { searchParams: Promise<{ error?: string }> }
+
+export default async function TeacherDashboardPage({ searchParams }: PageProps) {
   const { teacherId } = await requireTeacher()
+  const { error } = await searchParams
 
   const [profile, courses, todayLessons, todaySchedules, upcoming, stats] =
     await Promise.all([
@@ -54,247 +103,214 @@ export default async function TeacherDashboardPage() {
       getRecentAttendanceStats(teacherId),
     ])
 
-  // Lezioni di oggi: unisco Lesson già create + CourseSchedule del giorno
-  // per cui Lesson NON esiste ancora (devono essere aperte dall'insegnante)
-  const lessonsByCourseId = new Map(
-    todayLessons.map((l) => [l.schedule.course.id, l]),
-  )
-  const todayItems = [
-    ...todayLessons.map((l) => ({
-      kind: "lesson" as const,
-      courseId: l.schedule.course.id,
-      courseName: l.schedule.course.name,
-      startTime: l.startTime,
-      endTime: l.endTime,
-      location: l.schedule.location,
-      lessonId: l.id,
-      attendancesCount: l._count.attendances,
-      status: l.status,
-    })),
-    ...todaySchedules
-      .filter((s) => !lessonsByCourseId.has(s.course.id))
-      .map((s) => ({
-        kind: "schedule" as const,
-        courseId: s.course.id,
-        courseName: s.course.name,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        location: s.location,
-        scheduleId: s.id,
-      })),
-  ].sort((a, b) => a.startTime.localeCompare(b.startTime))
-
+  const today = todayItems(todayLessons, todaySchedules)
   const presentRatio =
     stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : null
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-5">
-      {/* Header welcome */}
+    <div className="mx-auto w-full max-w-3xl space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">
           Buongiorno {profile?.firstName ?? "Insegnante"}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          {todayLongLabel()}
-        </p>
+        <p className="text-sm text-muted-foreground">{todayLongLabel()}</p>
       </header>
 
-      {/* Lezione di oggi */}
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Lezione di oggi</h2>
-        {todayItems.length === 0 ? (
+      {/* Il valore arriva dall'indirizzo: non si mostra, si dice solo che
+          l'apertura non è riuscita */}
+      {error ? (
+        <p
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+        >
+          Non è stato possibile aprire la lezione di oggi. Riprova dal tasto qui sotto; se
+          succede ancora, avvisa la segreteria.
+        </p>
+      ) : null}
+
+      {/* Oggi: una card per corso, un tasto solo */}
+      <section className="space-y-2" aria-labelledby="oggi">
+        <h2 id="oggi" className="text-lg font-semibold">
+          Oggi
+        </h2>
+        {today.length === 0 ? (
           <Card>
-            <CardContent className="py-6 text-center text-sm text-muted-foreground">
-              Oggi non hai lezioni in programma.
+            <CardContent className="p-0">
+              <EmptyState
+                icon={CalendarOff}
+                title="Nessuna lezione oggi"
+                description="Nei giorni di lezione qui compare il corso con il tasto per segnare le presenze."
+                action={
+                  <Button asChild variant="outline" className="min-h-11">
+                    <Link href="/teacher/courses">Le mie classi</Link>
+                  </Button>
+                }
+              />
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-2">
-            {todayItems.map((item) => (
-              <Card key={`${item.kind}-${item.courseId}-${item.startTime}`}>
-                <CardContent className="flex items-center gap-4 py-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted">
-                    <Clock className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-semibold">
-                      {item.courseName}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      <span className="font-mono tabular-nums">
-                        {item.startTime}–{item.endTime}
-                      </span>
-                      {item.location ? ` · ${item.location}` : null}
-                    </p>
-                  </div>
-                  {item.kind === "lesson" ? (
-                    <div className="flex flex-col items-end gap-1">
-                      {item.status === "CANCELLED" ? (
-                        <Badge variant="destructive">Annullata</Badge>
-                      ) : (
+          <ul className="space-y-3">
+            {today.map((item) => (
+              <li key={item.scheduleId}>
+                <Card>
+                  <CardContent className="space-y-3 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold">{item.courseName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-mono tabular-nums">
+                            {item.startTime}–{item.endTime}
+                          </span>
+                          {item.location ? ` · ${item.location}` : null}
+                        </p>
+                      </div>
+                      {item.lesson?.status === "CANCELLED" ? (
+                        <Badge variant="outline">Annullata</Badge>
+                      ) : item.lesson && item.lesson.attendances > 0 ? (
                         <Badge variant="secondary">
-                          {item.attendancesCount} registrate
+                          {item.lesson.attendances}{" "}
+                          {item.lesson.attendances === 1 ? "segnata" : "segnate"}
                         </Badge>
-                      )}
-                      <Button asChild size="sm" className="min-h-11">
-                        <Link href={`/teacher/sessions/${item.lessonId}`}>
-                          Continua
-                        </Link>
-                      </Button>
+                      ) : null}
                     </div>
-                  ) : (
-                    <form
-                      action={`/api/teacher/open-lesson`}
-                      method="POST"
-                      className="contents"
-                    >
-                      {/* L'apertura lezione è una server action: usiamo
-                          un Link che porta alla pagina sessione, la quale
-                          fa upsert Lesson on-demand se non esiste. */}
-                      <Button asChild size="sm" className="min-h-11">
-                        <Link
-                          href={`/teacher/sessions/new?scheduleId=${item.scheduleId}`}
-                        >
-                          Apri registrazione
+                    {item.lesson?.status === "CANCELLED" ? (
+                      <p className="text-sm text-muted-foreground">
+                        Lezione annullata: niente presenze da segnare.
+                      </p>
+                    ) : item.lesson ? (
+                      <Button
+                        asChild
+                        className="min-h-11 w-full"
+                        variant={item.lesson.status === "COMPLETED" ? "outline" : "default"}
+                      >
+                        <Link href={`/teacher/sessions/${item.lesson.id}`}>
+                          {item.lesson.status === "COMPLETED"
+                            ? "Rivedi le presenze"
+                            : "Segna le presenze"}
                         </Link>
                       </Button>
-                    </form>
-                  )}
-                </CardContent>
-              </Card>
+                    ) : (
+                      <Button asChild className="min-h-11 w-full">
+                        <Link href={`/teacher/sessions/new?scheduleId=${item.scheduleId}`}>
+                          Segna le presenze
+                        </Link>
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </section>
 
-      {/* Prossime lezioni */}
       {upcoming.length > 0 ? (
-        <section className="space-y-2">
-          <h2 className="text-lg font-semibold">Prossime lezioni</h2>
-          <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-            {upcoming.map((l) => (
-              <Card key={l.id}>
-                <CardContent className="space-y-1 py-3 text-sm">
-                  <p className="font-medium">{l.schedule.course.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDateShort(l.date)} ·{" "}
-                    <span className="font-mono tabular-nums">
-                      {l.startTime}–{l.endTime}
-                    </span>
-                  </p>
-                  {l.schedule.location ? (
-                    <p className="text-xs text-muted-foreground">
-                      {l.schedule.location}
-                    </p>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+        <section className="space-y-2" aria-labelledby="prossime">
+          <h2 id="prossime" className="text-lg font-semibold">
+            Prossime lezioni
+          </h2>
+          <Card>
+            <CardContent className="p-0">
+              <ul className="divide-y">
+                {upcoming.map((l) => (
+                  <li key={l.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{l.schedule.course.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateShort(l.date)} ·{" "}
+                        <span className="font-mono tabular-nums">
+                          {l.startTime}–{l.endTime}
+                        </span>
+                        {l.schedule.location ? ` · ${l.schedule.location}` : null}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
         </section>
       ) : null}
 
-      {/* Le mie classi */}
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Le mie classi</h2>
+      <section className="space-y-2" aria-labelledby="classi">
+        <h2 id="classi" className="text-lg font-semibold">
+          Le mie classi
+        </h2>
         {courses.length === 0 ? (
           <Card>
-            <CardContent className="py-6 text-center text-sm text-muted-foreground">
-              Non sei ancora assegnata a nessun corso.
-              <br />
-              Contatta la segreteria.
+            <CardContent className="p-0">
+              <EmptyState
+                icon={Users}
+                title="Nessuna classe assegnata"
+                description="Quando la segreteria ti assegna un corso, compare qui con orari e allieve."
+              />
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-2 md:grid-cols-2">
+          <ul className="grid gap-2 md:grid-cols-2">
             {courses.map((c) => (
-              <Link
-                key={c.id}
-                href={`/teacher/courses/${c.id}`}
-                className="block"
-              >
-                <Card className="transition hover:shadow-md">
-                  <CardContent className="flex items-center justify-between gap-3 py-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-base font-semibold">
-                          {c.name}
+              <li key={c.id}>
+                <Link
+                  href={`/teacher/courses/${c.id}`}
+                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Card className="transition hover:shadow-md">
+                    <CardContent className="flex min-h-11 items-center justify-between gap-3 py-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-base font-semibold">{c.name}</p>
+                          {c.isPrimary ? (
+                            <Badge variant="secondary" className="text-xs">
+                              Principale
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {c.schedules.length === 0
+                            ? "Nessun orario impostato"
+                            : c.schedules
+                                .map(
+                                  (s) =>
+                                    `${DAY_OF_WEEK_LABELS[s.dayOfWeek].slice(0, 3)} ${s.startTime}`,
+                                )
+                                .join(" · ")}
                         </p>
-                        {c.isPrimary ? (
-                          <Badge variant="secondary" className="text-xs">
-                            Principale
-                          </Badge>
-                        ) : null}
+                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Users className="h-3 w-3" aria-hidden />
+                          {c.activeEnrollments} {c.activeEnrollments === 1 ? "allieva" : "allieve"}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {c.schedules.length === 0
-                          ? "Nessun orario impostato"
-                          : c.schedules
-                              .map(
-                                (s) =>
-                                  `${DAY_OF_WEEK_LABELS[s.dayOfWeek].slice(0, 3)} ${s.startTime}`,
-                              )
-                              .join(" · ")}
-                      </p>
-                      <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        <Users className="h-3 w-3" />
-                        {c.activeEnrollments}{" "}
-                        {c.activeEnrollments === 1 ? "allieva" : "allieve"}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-              </Link>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    </CardContent>
+                  </Card>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </section>
 
-      {/* Storico presenze recente */}
+      {/* Presenze del mese: un numero, non tre riquadri colorati — presente e
+          assente non sono stati che bloccano (§17.43) */}
       {stats.total > 0 ? (
-        <section className="space-y-2">
-          <h2 className="text-lg font-semibold">Presenze ultimi 30 giorni</h2>
+        <section className="space-y-2" aria-labelledby="presenze">
+          <h2 id="presenze" className="text-lg font-semibold">
+            Presenze ultimi 30 giorni
+          </h2>
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                {formatMeseIt(new Date())}
-              </CardTitle>
-              <CardDescription>
-                Su {stats.total} marcature totali nei tuoi corsi
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-md border bg-emerald-50 py-3 dark:bg-emerald-950/30">
-                  <p className="text-2xl font-bold tabular-nums">
-                    {stats.present}
-                  </p>
-                  <p className="text-xs text-emerald-900 dark:text-emerald-100">
-                    Presenti
-                  </p>
-                </div>
-                <div className="rounded-md border bg-red-50 py-3 dark:bg-red-950/30">
-                  <p className="text-2xl font-bold tabular-nums">
-                    {stats.absent}
-                  </p>
-                  <p className="text-xs text-red-900 dark:text-red-100">
-                    Assenti
-                  </p>
-                </div>
-                <div className="rounded-md border bg-amber-50 py-3 dark:bg-amber-950/30">
-                  <p className="text-2xl font-bold tabular-nums">
-                    {stats.justified}
-                  </p>
-                  <p className="text-xs text-amber-900 dark:text-amber-100">
-                    Giustificate
-                  </p>
-                </div>
-              </div>
+            <CardContent className="py-4 text-sm">
+              <p>
+                <strong className="tabular-nums">{stats.present}</strong>{" "}
+                {stats.present === 1 ? "presente" : "presenti"} ·{" "}
+                <strong className="tabular-nums">{stats.absent}</strong>{" "}
+                {stats.absent === 1 ? "assente" : "assenti"} ·{" "}
+                <strong className="tabular-nums">{stats.justified}</strong>{" "}
+                {stats.justified === 1 ? "giustificata" : "giustificate"}
+              </p>
               {presentRatio !== null ? (
-                <p className="mt-3 text-center text-sm text-muted-foreground">
-                  Tasso di presenza: <strong>{presentRatio}%</strong>
+                <p className="mt-1 text-muted-foreground">
+                  Presenza {presentRatio}% su {stats.total}{" "}
+                  {stats.total === 1 ? "marcatura" : "marcature"} nei tuoi corsi
                 </p>
               ) : null}
             </CardContent>

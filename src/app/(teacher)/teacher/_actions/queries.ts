@@ -122,6 +122,9 @@ export async function getTodayLessons(teacherId: string) {
       status: true,
       schedule: {
         select: {
+          // L'id serve alla dashboard per accoppiare la lezione al suo orario
+          // (un corso può avere due orari nello stesso giorno)
+          id: true,
           location: true,
           course: { select: { id: true, name: true } },
         },

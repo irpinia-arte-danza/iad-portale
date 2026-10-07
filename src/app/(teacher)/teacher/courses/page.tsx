@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { ChevronRight, Users } from "lucide-react"
 
+import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { requireTeacher } from "@/lib/auth/require-teacher"
@@ -26,24 +27,30 @@ export default async function TeacherCoursesPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Le mie classi</h1>
         <p className="text-sm text-muted-foreground">
-          Tocca un corso per vedere allieve e contatti.
+          Tocca un corso per vedere le allieve e lo stato del certificato.
         </p>
       </header>
 
       {courses.length === 0 ? (
         <Card>
-          <CardContent className="py-6 text-center text-sm text-muted-foreground">
-            Non sei ancora assegnata a nessun corso.
-            <br />
-            Contatta la segreteria.
+          <CardContent className="p-0">
+            <EmptyState
+              icon={Users}
+              title="Nessuna classe assegnata"
+              description="Quando la segreteria ti assegna un corso, compare qui con orari e allieve."
+            />
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-2 md:grid-cols-2">
           {courses.map((c) => (
-            <Link key={c.id} href={`/teacher/courses/${c.id}`} className="block">
+            <Link
+              key={c.id}
+              href={`/teacher/courses/${c.id}`}
+              className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <Card className="transition hover:shadow-md">
-                <CardContent className="flex items-center justify-between gap-3 py-4">
+                <CardContent className="flex min-h-11 items-center justify-between gap-3 py-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-base font-semibold">

@@ -2,66 +2,53 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Check, Loader2, MessageSquarePlus, X } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import type { AttendanceStatus } from "@prisma/client"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import { logError } from "@/lib/logging/log-error"
 import { cn } from "@/lib/utils"
-import type { AttendanceStatus } from "@prisma/client"
 
 import { saveAttendance } from "../../../_actions/sessions"
-import { logError } from "@/lib/logging/log-error"
+
+// ─────────────────────────────────────────────────────────────────────────
+// Le presenze con una mano sola: una riga per allieva, una casella grande
+// (spuntata = presente), un solo tasto Salva in fondo. Chi non è spuntata al
+// salvataggio risulta assente; «giustificata» resta come opzione secondaria
+// sulla riga, senza colori: presente e assente non sono stati che bloccano.
+// Le note per allieva non si scrivono più da qui; quelle già salvate restano.
+// ─────────────────────────────────────────────────────────────────────────
 
 type Item = {
   athleteId: string
   firstName: string
   lastName: string
-  photoUrl: string | null
   currentStatus: AttendanceStatus | null
   currentNotes: string | null
 }
 
-type FormState = {
-  status: AttendanceStatus | null
-  notes: string
-  notesOpen: boolean
+type RowState = { present: boolean; justified: boolean }
+
+function initialRow(item: Item): RowState {
+  return {
+    present: item.currentStatus === "PRESENT",
+    justified: item.currentStatus === "JUSTIFIED",
+  }
 }
 
-const STATUS_OPTIONS: {
-  value: AttendanceStatus
-  label: string
-  short: string
-  className: string
-  activeClassName: string
-}[] = [
-  {
-    value: "PRESENT",
-    label: "Presente",
-    short: "P",
-    className:
-      "border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300",
-    activeClassName:
-      "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700",
-  },
-  {
-    value: "ABSENT",
-    label: "Assente",
-    short: "A",
-    className: "border-red-300 text-red-700 dark:border-red-800 dark:text-red-300",
-    activeClassName: "bg-red-600 text-white border-red-600 hover:bg-red-700",
-  },
-  {
-    value: "JUSTIFIED",
-    label: "Giustificata",
-    short: "G",
-    className:
-      "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300",
-    activeClassName:
-      "bg-amber-600 text-white border-amber-600 hover:bg-amber-700",
-  },
-]
+function statusOf(row: RowState): AttendanceStatus {
+  if (row.present) return "PRESENT"
+  return row.justified ? "JUSTIFIED" : "ABSENT"
+}
+
+const STATUS_LABEL: Record<AttendanceStatus, string> = {
+  PRESENT: "Presente",
+  ABSENT: "Assente",
+  JUSTIFIED: "Giustificata",
+}
 
 export function AttendanceForm({
   lessonId,
@@ -74,81 +61,54 @@ export function AttendanceForm({
 }) {
   const router = useRouter()
   const [busy, setBusy] = React.useState(false)
-  const [state, setState] = React.useState<Record<string, FormState>>(() =>
-    Object.fromEntries(
-      items.map((i) => [
-        i.athleteId,
-        {
-          status: i.currentStatus,
-          notes: i.currentNotes ?? "",
-          notesOpen: !!i.currentNotes,
-        } satisfies FormState,
-      ]),
-    ),
+  const [rows, setRows] = React.useState<Record<string, RowState>>(() =>
+    Object.fromEntries(items.map((i) => [i.athleteId, initialRow(i)])),
   )
 
-  function setStatus(athleteId: string, status: AttendanceStatus) {
-    if (locked) return
-    setState((prev) => ({
+  function setPresent(athleteId: string, present: boolean) {
+    setRows((prev) => ({
       ...prev,
-      [athleteId]: { ...prev[athleteId], status },
+      [athleteId]: { present, justified: present ? false : prev[athleteId].justified },
     }))
   }
 
-  function setNotes(athleteId: string, notes: string) {
-    setState((prev) => ({
+  function toggleJustified(athleteId: string) {
+    setRows((prev) => ({
       ...prev,
-      [athleteId]: { ...prev[athleteId], notes },
+      [athleteId]: { present: false, justified: !prev[athleteId].justified },
     }))
   }
 
-  function toggleNotes(athleteId: string) {
-    setState((prev) => ({
-      ...prev,
-      [athleteId]: { ...prev[athleteId], notesOpen: !prev[athleteId].notesOpen },
-    }))
-  }
-
-  const unmarked = items.filter(
-    (i) => state[i.athleteId]?.status === null,
-  ).length
-
-  const dirty = items.some((i) => {
-    const s = state[i.athleteId]
-    return (
-      s.status !== i.currentStatus ||
-      (s.notes ?? "") !== (i.currentNotes ?? "")
-    )
-  })
+  const presentCount = items.filter((i) => rows[i.athleteId].present).length
+  // Una lezione mai segnata si può salvare anche senza spunte (tutte
+  // assenti); una già segnata solo se qualcosa è cambiato
+  const hasRecords = items.some((i) => i.currentStatus !== null)
+  const dirty = items.some((i) => statusOf(rows[i.athleteId]) !== (i.currentStatus ?? "ABSENT"))
+  const canSave = !locked && !busy && (!hasRecords || dirty)
 
   async function onSave() {
     setBusy(true)
     try {
-      const itemsPayload = items
-        .filter((i) => state[i.athleteId].status !== null)
-        .map((i) => ({
+      const result = await saveAttendance({
+        lessonId,
+        items: items.map((i) => ({
           athleteId: i.athleteId,
-          status: state[i.athleteId].status!,
-          notes: state[i.athleteId].notes.trim() || null,
-        }))
-
-      if (itemsPayload.length === 0) {
-        toast.error("Seleziona almeno una marcatura")
-        setBusy(false)
-        return
-      }
-
-      const result = await saveAttendance({ lessonId, items: itemsPayload })
+          status: statusOf(rows[i.athleteId]),
+          // Le note scritte in passato non si perdono
+          notes: i.currentNotes,
+        })),
+      })
       if (!result.ok) {
         toast.error(result.error)
-        setBusy(false)
         return
       }
-      toast.success("Presenze salvate")
+      toast.success(
+        `Presenze salvate: ${presentCount} ${presentCount === 1 ? "presente" : "presenti"} su ${items.length}`,
+      )
       router.refresh()
     } catch (error) {
       logError("[attendance form] save error", error)
-      toast.error("Errore salvataggio presenze")
+      toast.error("Non è stato possibile salvare le presenze, riprova")
     } finally {
       setBusy(false)
     }
@@ -160,74 +120,53 @@ export function AttendanceForm({
         <CardContent className="p-0">
           <ul className="divide-y">
             {items.map((item) => {
-              const s = state[item.athleteId]
+              const row = rows[item.athleteId]
+              const checkboxId = `presente-${item.athleteId}`
               return (
-                <li key={item.athleteId} className="flex flex-col gap-3 p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold uppercase">
-                      {item.firstName.charAt(0)}
-                      {item.lastName.charAt(0)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">
+                <li key={item.athleteId} className="flex items-center gap-2 pr-2">
+                  {/* L'etichetta è tutta la riga: il dito prende il nome, non
+                      solo la casella */}
+                  <label
+                    htmlFor={checkboxId}
+                    className={cn(
+                      "flex min-h-14 flex-1 cursor-pointer items-center gap-3 py-2 pl-3",
+                      locked && "cursor-default",
+                    )}
+                  >
+                    <Checkbox
+                      id={checkboxId}
+                      className="size-6 [&_svg]:size-4"
+                      checked={row.present}
+                      disabled={locked || busy}
+                      onCheckedChange={(checked) =>
+                        setPresent(item.athleteId, checked === true)
+                      }
+                    />
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-base font-medium">
                         {item.firstName} {item.lastName}
-                      </p>
-                    </div>
+                      </span>
+                      {locked ? (
+                        <span className="text-xs text-muted-foreground">
+                          {item.currentStatus ? STATUS_LABEL[item.currentStatus] : "Non segnata"}
+                        </span>
+                      ) : !row.present && row.justified ? (
+                        <span className="text-xs text-muted-foreground">Assenza giustificata</span>
+                      ) : null}
+                    </span>
+                  </label>
+                  {!locked && !row.present ? (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className={cn(
-                        "min-h-11 shrink-0 text-xs",
-                        s.notesOpen && "bg-muted",
-                      )}
-                      onClick={() => toggleNotes(item.athleteId)}
-                      aria-label="Note"
+                      className={cn("min-h-11 shrink-0 text-xs", row.justified && "bg-muted")}
+                      aria-pressed={row.justified}
+                      disabled={busy}
+                      onClick={() => toggleJustified(item.athleteId)}
                     >
-                      <MessageSquarePlus className="h-4 w-4" />
+                      Giustificata
                     </Button>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    {STATUS_OPTIONS.map((opt) => {
-                      const active = s.status === opt.value
-                      return (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          disabled={locked || busy}
-                          onClick={() => setStatus(item.athleteId, opt.value)}
-                          className={cn(
-                            "flex min-h-11 items-center justify-center gap-1 rounded-md border px-3 py-2 text-sm font-medium transition",
-                            active ? opt.activeClassName : opt.className,
-                            (locked || busy) && "cursor-not-allowed opacity-60",
-                          )}
-                          aria-pressed={active}
-                        >
-                          {active ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <span className="font-bold tabular-nums">
-                              {opt.short}
-                            </span>
-                          )}
-                          <span className="hidden sm:inline">{opt.label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {s.notesOpen ? (
-                    <Textarea
-                      placeholder="Note (opzionale)"
-                      value={s.notes}
-                      onChange={(e) =>
-                        setNotes(item.athleteId, e.target.value)
-                      }
-                      disabled={locked || busy}
-                      maxLength={500}
-                      rows={2}
-                    />
                   ) : null}
                 </li>
               )
@@ -237,37 +176,23 @@ export function AttendanceForm({
       </Card>
 
       {!locked ? (
-        <div className="sticky bottom-20 z-10 -mx-4 border-t bg-card px-4 py-3 shadow-md sm:mx-0 sm:rounded-md sm:border">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              {unmarked === 0
-                ? "Tutte registrate"
-                : `${unmarked} ${unmarked === 1 ? "non registrata" : "non registrate"}`}
-            </p>
-            <Button
-              onClick={onSave}
-              disabled={busy || !dirty}
-              className="min-h-11"
-            >
-              {busy ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvataggio...
-                </>
-              ) : (
-                "Salva presenze"
-              )}
-            </Button>
-          </div>
+        <div className="sticky bottom-20 z-10 -mx-4 border-t bg-card/95 px-4 py-3 shadow-md backdrop-blur sm:mx-0 sm:rounded-md sm:border">
+          <p className="mb-2 text-center text-xs text-muted-foreground" aria-live="polite">
+            {presentCount} {presentCount === 1 ? "presente" : "presenti"} su {items.length}
+            {" · "}chi non è spuntata risulta assente
+          </p>
+          <Button onClick={onSave} disabled={!canSave} className="min-h-11 w-full">
+            {busy ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                Salvataggio…
+              </>
+            ) : (
+              "Salva"
+            )}
+          </Button>
         </div>
-      ) : (
-        <Card>
-          <CardContent className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-            <X className="h-4 w-4" />
-            Lezione registrata. Per modificare contatta l&apos;amministratore.
-          </CardContent>
-        </Card>
-      )}
+      ) : null}
     </>
   )
 }
