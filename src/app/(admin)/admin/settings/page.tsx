@@ -1,3 +1,5 @@
+import { adminHasVerifiedFactor } from "@/lib/auth/mfa"
+import { countUnusedRecoveryCodes } from "@/lib/auth/recovery-codes"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { loadNumberingPreviewContext } from "@/lib/receipts/numbering-context"
 import type {
@@ -26,7 +28,7 @@ import {
 export default async function SettingsPage() {
   const { userId } = await requireAdmin()
 
-  const [brand, receipt, profile, admins, auditRows, reminder, reminderPreview] =
+  const [brand, receipt, profile, adminUsers, auditRows, reminder, reminderPreview] =
     await Promise.all([
       getBrandSettings(),
       getReceiptSettings(),
@@ -36,6 +38,15 @@ export default async function SettingsPage() {
       getReminderConfig(),
       previewCronReminders(),
     ])
+
+  // Il secondo fattore vive in Supabase Auth: una chiamata per admin (sono due)
+  const admins = await Promise.all(
+    adminUsers.map(async (a) => ({
+      ...a,
+      hasSecondFactor: await adminHasVerifiedFactor(a.id),
+      recoveryCodesLeft: await countUnusedRecoveryCodes(a.id),
+    })),
+  )
 
   const initialAssociation: AssociationValues = {
     asdName: brand.asdName,

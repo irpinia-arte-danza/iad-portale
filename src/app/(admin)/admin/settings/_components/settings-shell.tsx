@@ -50,6 +50,8 @@ interface SettingsShellProps {
     lastName: string | null
     isActive: boolean
     createdAt: Date
+    hasSecondFactor: boolean
+    recoveryCodesLeft: number
   }[]
   auditRows: AuditLogRow[]
 }

@@ -89,6 +89,8 @@ export async function getSettingsAuditLog(
           "INVITE_ADMIN",
           "LOGO_UPLOAD",
           "LOGO_DELETE",
+          "MFA_ENROLL",
+          "MFA_RESET",
         ],
       },
     },

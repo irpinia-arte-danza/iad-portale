@@ -59,6 +59,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.46 RLS spenta di proposito, Data API chiusa con i REVOKE in migration
 - [Supabase Auth](#supabase-auth)
   - §17.35 Email OTP expiration a 86400: avviso del security advisor voluto
+  - §17.49 Secondo fattore degli admin: il controllo aal2 sta in `adminGate`, chiamato da proxy e `requireAdmin`
 - [Domain specifico](#domain-specifico)
   - §17.19 `AcademicYear.endDate` ≠ course season end
 
@@ -403,6 +404,14 @@ Pattern applicato in `src/app/ricevute/[receiptId]/route.ts` (pagine distinte 40
 ## Supabase Auth
 
 **§17.35 Email OTP expiration a 86400 — l'avviso del security advisor è voluto**: in Supabase Dashboard → Authentication → Providers → Email, "Email OTP Expiration" è impostato a **86400 secondi (24 ore)**, il massimo consentito. Il security advisor segnala "OTP expiry exceeds recommended threshold": **non va "sistemato" riportandolo a 3600**. Il valore decide la durata dei link di invito e di recupero password generati con `auth.admin.generateLink` (vedi `docs/email-system.md`). Motivo: Giuseppina invia l'accesso a ~40 famiglie in una sera, e molti genitori aprono l'email il giorno dopo; con un link da un'ora la maggior parte degli inviti sarebbe inutilizzabile e diventerebbe una richiesta di supporto. Il rischio residuo è coperto da: link monouso, invalidato da ogni reinvio, e dal tasto "Reinvia accesso" / pagina "Password dimenticata" per i link scaduti. Se l'avviso compare in un audit, rimandare a questa voce. Scoperto: Sprint onboarding, settembre 2026.
+
+**§17.49 Secondo fattore degli admin — il controllo aal2 sta in `adminGate`, chiamato dal proxy e da `requireAdmin`**: dalla PR del secondo fattore un utente con ruolo ADMIN è «admin» solo se la sua sessione ha superato anche il TOTP. Il fattore è di Supabase Auth (`mfa.enroll` / `mfa.challengeAndVerify`, nessuna tabella nostra); il livello della sessione è il claim `aal` del JWT (`aal1` = solo password, `aal2` = anche il codice), letto da `sessionLevelFromClaims` (`src/lib/auth/mfa-gate.ts`) sul payload del token **dopo** che `getUser()` lo ha fatto verificare a Supabase. La decisione è una funzione pura, `adminGate({ role, aal, recoveryPass })`, e la chiamano in due: **`src/proxy.ts` step 5** (dentro `/admin`, redirect a `/verifica-2fa`) e **`requireAdmin()`** (`src/lib/auth/require-admin.ts`, stesso redirect). Chi aggiunge una terza porta verso dati admin deve passare da lì, non riscrivere il confronto con `"aal2"`. Cose da sapere:
+- **Le pagine del secondo passaggio stanno fuori da `/admin`**: `/verifica-2fa` e `/imposta-2fa` sono nel gruppo `(account)`, raggiungibili con aal1, e usano `requireAdminFirstFactor()` (solo ruolo). Dentro `/admin` farebbero loop col proxy.
+- **I codici di recupero non alzano l'aal**: Supabase non li ha. Un codice valido (hash bcrypt in `mfa_recovery_codes`, segnato `used_at` alla prima verifica) emette il cookie `iad_mfa_pass`, firmato HMAC con chiave derivata dalla service role e legato a `userId` + `session_id` del JWT, 12 ore. `adminGate` lo conta come secondo fattore. Un logout cambia `session_id` e il cookie muore con la sessione.
+- **Cambio password (`/imposta-password`) e sostituzione del fattore (`/imposta-2fa`)**: per un admin con fattore attivo servono aal2 o il lasciapassare, altrimenti chi ha la sola password sostituirebbe l'iPad col proprio telefono. Un admin **senza** fattore (appena invitato, o azzerato) sceglie prima la password e poi viene portato all'iscrizione.
+- **Azzeramento dall'altro admin**: `auth.admin.mfa.deleteFactor` con la service role + `deleteMany` dei codici, riga `MFA_RESET` nell'audit. Il TOTP deve restare abilitato nel progetto Supabase (Authentication → Multi-Factor): se qualcuno lo spegne dalla dashboard, `mfa.enroll` fallisce e nessun admin entra più. Sequenza per Giuseppina in `docs/runbook.md`.
+- **Codice sbagliato = tentativo di login**: stessa tabella `login_attempts` (kind `LOGIN`, email dell'utente, IP), stesso blocco di 15 minuti dopo 5.
+- **Una server action che scrive un cookie fa rifare il rendering della pagina**: dopo `cookies().set` del lasciapassare, Next rimanda al client l'albero aggiornato di `/verifica-2fa`, che con il lasciapassare valido faceva `redirect` alla dashboard prima che il client mostrasse «Ti restano n codici». L'avviso vive quindi in un secondo cookie breve (`iad_mfa_notice`) che la pagina legge e il tasto «Continua» cancella; non in uno stato React.
 
 ---
 

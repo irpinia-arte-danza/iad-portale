@@ -1,8 +1,10 @@
 "use client"
 
+import Link from "next/link"
 import { ShieldCheck } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -15,6 +17,7 @@ import type { AuditLogRow } from "../queries"
 
 import { AdminInviteForm } from "./admin-invite-form"
 import { AuditLogList } from "./audit-log-list"
+import { ResetSecondFactorButton } from "./reset-second-factor-button"
 
 interface AdminRow {
   id: string
@@ -23,6 +26,8 @@ interface AdminRow {
   lastName: string | null
   isActive: boolean
   createdAt: Date
+  hasSecondFactor: boolean
+  recoveryCodesLeft: number
 }
 
 interface AdminTabProps {
@@ -38,9 +43,12 @@ export function AdminTab({ currentUserId, admins, auditRows }: AdminTabProps) {
         <CardHeader>
           <CardTitle>Amministratori attivi</CardTitle>
           <CardDescription>
-            Utenti con accesso completo al pannello. La revoca non è disponibile
-            per sicurezza: per disabilitare un admin contatta il responsabile
-            tecnico.
+            Utenti con accesso completo al pannello. Ogni amministratore entra
+            con password e secondo fattore (i sei numeri dell&apos;app). Se
+            l&apos;altro amministratore ha perso il dispositivo, da qui gli
+            azzeri il secondo fattore: al prossimo accesso lo ricollega. La
+            revoca dell&apos;accesso non è disponibile per sicurezza: per
+            disabilitare un admin contatta il responsabile tecnico.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -68,11 +76,26 @@ export function AdminTab({ currentUserId, admins, auditRows }: AdminTabProps) {
                       <span className="text-xs text-muted-foreground">
                         {a.email}
                       </span>
+                      <span className="text-xs text-muted-foreground">
+                        {a.hasSecondFactor
+                          ? `Secondo fattore attivo · ${a.recoveryCodesLeft} codici di recupero`
+                          : "Secondo fattore non ancora collegato"}
+                      </span>
                     </div>
                   </div>
-                  {!a.isActive ? (
-                    <Badge variant="destructive">disattivato</Badge>
-                  ) : null}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {!a.isActive ? (
+                      <Badge variant="destructive">disattivato</Badge>
+                    ) : null}
+                    {isMe && a.hasSecondFactor ? (
+                      <Button asChild variant="outline" size="sm" className="min-h-11 sm:min-h-9">
+                        <Link href="/imposta-2fa">Collega di nuovo l&apos;app</Link>
+                      </Button>
+                    ) : null}
+                    {!isMe && (a.hasSecondFactor || a.recoveryCodesLeft > 0) ? (
+                      <ResetSecondFactorButton userId={a.id} name={fullName} />
+                    ) : null}
+                  </div>
                 </li>
               )
             })}

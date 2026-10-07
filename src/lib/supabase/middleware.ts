@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { sessionLevelOf } from "@/lib/auth/mfa";
+import type { SessionLevel } from "@/lib/auth/mfa-gate";
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -35,5 +38,10 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return { supabaseResponse, user };
+  // Il livello della sessione (aal1/aal2) per il proxy: dal JWT, che getUser
+  // ha appena fatto verificare a Supabase
+  let level: SessionLevel = { aal: "aal1", sessionId: null };
+  if (user) level = await sessionLevelOf(supabase);
+
+  return { supabaseResponse, user, level };
 }

@@ -883,6 +883,39 @@ backup notturno da solo (`storage-consents.tar.gpg`).
 
 ---
 
+## Secondo fattore degli admin (2FA)
+
+Dalla PR del secondo fattore ogni admin entra con password **e** sei numeri
+generati dall'app Password dell'iPad (TOTP di Supabase Auth). Genitori e
+insegnanti non sono toccati. Il controllo è in `adminGate`
+(`docs/gotchas.md` §17.49).
+
+### Primo accesso dopo il deploy — da leggere a Giuseppina al telefono
+
+1. Entra nel portale come sempre, con email e password: compare la pagina «Proteggi il tuo accesso».
+2. Sull'iPad apri l'app **Password**, cerca l'account del portale (o creane uno con email e password del portale) e tocca **Imposta codice di verifica**.
+3. Scegli **Scansiona codice QR** e inquadra il quadrato che vedi nel portale.
+4. Nell'app compaiono sei numeri che cambiano ogni mezzo minuto: scrivili nel portale e tocca **Collega l'app**.
+5. Il portale ti mostra otto codici di recupero: copiali nelle note di quell'account nell'app Password (tasto «Copia i codici», poi incolla) e spunta «Ho salvato gli otto codici».
+6. Da oggi, dopo la password, il portale chiede i sei numeri: li trovi nell'app Password sotto l'account del portale, oppure l'iPad li suggerisce da solo sopra la tastiera.
+
+### Se l'iPad non c'è
+
+- Alla pagina dei sei numeri tocca «Non hai l'iPad? Usa un codice di recupero» e scrivi uno degli otto codici. Vale **una volta sola**; il portale dice quanti ne restano. Sotto i tre, da Impostazioni › Account «Collega di nuovo l'app» per averne otto nuovi (serve l'app, o un altro codice).
+- iPad perso, codici persi: **l'altro admin** entra in Impostazioni › Account › Amministratori attivi e tocca **Azzera il secondo fattore** sull'account bloccato. Resta nel registro attività (`MFA_RESET`). Al login successivo quell'admin rifà i punti 1–5.
+- Entrambi gli admin chiusi fuori: dalla dashboard Supabase (Authentication → Users → utente → Multi-factor) si toglie il fattore a mano; i codici di recupero si cancellano con `DELETE FROM mfa_recovery_codes WHERE user_id = '…'` dal SQL editor. Al login l'admin rifà l'iscrizione.
+
+### Cosa deve restare acceso in Supabase
+
+- Authentication → Multi-Factor → **TOTP abilitato** (lo è da prima della PR). Se viene spento, l'iscrizione fallisce e nessun admin nuovo o azzerato riesce a entrare.
+- La verifica non usa l'SMTP di Supabase né email: non c'è niente da configurare in Resend.
+
+### Dopo un codice sbagliato cinque volte
+
+Stesso blocco del login: 15 minuti per quell'email e per quell'IP (`login_attempts`). Non si sblocca a mano: si aspetta.
+
+---
+
 ## Endas / CSEN — invio tesseramenti
 
 Non esiste API: il flusso resta manuale.

@@ -12,6 +12,8 @@ const ACTION_LABELS: Record<string, string> = {
   INVITE_ADMIN: "Invito amministratore inviato",
   LOGO_UPLOAD: "Logo caricato",
   LOGO_DELETE: "Logo rimosso",
+  MFA_ENROLL: "Secondo fattore collegato",
+  MFA_RESET: "Secondo fattore azzerato",
 }
 
 const ACTION_VARIANT: Record<
@@ -26,6 +28,8 @@ const ACTION_VARIANT: Record<
   INVITE_ADMIN: "default",
   LOGO_UPLOAD: "outline",
   LOGO_DELETE: "destructive",
+  MFA_ENROLL: "default",
+  MFA_RESET: "destructive",
 }
 
 function formatWhen(date: Date): string {

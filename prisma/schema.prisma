@@ -52,6 +52,7 @@ model User {
 
   parentProfile  Parent?
   teacherProfile Teacher?
+  mfaRecoveryCodes MfaRecoveryCode[]
   athleteProfile Athlete?
   auditLogs      AuditLog[]
   emailsSent     EmailLog[] @relation("EmailsSent")
@@ -1501,6 +1502,10 @@ enum AuditAction {
   GUARDIAN_LINK
   GUARDIAN_UNLINK
   ANNUAL_EXPORT
+  // Secondo fattore degli admin: iscrizione completata, azzeramento da parte
+  // dell'altro admin (migration a sé)
+  MFA_ENROLL
+  MFA_RESET
 }
 
 model AuditLog {
@@ -1548,4 +1553,25 @@ model LoginAttempt {
   @@index([email, createdAt])
   @@index([ip, createdAt])
   @@map("login_attempts")
+}
+
+// ============================================================================
+// SECURITY: codici di recupero del secondo fattore (admin)
+// ============================================================================
+
+// Otto codici per admin, generati dal portale alla fine dell'iscrizione al
+// secondo fattore e mostrati una volta sola. Qui c'è solo l'hash (bcrypt):
+// un codice vale una volta, poi usedAt. L'azzeramento del secondo fattore
+// li cancella tutti.
+model MfaRecoveryCode {
+  id       String @id @default(uuid()) @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash String @map("code_hash")
+
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
 }
