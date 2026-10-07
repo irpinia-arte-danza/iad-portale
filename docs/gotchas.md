@@ -61,6 +61,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
   - §17.35 Email OTP expiration a 86400: avviso del security advisor voluto
   - §17.49 Secondo fattore degli admin: il controllo aal2 sta in `adminGate`, chiamato da proxy e `requireAdmin`
   - §17.50 Storico accessi admin: l'iPad si presenta come un Mac, il paese c'è solo su Vercel, le email con `after()`
+  - §17.51 `X-Frame-Options` è SAMEORIGIN, non DENY: l'anteprima della ricevuta è un nostro iframe
 - [Domain specifico](#domain-specifico)
   - §17.19 `AcademicYear.endDate` ≠ course season end
 
@@ -419,6 +420,8 @@ Pattern applicato in `src/app/ricevute/[receiptId]/route.ts` (pagine distinte 40
 - **Il paese esiste solo su Vercel.** `x-vercel-ip-country` lo aggiunge la rete di Vercel; in locale e nei test non c'è, e `loginAnomalies` con paese `null` **non** avvisa (sarebbe un falso allarme a ogni login di sviluppo). Per provare «dall'estero» in locale: un proxy davanti a `next dev` che aggiunge l'header (vedi la PR di Sicurezza 5).
 - **Gli avvisi partono con `after()` di `next/server`**, dentro la server action: il login risponde subito, l'email parte dopo la risposta, e se Resend fallisce l'errore va in `logError` (e in `EmailLog` con `FAILED`). Mai `await sendEmail(...)` sulla strada del login: un provider lento o giù non deve tenere Giuseppina fuori. Lo storico si scrive invece prima della risposta, ma dentro `try/catch`: un errore di scrittura si logga e il login va avanti.
 - **Il cookie `iad_device` si rinnova a ogni accesso riuscito** (un anno dall'ultimo login, non dal primo), ed è firmato come il lasciapassare della #54 (`device-cookie.ts`): un cookie inventato o di un altro portale vale come «nessun cookie», cioè dispositivo nuovo. «Dimentica» non tocca il cookie: segna `forgotten_at` sulla riga di `admin_devices`, e al login successivo quello stesso id è di nuovo nuovo (la riga si riusa, `first_seen_at` riparte).
+
+**§17.51 `X-Frame-Options: SAMEORIGIN` (e `frame-ancestors 'self'`), non DENY**: l'header non protegge la pagina che *contiene* un iframe, vale per la risposta che ci finisce *dentro*. Con `DENY` su tutte le route (#53) il browser rifiutava anche i frame nostri: l'anteprima della ricevuta nel pannello di emissione (`<iframe src="/ricevute/anteprima/[paymentId]">`) restava bianca su iPad e dava «Connessione negata» su Safari Mac, e lo stesso valeva per il PDF emesso (`/ricevute/[receiptId]`) quando il visualizzatore PDF del browser lo carica in un frame interno. `SAMEORIGIN` blocca comunque ogni sito esterno (clickjacking) e lascia passare i nostri. Il valore sta in `FRAME_OPTIONS` (`src/lib/security/headers.ts`) e `route-headers.test.ts` lo controlla sulla regola vera di `next.config.ts`. Le anteprime delle email sono iframe `srcDoc` con `sandbox=""`: non caricano un URL, questo header non le riguarda. Se un giorno servisse un iframe verso un'origine esterna, si tocca `frame-src`, non questo. In locale i test di #53 non lo vedevano perché controllavano il valore dell'header, non un iframe caricato davvero.
 
 ---
 

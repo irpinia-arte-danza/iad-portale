@@ -13,7 +13,9 @@ describe("securityHeaders", () => {
     const map = Object.fromEntries(
       securityHeaders(PROD).map((h) => [h.key, h.value]),
     )
-    expect(map["X-Frame-Options"]).toBe("DENY")
+    // SAMEORIGIN e non DENY: i nostri iframe (anteprima e PDF della
+    // ricevuta) devono poter caricare le nostre route
+    expect(map["X-Frame-Options"]).toBe("SAMEORIGIN")
     expect(map["X-Content-Type-Options"]).toBe("nosniff")
     expect(map["Referrer-Policy"]).toBe("strict-origin-when-cross-origin")
     expect(map["Permissions-Policy"]).toBe(PERMISSIONS_POLICY)
@@ -37,7 +39,8 @@ describe("securityHeaders", () => {
     expect(csp).toContain("img-src 'self' data: blob: https://abc.supabase.co")
     expect(csp).toContain("connect-src 'self' https://abc.supabase.co")
     expect(csp).toContain("frame-src 'self'")
-    expect(csp).toContain("frame-ancestors 'none'")
+    expect(csp).toContain("frame-ancestors 'self'")
+    expect(csp).not.toContain("frame-ancestors 'none'")
     expect(csp).toContain("object-src 'none'")
     expect(csp).toContain("form-action 'self'")
     // Nessun'altra origine esterna
