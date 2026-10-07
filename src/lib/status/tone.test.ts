@@ -60,3 +60,29 @@ describe("quando una cosa blocca e quando no", () => {
     }
   })
 })
+
+// L'area genitori usa gli stessi toni del gestionale (§17.43): una rata
+// scaduta è ambra «da pagare», mai rossa; il rosso resta a certificato e
+// tessera mancanti o scaduti, che tengono l'allieva fuori dalla sala.
+describe("tono del genitore", () => {
+  it("rata scaduta → fix (ambra, «da pagare»), mai block", () => {
+    expect(statusTone({ kind: "contributions", overdue: true })).toBe("fix")
+    expect(statusTone({ kind: "contributions", overdue: true })).not.toBe("block")
+    expect(statusTone({ kind: "contributions", overdue: false })).toBe("neutral")
+  })
+
+  it("certificato assente o scaduto → block («senza certificato non può fare lezione»)", () => {
+    expect(statusTone({ kind: "certificate", status: "missing" })).toBe("block")
+    expect(statusTone({ kind: "certificate", status: "expired" })).toBe("block")
+  })
+
+  it("certificato in scadenza → fix, valido → neutral", () => {
+    expect(statusTone({ kind: "certificate", status: "expiring" })).toBe("fix")
+    expect(statusTone({ kind: "certificate", status: "valid" })).toBe("neutral")
+  })
+
+  it("tessera assente o scaduta → block, come il certificato", () => {
+    expect(statusTone({ kind: "card", status: "missing" })).toBe("block")
+    expect(statusTone({ kind: "card", status: "expired" })).toBe("block")
+  })
+})
