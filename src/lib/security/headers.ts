@@ -3,7 +3,8 @@
 //
 // Qui e non nel config perché il config non si testa; questa è una funzione
 // pura con il suo test. Il portale è un'applicazione privata che tratta dati
-// di minori: non deve mai stare dentro un frame altrui (clickjacking), il
+// di minori: non deve mai stare dentro un frame altrui (clickjacking; i
+// frame nostri sì: l'anteprima e il PDF della ricevuta sono iframe same-origin), il
 // browser non deve indovinare i content-type, il referrer non deve portare
 // fuori l'indirizzo delle pagine, e delle API del browser serve solo la
 // fotocamera (la foto del certificato medico).
@@ -72,17 +73,25 @@ export function contentSecurityPolicy(options: SecurityHeadersOptions): string {
     "base-uri": ["'self'"],
     // Il solo form che fa POST classico è /auth/confirm, stessa origine
     "form-action": ["'self'"],
-    // Equivalente di X-Frame-Options: DENY per i browser moderni
-    "frame-ancestors": ["'none'"],
+    // Equivalente di X-Frame-Options: SAMEORIGIN per i browser moderni.
+    // Non 'none': vedi FRAME_OPTIONS qui sotto
+    "frame-ancestors": ["'self'"],
   }
   return Object.entries(directives)
     .map(([name, values]) => `${name} ${values.join(" ")}`)
     .join("; ")
 }
 
+// SAMEORIGIN, non DENY. L'header vale per la risposta che viene messa NEL
+// frame: con DENY su tutte le route il browser rifiutava anche i nostri
+// iframe, cioè l'anteprima della ricevuta (/ricevute/anteprima/[paymentId]) e
+// il PDF emesso (/ricevute/[receiptId]): riquadro bianco su iPad,
+// «Connessione negata» su Safari. Un sito esterno resta fuori comunque.
+export const FRAME_OPTIONS = "SAMEORIGIN"
+
 export function securityHeaders(options: SecurityHeadersOptions): SecurityHeader[] {
   return [
-    { key: "X-Frame-Options", value: "DENY" },
+    { key: "X-Frame-Options", value: FRAME_OPTIONS },
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     { key: "Permissions-Policy", value: PERMISSIONS_POLICY },
