@@ -8,12 +8,14 @@ import type {
   ProfileValues,
   RicevuteValues,
 } from "@/lib/schemas/admin-settings"
+import type { AdminLoginRow, KnownDevice, PreviousLogin } from "@/lib/auth/admin-logins"
 import type { NumberingPreviewContext } from "@/lib/receipts/numbering-context"
 import type { ReminderConfigValues } from "@/lib/schemas/reminder-config"
 
 import type { AuditLogRow } from "../queries"
 import type { CronPreview } from "../reminder-actions"
 
+import { AccessTab } from "./access-tab"
 import { AccountTab } from "./account-tab"
 import { AdminTab } from "./admin-tab"
 import { AssociationTab } from "./association-tab"
@@ -22,12 +24,15 @@ import { DirtyGuardDialog } from "./dirty-guard-dialog"
 import { ReminderTab } from "./reminder-tab"
 import { RicevuteTab } from "./ricevute-tab"
 import {
+  SETTINGS_TABS,
   SettingsNav,
   type SettingsTabKey,
 } from "./settings-nav"
 
 interface SettingsShellProps {
   currentUserId: string
+  // Da ?tab=…; non valida → la prima scheda
+  initialTab?: string
   initialAssociation: AssociationValues
   initialBrand: {
     colors: BrandValues
@@ -54,10 +59,20 @@ interface SettingsShellProps {
     recoveryCodesLeft: number
   }[]
   auditRows: AuditLogRow[]
+  access: {
+    logins: AdminLoginRow[]
+    devices: KnownDevice[]
+    currentDeviceId: string | null
+    previousLogin: PreviousLogin | null
+  }
 }
 
 export function SettingsShell(props: SettingsShellProps) {
-  const [active, setActive] = useState<SettingsTabKey>("associazione")
+  const [active, setActive] = useState<SettingsTabKey>(
+    SETTINGS_TABS.some((t) => t.key === props.initialTab)
+      ? (props.initialTab as SettingsTabKey)
+      : "associazione",
+  )
   const [dirty, setDirty] = useState(false)
   const [pendingTab, setPendingTab] = useState<SettingsTabKey | null>(null)
 
@@ -100,6 +115,8 @@ export function SettingsShell(props: SettingsShellProps) {
             onDirtyChange={onDirtyChange}
           />
         ) : null}
+
+        {active === "accessi" ? <AccessTab key="accessi" {...props.access} /> : null}
 
         {active === "brand" ? (
           <BrandTab

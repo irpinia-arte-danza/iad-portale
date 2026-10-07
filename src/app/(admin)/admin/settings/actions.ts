@@ -1,10 +1,13 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 
 import { AuditAction, Prisma, ReceiptCategory } from "@prisma/client"
 
+import { forgetKnownDevice } from "@/lib/auth/admin-logins"
 import { adminResetSecondFactor } from "@/lib/auth/mfa"
+import { sendSecurityNotice } from "@/lib/auth/security-notice-email"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { prisma } from "@/lib/prisma"
 import { todayInRome } from "@/lib/receipts/numbering"
@@ -593,10 +596,37 @@ export async function resetAdminSecondFactor(
       entityId: targetUserId,
       changes: result,
     })
+    // Avviso di sicurezza a entrambi gli admin: chi l'ha fatto, per chi
+    const at = new Date()
+    after(() => sendSecurityNotice({ kind: "mfa-reset", byUserId: userId, targetUserId, at }))
     revalidatePath("/admin/settings")
     return { ok: true, data: result }
   } catch (error) {
     logError("[settings] resetAdminSecondFactor failed", error, { targetUserId })
+    return { ok: false, error: GENERIC_ERROR_MESSAGE }
+  }
+}
+
+// ============================================================================
+// Accessi: «Dimentica» un dispositivo conosciuto (torna nuovo al prossimo login)
+// ============================================================================
+export async function forgetDevice(deviceRowId: string): Promise<ActionResult> {
+  const { userId } = await requireAdmin()
+  if (!/^[0-9a-f-]{36}$/i.test(deviceRowId)) return { ok: false, error: "Dispositivo non trovato" }
+  try {
+    const done = await forgetKnownDevice(userId, deviceRowId)
+    if (!done) return { ok: false, error: "Dispositivo non trovato" }
+    await logSettingsChange({
+      userId,
+      action: AuditAction.UPDATE,
+      entityType: "AdminDevice",
+      entityId: deviceRowId,
+      changes: { forgotten: true },
+    })
+    revalidatePath("/admin/settings")
+    return { ok: true }
+  } catch (error) {
+    logError("[settings] forgetDevice failed", error)
     return { ok: false, error: GENERIC_ERROR_MESSAGE }
   }
 }

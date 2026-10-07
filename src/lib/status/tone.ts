@@ -1,3 +1,5 @@
+import type { AdminLoginOutcome } from "@prisma/client"
+
 import type { CardStatus } from "@/lib/affiliations/card-status"
 import type { SetupStepId } from "@/lib/athletes/setup-checklist"
 import type { CertStatus } from "@/lib/medical-certificates/certificate-status"
@@ -34,6 +36,8 @@ export type DomainStatus =
   | { kind: "receipt"; toDeliver: boolean; cancelled?: boolean }
   | { kind: "access"; invited: boolean }
   | { kind: "setupStep"; step: SetupStepId }
+  // Esito di un accesso admin (Impostazioni › Accessi)
+  | { kind: "login"; outcome: AdminLoginOutcome }
 
 export function statusTone(status: DomainStatus): StatusTone {
   switch (status.kind) {
@@ -62,6 +66,12 @@ export function statusTone(status: DomainStatus): StatusTone {
 
     case "access":
       return status.invited ? "neutral" : "fix"
+
+    case "login":
+      // Bloccato = qualcuno ha insistito oltre i cinque tentativi; un codice
+      // o una password sbagliati sono da guardare, non un allarme
+      if (status.outcome === "BLOCKED") return "block"
+      return status.outcome === "OK" ? "neutral" : "fix"
 
     case "setupStep":
       // I passi della scheda: quelli che bloccano sono gli stessi di sopra.

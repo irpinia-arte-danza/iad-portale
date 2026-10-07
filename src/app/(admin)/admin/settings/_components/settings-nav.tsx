@@ -4,6 +4,7 @@ import {
   BellRing,
   Building2,
   FileText,
+  History,
   Palette,
   ShieldCheck,
   UserRound,
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils"
 
 export type SettingsTabKey =
   | "account"
+  | "accessi"
   | "associazione"
   | "brand"
   | "ricevute"
@@ -32,6 +34,7 @@ export const SETTINGS_TABS: {
   icon: React.ComponentType<{ className?: string }>
 }[] = [
   { key: "account", label: "Account", icon: UserRound },
+  { key: "accessi", label: "Accessi", icon: History },
   { key: "associazione", label: "Associazione", icon: Building2 },
   { key: "brand", label: "Brand", icon: Palette },
   { key: "ricevute", label: "Ricevute", icon: FileText },

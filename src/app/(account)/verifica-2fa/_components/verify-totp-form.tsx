@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { touchMacHint } from "@/lib/auth/device-hint"
 import { logError } from "@/lib/logging/log-error"
 
 import { logout } from "@/app/(public)/login/actions"
@@ -37,7 +38,9 @@ export function VerifyTotpForm({ recoveryCodesLeft }: { recoveryCodesLeft: numbe
     setError(null)
     try {
       const result: SecondFactorResult =
-        mode === "totp" ? await verifySecondFactor({ code }) : await redeemRecoveryCode({ code })
+        mode === "totp"
+          ? await verifySecondFactor({ code, touchMac: touchMacHint() })
+          : await redeemRecoveryCode({ code, touchMac: touchMacHint() })
       if (!result.ok || !result.data) {
         setError(result.ok ? "Riprova" : result.error)
         setCode("")

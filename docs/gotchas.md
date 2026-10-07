@@ -60,6 +60,7 @@ Estratto da CLAUDE.md v3.2 il 22 aprile 2026. Aggiornato ad ogni nuova lezione i
 - [Supabase Auth](#supabase-auth)
   - §17.35 Email OTP expiration a 86400: avviso del security advisor voluto
   - §17.49 Secondo fattore degli admin: il controllo aal2 sta in `adminGate`, chiamato da proxy e `requireAdmin`
+  - §17.50 Storico accessi admin: l'iPad si presenta come un Mac, il paese c'è solo su Vercel, le email con `after()`
 - [Domain specifico](#domain-specifico)
   - §17.19 `AcademicYear.endDate` ≠ course season end
 
@@ -412,6 +413,12 @@ Pattern applicato in `src/app/ricevute/[receiptId]/route.ts` (pagine distinte 40
 - **Azzeramento dall'altro admin**: `auth.admin.mfa.deleteFactor` con la service role + `deleteMany` dei codici, riga `MFA_RESET` nell'audit. Il TOTP deve restare abilitato nel progetto Supabase (Authentication → Multi-Factor): se qualcuno lo spegne dalla dashboard, `mfa.enroll` fallisce e nessun admin entra più. Sequenza per Giuseppina in `docs/runbook.md`.
 - **Codice sbagliato = tentativo di login**: stessa tabella `login_attempts` (kind `LOGIN`, email dell'utente, IP), stesso blocco di 15 minuti dopo 5.
 - **Una server action che scrive un cookie fa rifare il rendering della pagina**: dopo `cookies().set` del lasciapassare, Next rimanda al client l'albero aggiornato di `/verifica-2fa`, che con il lasciapassare valido faceva `redirect` alla dashboard prima che il client mostrasse «Ti restano n codici». L'avviso vive quindi in un secondo cookie breve (`iad_mfa_notice`) che la pagina legge e il tasto «Continua» cancella; non in uno stato React.
+
+**§17.50 Storico accessi admin (`admin_logins`) — tre cose che dal codice non si vedono**:
+- **iPadOS si presenta come un Mac.** Dal 2019 Safari su iPad manda lo stesso user agent del Mac (`Macintosh; Intel Mac OS X`): un parser dello user agent, per quanto buono, scrive «Safari su Mac» per l'iPad di Giuseppina. L'unica differenza la vede il browser: `navigator.maxTouchPoints > 1` su piattaforma Mac. Il modulo di accesso e quello del secondo fattore mandano quell'indizio (`src/lib/auth/device-hint.ts`, campo `touchMac`) e `describeUserAgent` lo usa. Se l'indizio manca, la riga dice «Mac»: non è un segnale d'allarme.
+- **Il paese esiste solo su Vercel.** `x-vercel-ip-country` lo aggiunge la rete di Vercel; in locale e nei test non c'è, e `loginAnomalies` con paese `null` **non** avvisa (sarebbe un falso allarme a ogni login di sviluppo). Per provare «dall'estero» in locale: un proxy davanti a `next dev` che aggiunge l'header (vedi la PR di Sicurezza 5).
+- **Gli avvisi partono con `after()` di `next/server`**, dentro la server action: il login risponde subito, l'email parte dopo la risposta, e se Resend fallisce l'errore va in `logError` (e in `EmailLog` con `FAILED`). Mai `await sendEmail(...)` sulla strada del login: un provider lento o giù non deve tenere Giuseppina fuori. Lo storico si scrive invece prima della risposta, ma dentro `try/catch`: un errore di scrittura si logga e il login va avanti.
+- **Il cookie `iad_device` si rinnova a ogni accesso riuscito** (un anno dall'ultimo login, non dal primo), ed è firmato come il lasciapassare della #54 (`device-cookie.ts`): un cookie inventato o di un altro portale vale come «nessun cookie», cioè dispositivo nuovo. «Dimentica» non tocca il cookie: segna `forgotten_at` sulla riga di `admin_devices`, e al login successivo quello stesso id è di nuovo nuovo (la riga si riusa, `first_seen_at` riparte).
 
 ---
 

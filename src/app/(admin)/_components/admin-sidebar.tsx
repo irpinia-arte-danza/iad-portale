@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/sidebar"
 import { LogoutButton } from "@/components/auth/logout-button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { formatAccessMoment } from "@/lib/auth/access-format"
+import type { PreviousLogin } from "@/lib/auth/admin-logins"
 import type { NavCounters } from "@/lib/dashboard/todo-tiles"
 import type { StatusTone } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
@@ -40,6 +42,8 @@ type AdminSidebarProps = {
   // Lavoro in sospeso accanto alle voci: gli stessi numeri dei riquadri
   // della dashboard
   counters: NavCounters
+  // L'accesso riuscito precedente a questa sessione (null al primo)
+  lastAccess: PreviousLogin | null
 }
 
 // Il tono arriva da statusTone come per i riquadri e i badge: qui si
@@ -57,6 +61,7 @@ export function AdminSidebar({
   email,
   brand,
   counters,
+  lastAccess,
 }: AdminSidebarProps) {
   const pathname = usePathname()
   // Sotto i 1024 la sidebar è un Sheet sopra la pagina: toccata una voce va
@@ -175,6 +180,16 @@ export function AdminSidebar({
         <div className="flex flex-col gap-0.5 px-2 py-1 text-xs">
           <span className="truncate font-medium">{displayName}</span>
           <span className="truncate text-muted-foreground">{email}</span>
+          {/* Piccolo, ma sempre lì: un orario che non si riconosce si nota */}
+          <Link
+            href="/admin/settings?tab=accessi"
+            className="truncate text-[11px] text-muted-foreground underline-offset-4 hover:underline"
+            title="Storico degli accessi"
+          >
+            {lastAccess
+              ? `Ultimo accesso: ${formatAccessMoment(lastAccess.at, { year: false })} · ${lastAccess.device}`
+              : "Ultimo accesso: primo da quando c'è lo storico"}
+          </Link>
         </div>
         <div className="flex items-center justify-between gap-2 px-2 py-1">
           <LogoutButton />

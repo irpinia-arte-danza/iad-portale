@@ -316,6 +316,7 @@ Il target principale di queste due aree è lo **smartphone** (iPhone Safari + An
 - ✅ Validazione Zod su ogni input, client E server
 - ✅ Sanitizzazione HTML se renderizzi contenuto utente
 - ✅ CSP header via `next.config.ts`
+- ✅ Storico accessi admin (`admin_logins`, 90 giorni) e avvisi email solo sugli accessi anomali (vedi «Flussi email»)
 - ✅ 2FA **obbligatoria** per admin: TOTP di Supabase Auth + 8 codici di recupero del portale; `requireAdmin()` e il proxy accettano solo sessioni aal2 (vedi `docs/gotchas.md` §17.49)
 
 ---
@@ -330,7 +331,9 @@ Sistema email end-to-end operativo (Sprint 3 chiuso 22 aprile 2026).
 
 Per dettagli architettura, cronologia 9 fasi, gotcha specifici (§17.25-27), file principali ed env vars: **`docs/email-system.md`**.
 
-**Regola: nessuna email alle famiglie parte da sola** (inviti, solleciti, ricevute li manda l'admin). **Unica eccezione**: l'avviso di sicurezza «La tua password è stata cambiata» (`src/lib/auth/password-changed-email.ts`), inviato all'interessato subito dopo un cambio password da `/imposta-password`. È un avviso all'utente stesso, non una comunicazione alle famiglie: se non è stato lui, ha il tempo di scrivere alla segreteria. Testo fisso nel codice, non nei modelli modificabili; tracciato in `EmailLog` con `milestoneKey = PASSWORD_CHANGED`.
+**Regola: nessuna email alle famiglie parte da sola** (inviti, solleciti, ricevute li manda l'admin). **Due eccezioni, entrambe avvisi di sicurezza**, con testo fisso nel codice (non nei modelli modificabili) e tracciate in `EmailLog`:
+1. «La tua password è stata cambiata» (`src/lib/auth/password-changed-email.ts`), all'interessato subito dopo un cambio password da `/imposta-password`; `milestoneKey = PASSWORD_CHANGED`.
+2. Gli **avvisi agli admin** (`src/lib/auth/security-notice-email.ts`), a tutti gli admin attivi, solo per: accesso riuscito da un dispositivo nuovo o da fuori Italia, cinque tentativi falliti in dieci minuti su un account admin (una sola email), azzeramento del secondo fattore. Inviati con `after()`, mai bloccanti per il login; `milestoneKey = SECURITY_*`. Storico in `admin_logins` (90 giorni), pagina Impostazioni › Accessi.
 
 ### WhatsApp (MVP = link manuale)
 Per ora NON integriamo WhatsApp Business API. Però ogni pagina rilevante ha un bottone "Invia via WhatsApp" che apre `wa.me/NUMERO?text=MESSAGGIO_PRECOMPILATO`. Giuseppina clicca → si apre WhatsApp Web → manda.
