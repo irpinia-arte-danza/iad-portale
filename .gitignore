@@ -41,3 +41,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# Screenshot delle PR: si allegano su GitHub, non si committano (repo pubblico)
+docs/screenshots/

@@ -229,7 +229,30 @@ export function AssociationTab({ initial, onDirtyChange }: AssociationTabProps) 
                     />
                   </FormControl>
                   <FormDescription>
-                    Mostrato in ricevute e comunicazioni per bonifici.
+                    Mostrato in ricevute e nell&apos;area genitori per i bonifici. Solo
+                    IBAN italiani (IT + 25 caratteri).
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="bankAccountHolder"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>Intestatario del conto (opzionale)</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      value={field.value ?? ""}
+                      placeholder="es. A.S.D. IAD Irpinia Arte Danza"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Quello che la famiglia scrive come beneficiario del bonifico. Se vuoto, il
+                    nome dell&apos;associazione.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

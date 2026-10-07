@@ -1310,6 +1310,8 @@ model BrandSettings {
   asdPhone      String? @map("asd_phone")
   asdWebsite    String? @map("asd_website")
   asdIban       String? @map("asd_iban")
+  // Intestatario del conto per i bonifici delle famiglie; se vuoto, asdName
+  bankAccountHolder String? @map("bank_account_holder")
   asdSdiCode    String? @map("asd_sdi_code") // Codice SDI fattura elettronica
 
   // Indirizzo legale (nuovo: decomposto)

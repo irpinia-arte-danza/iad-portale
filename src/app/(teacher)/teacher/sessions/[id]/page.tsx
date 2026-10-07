@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Lock } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { ATTENDANCE_EDIT_DAYS, attendanceEditCutoff } from "@/lib/attendance/edit-window"
 import { prisma } from "@/lib/prisma"
 import { requireTeacher } from "@/lib/auth/require-teacher"
 import { formatDateLong } from "@/lib/utils/format"
@@ -21,6 +22,9 @@ type PageProps = {
   params: Promise<{ id: string }>
 }
 
+// La pagina delle presenze di una lezione: elenco delle allieve con una
+// casella ciascuna e un solo tasto Salva. Dopo ATTENDANCE_EDIT_DAYS giorni
+// la lezione è chiusa (#53): si vede ancora chi c'era, non si cambia più.
 export default async function SessionPage({ params }: PageProps) {
   const { teacherId } = await requireTeacher()
   const { id } = await params
@@ -33,7 +37,6 @@ export default async function SessionPage({ params }: PageProps) {
       startTime: true,
       endTime: true,
       status: true,
-      notes: true,
       schedule: {
         select: {
           location: true,
@@ -51,7 +54,6 @@ export default async function SessionPage({ params }: PageProps) {
       },
       attendances: {
         select: {
-          id: true,
           athleteId: true,
           status: true,
           notes: true,
@@ -61,12 +63,11 @@ export default async function SessionPage({ params }: PageProps) {
   })
 
   if (!lesson) notFound()
-  if (lesson.schedule.course.teacherCourses.length === 0) {
-    // IDOR: lesson appartiene a corso non assegnato al teacher
-    notFound()
-  }
+  // La lezione è di un corso non assegnato all'insegnante: come se non esistesse
+  if (lesson.schedule.course.teacherCourses.length === 0) notFound()
 
-  // Allieve attive iscritte al corso, AY corrente
+  // Le allieve iscritte al corso nell'anno corrente. Solo il nome: niente
+  // genitori, niente recapiti (#49)
   const enrollments = await prisma.courseEnrollment.findMany({
     where: {
       courseId: lesson.schedule.course.id,
@@ -76,55 +77,41 @@ export default async function SessionPage({ params }: PageProps) {
       athlete: { deletedAt: null },
     },
     select: {
-      athlete: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          photoUrl: true,
-        },
-      },
+      athlete: { select: { id: true, firstName: true, lastName: true } },
     },
-    orderBy: [
-      { athlete: { lastName: "asc" } },
-      { athlete: { firstName: "asc" } },
-    ],
+    orderBy: [{ athlete: { lastName: "asc" } }, { athlete: { firstName: "asc" } }],
   })
 
-  const existingByAthleteId = new Map(
-    lesson.attendances.map((a) => [a.athleteId, a]),
-  )
-
+  const existingByAthleteId = new Map(lesson.attendances.map((a) => [a.athleteId, a]))
   const items = enrollments.map((e) => {
     const existing = existingByAthleteId.get(e.athlete.id)
     return {
       athleteId: e.athlete.id,
       firstName: e.athlete.firstName,
       lastName: e.athlete.lastName,
-      photoUrl: e.athlete.photoUrl,
       currentStatus: existing?.status ?? null,
       currentNotes: existing?.notes ?? null,
     }
   })
 
+  const closed = lesson.date < attendanceEditCutoff(new Date())
+  const cancelled = lesson.status === "CANCELLED"
+  const locked = closed || cancelled
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
-      <div className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="sm" className="min-h-11 -ml-2">
-          <Link href="/teacher/dashboard">
-            <ChevronLeft className="mr-1 h-4 w-4" />
-            Indietro
-          </Link>
-        </Button>
-      </div>
+      <Button asChild variant="ghost" size="sm" className="-ml-2 min-h-11">
+        <Link href="/teacher/dashboard">
+          <ChevronLeft className="mr-1 h-4 w-4" aria-hidden />
+          Indietro
+        </Link>
+      </Button>
 
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <CardTitle className="text-xl">
-                {lesson.schedule.course.name}
-              </CardTitle>
+              <CardTitle className="text-xl">{lesson.schedule.course.name}</CardTitle>
               <CardDescription className="mt-1">
                 {formatDateLong(lesson.date)} ·{" "}
                 <span className="font-mono tabular-nums">
@@ -133,35 +120,42 @@ export default async function SessionPage({ params }: PageProps) {
                 {lesson.schedule.location ? ` · ${lesson.schedule.location}` : null}
               </CardDescription>
             </div>
-            {lesson.status === "CANCELLED" ? (
-              <Badge variant="destructive">Annullata</Badge>
+            {cancelled ? (
+              <Badge variant="outline">Annullata</Badge>
             ) : lesson.status === "COMPLETED" ? (
-              <Badge variant="secondary">Registrata</Badge>
-            ) : (
-              <Badge>In corso</Badge>
-            )}
+              <Badge variant="secondary">Segnate</Badge>
+            ) : null}
           </div>
         </CardHeader>
       </Card>
 
-      {lesson.status === "CANCELLED" ? (
+      {closed && !cancelled ? (
+        <Card>
+          <CardContent className="flex items-start gap-3 py-4 text-sm">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <p>
+              <strong>Lezione chiusa:</strong> le presenze si segnano entro {ATTENDANCE_EDIT_DAYS}{" "}
+              giorni dalla lezione. Qui vedi quelle registrate; per correggerle avvisa la
+              segreteria.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {cancelled ? (
         <Card>
           <CardContent className="py-6 text-center text-sm text-muted-foreground">
-            Questa lezione è stata annullata. Non sono ammesse registrazioni.
+            Questa lezione è stata annullata: niente presenze da segnare.
           </CardContent>
         </Card>
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-6 text-center text-sm text-muted-foreground">
-            Nessuna allieva iscritta al corso.
+            Nessuna allieva iscritta al corso quest&apos;anno.
           </CardContent>
         </Card>
       ) : (
-        <AttendanceForm
-          lessonId={lesson.id}
-          items={items}
-          locked={lesson.status === "COMPLETED"}
-        />
+        <AttendanceForm lessonId={lesson.id} items={items} locked={locked} />
       )}
     </div>
   )

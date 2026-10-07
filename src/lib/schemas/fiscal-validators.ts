@@ -74,6 +74,36 @@ export const ibanSchema = z
   .or(z.literal(""))
 
 // ============================================================================
+// IBAN italiano: «IT» + 2 cifre di controllo + 23 caratteri di BBAN = 27,
+// e il resto mod 97 della stringa riordinata deve fare 1 (ISO 7064). È il
+// conto su cui le famiglie fanno i bonifici: un errore di battitura qui
+// manda i soldi altrove, quindi si controlla tutto, non solo la forma.
+// ============================================================================
+export const ITALIAN_IBAN_LENGTH = 27
+
+export function isValidItalianIban(input: string): boolean {
+  const iban = input.replace(/\s+/g, "").toUpperCase()
+  if (!/^IT\d{2}[A-Z]\d{10}[A-Z0-9]{12}$/.test(iban)) return false
+  if (iban.length !== ITALIAN_IBAN_LENGTH) return false
+  const rearranged = iban.slice(4) + iban.slice(0, 4)
+  let remainder = 0
+  for (const ch of rearranged) {
+    const value = /\d/.test(ch) ? ch : String(ch.charCodeAt(0) - 55)
+    for (const digit of value) remainder = (remainder * 10 + Number(digit)) % 97
+  }
+  return remainder === 1
+}
+
+export const italianIbanSchema = z
+  .string()
+  .trim()
+  .refine((v) => v === "" || isValidItalianIban(v), {
+    message: "IBAN non valido: deve iniziare con IT, avere 27 caratteri e le cifre di controllo giuste",
+  })
+  .optional()
+  .or(z.literal(""))
+
+// ============================================================================
 // PEC: email con TLD specifico, tollerante — validiamo solo come email
 // ============================================================================
 export const pecSchema = z

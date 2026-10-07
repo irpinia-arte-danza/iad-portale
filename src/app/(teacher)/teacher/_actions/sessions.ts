@@ -109,7 +109,10 @@ export async function createOrFindTodayLesson(
       },
       select: { id: true },
     })
-    revalidatePath("/teacher/dashboard")
+    // Niente revalidatePath qui: la funzione gira anche dentro il rendering
+    // della pagina ponte /teacher/sessions/new, dove Next non lo permette
+    // (la lezione veniva creata ma la pagina finiva in errore). La dashboard
+    // è dinamica e rilegge le lezioni a ogni apertura.
     return { ok: true, data: { lessonId: lesson.id } }
   } catch (error) {
     logError("[teacher session] create lesson failed", error)

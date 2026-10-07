@@ -1,6 +1,7 @@
 import "server-only"
 
 import { CURRENT_CARD_ORDER } from "@/lib/affiliations/card-status"
+import { CURRENT_CERTIFICATE_ORDER } from "@/lib/medical-certificates/certificate-status"
 import {
   athleteScopeWhere,
   type PortalScope,
@@ -171,113 +172,54 @@ export type MyAthleteCard = NonNullable<
   ReturnType<Awaited<ReturnType<typeof getMyAthleteCards>>["get"]>
 >
 
+const ATHLETE_NAME_SELECT = {
+  select: { id: true, firstName: true, lastName: true },
+} as const
+
 export async function getMyOpenSchedules(scope: PortalScope) {
-  // Scadenze DUE/OVERDUE delle figlie del genitore (corsi, contributo di iscrizione,
-  // stage, saggio, costumi)
+  // Scadenze DUE/OVERDUE delle allieve dell'ambito (corsi, contributo di
+  // iscrizione, stage, saggio, costumi). La select è quella di
+  // schedule-lines più il nome dell'allieva: così la dicitura è la stessa
+  // della ricevuta (describeSchedule) e la causale del bonifico si compone
+  // dagli stessi dati.
+  const athleteScope = { deletedAt: null, ...athleteScopeWhere(scope) }
   const schedules = await prisma.paymentSchedule.findMany({
     where: withActiveCourseOrStageScheduleFilter({
       status: { in: ["DUE", "OVERDUE"] },
       OR: [
-        {
-          courseEnrollment: {
-            athlete: {
-              deletedAt: null,
-              ...athleteScopeWhere(scope),
-            },
-          },
-        },
-        {
-          stageEnrollment: {
-            athlete: {
-              deletedAt: null,
-              ...athleteScopeWhere(scope),
-            },
-          },
-        },
-        {
-          showcaseParticipation: {
-            athlete: {
-              deletedAt: null,
-              ...athleteScopeWhere(scope),
-            },
-          },
-        },
-        {
-          costumeAssignment: {
-            participation: {
-              athlete: {
-                deletedAt: null,
-                ...athleteScopeWhere(scope),
-              },
-            },
-          },
-        },
-        {
-          athlete: {
-            deletedAt: null,
-            ...athleteScopeWhere(scope),
-          },
-        },
+        { courseEnrollment: { athlete: athleteScope } },
+        { stageEnrollment: { athlete: athleteScope } },
+        { showcaseParticipation: { athlete: athleteScope } },
+        { costumeAssignment: { participation: { athlete: athleteScope } } },
+        { athlete: athleteScope },
       ],
     }),
     select: {
-      id: true,
-      feeType: true,
-      dueDate: true,
-      amountCents: true,
-      status: true,
-      notes: true,
-      // Serve alla dicitura del contributo di iscrizione ("… 2026/2027")
-      academicYear: { select: { label: true } },
-      // Contributo di iscrizione: collegato direttamente all'allieva
-      athlete: {
-        select: { id: true, firstName: true, lastName: true },
-      },
+      ...SCHEDULE_LINE_SELECT,
+      athlete: ATHLETE_NAME_SELECT,
       courseEnrollment: {
         select: {
-          athleteId: true,
-          athlete: {
-            select: { id: true, firstName: true, lastName: true },
-          },
-          course: {
-            select: { id: true, name: true },
-          },
+          ...SCHEDULE_LINE_SELECT.courseEnrollment.select,
+          athlete: ATHLETE_NAME_SELECT,
         },
       },
       stageEnrollment: {
         select: {
-          athleteId: true,
-          athlete: {
-            select: { id: true, firstName: true, lastName: true },
-          },
-          stage: {
-            select: { id: true, title: true },
-          },
+          ...SCHEDULE_LINE_SELECT.stageEnrollment.select,
+          athlete: ATHLETE_NAME_SELECT,
         },
       },
       showcaseParticipation: {
         select: {
-          athleteId: true,
-          athlete: {
-            select: { id: true, firstName: true, lastName: true },
-          },
-          showcase: {
-            select: { id: true, title: true },
-          },
+          ...SCHEDULE_LINE_SELECT.showcaseParticipation.select,
+          athlete: ATHLETE_NAME_SELECT,
         },
       },
       costumeAssignment: {
         select: {
-          size: true,
-          costume: { select: { id: true, name: true } },
+          ...SCHEDULE_LINE_SELECT.costumeAssignment.select,
           participation: {
-            select: {
-              athleteId: true,
-              athlete: {
-                select: { id: true, firstName: true, lastName: true },
-              },
-              showcase: { select: { id: true, title: true } },
-            },
+            select: { athleteId: true, athlete: ATHLETE_NAME_SELECT },
           },
         },
       },
@@ -286,32 +228,22 @@ export async function getMyOpenSchedules(scope: PortalScope) {
   })
 
   return schedules.map((s) => {
-    const courseAth = s.courseEnrollment?.athlete
-    const stageAth = s.stageEnrollment?.athlete
-    const showcaseAth = s.showcaseParticipation?.athlete
-    const costumeAth = s.costumeAssignment?.participation.athlete
     const athlete =
-      courseAth ?? stageAth ?? showcaseAth ?? costumeAth ?? s.athlete
+      s.courseEnrollment?.athlete ??
+      s.stageEnrollment?.athlete ??
+      s.showcaseParticipation?.athlete ??
+      s.costumeAssignment?.participation.athlete ??
+      s.athlete
     return {
       id: s.id,
       feeType: s.feeType,
       dueDate: s.dueDate,
       amountCents: s.amountCents,
       status: s.status,
-      notes: s.notes,
-      academicYearLabel: s.academicYear.label,
+      // «Contributo mensile di ottobre 2026», «Contributo di iscrizione 2026/2027»…
+      description: describeSchedule(s),
       athleteId: athlete?.id ?? "",
-      athleteName: athlete
-        ? `${athlete.firstName} ${athlete.lastName}`
-        : "—",
-      courseName: s.courseEnrollment?.course.name ?? null,
-      stageName: s.stageEnrollment?.stage.title ?? null,
-      showcaseName:
-        s.showcaseParticipation?.showcase.title ??
-        s.costumeAssignment?.participation.showcase.title ??
-        null,
-      costumeName: s.costumeAssignment?.costume.name ?? null,
-      costumeSize: s.costumeAssignment?.size ?? null,
+      athleteName: athlete ? `${athlete.firstName} ${athlete.lastName}` : "—",
     }
   })
 }
@@ -349,7 +281,13 @@ export async function getMyPayments(scope: PortalScope) {
       },
       status: true,
       receipt: {
-        select: { id: true, receiptNumber: true, status: true, payerId: true },
+        select: {
+          id: true,
+          receiptNumber: true,
+          status: true,
+          payerId: true,
+          issueDate: true,
+        },
       },
       // Scadenze coperte: più d'una → righe nello storico
       paymentSchedules: { select: SCHEDULE_LINE_SELECT },
@@ -386,7 +324,11 @@ export async function getMyPayments(scope: PortalScope) {
       // … e intestata a chi guarda: l'altro genitore vede il pagamento, non
       // la ricevuta
       receipt: mine
-        ? { id: validReceipt.id, receiptNumber: validReceipt.receiptNumber }
+        ? {
+            id: validReceipt.id,
+            receiptNumber: validReceipt.receiptNumber,
+            issueDate: validReceipt.issueDate,
+          }
         : null,
       // Emessa ma intestata a un'altra persona: si dice che c'è, non a chi
       receiptHeldByOther: validReceipt !== null && !mine,
@@ -489,12 +431,43 @@ export type GeneralCourseSchedule = Awaited<
   ReturnType<typeof getGeneralCourseSchedules>
 >[number]
 
-export async function getBrandIban() {
+// Dati per il bonifico mostrati in dashboard. L'intestatario è un campo a
+// parte: se vuoto, il nome dell'ASD.
+export async function getBrandPaymentInfo() {
   const brand = await prisma.brandSettings.findUnique({
     where: { id: 1 },
-    select: { asdIban: true, asdName: true, asdEmail: true },
+    select: { asdIban: true, asdName: true, asdEmail: true, bankAccountHolder: true },
   })
-  return brand
+  if (!brand) return null
+  return {
+    iban: brand.asdIban,
+    asdName: brand.asdName,
+    asdEmail: brand.asdEmail,
+    accountHolder: brand.bankAccountHolder?.trim() || brand.asdName,
+  }
+}
+
+// Certificato medico corrente per ogni allieva di cui si vedono i dati
+// personali (figlia minorenne, o sé stessa): è un dato sanitario, e di una
+// figlia maggiorenne il genitore non lo vede. Lo stato (valido, in
+// scadenza, scaduto, mancante) lo ricava chi legge con classifyCert.
+export async function getMyAthleteCertificates(scope: PortalScope) {
+  const certificates = await prisma.medicalCertificate.findMany({
+    where: {
+      deletedAt: null,
+      athlete: { deletedAt: null, ...personalDataScopeWhere(scope) },
+    },
+    orderBy: CURRENT_CERTIFICATE_ORDER,
+    select: { id: true, athleteId: true, expiryDate: true },
+  })
+  // Solo il corrente per allieva (lo stesso ordine delle pagine admin)
+  const byAthlete = new Map<string, (typeof certificates)[number]>()
+  for (const certificate of certificates) {
+    if (!byAthlete.has(certificate.athleteId)) {
+      byAthlete.set(certificate.athleteId, certificate)
+    }
+  }
+  return byAthlete
 }
 
 export type AttendanceStats = {

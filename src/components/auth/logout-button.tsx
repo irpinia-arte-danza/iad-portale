@@ -11,7 +11,7 @@ export function LogoutButton() {
     <button
       type="button"
       disabled={isPending}
-      className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
+      className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
       onClick={() => startTransition(() => logout())}
     >
       {isPending ? "Uscita..." : "Esci"}

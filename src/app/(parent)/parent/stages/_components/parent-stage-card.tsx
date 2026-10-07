@@ -100,7 +100,7 @@ export function ParentStageCard({ stage, wording, selfService }: Props) {
             {stage.title}
           </h3>
           {full ? (
-            <Badge variant="destructive" className="shrink-0">
+            <Badge variant="secondary" className="shrink-0">
               Esaurito
             </Badge>
           ) : (
@@ -147,7 +147,7 @@ export function ParentStageCard({ stage, wording, selfService }: Props) {
         </div>
 
         {alreadyEnrolled.length > 0 && (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
+          <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
             {selfService ? "Sei già iscritta" : "Già iscritte:"}{" "}
             {selfService
               ? alreadyEnrolled.some((a) => a.paid)
@@ -162,7 +162,7 @@ export function ParentStageCard({ stage, wording, selfService }: Props) {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button
-              className="w-full"
+              className="min-h-11 w-full"
               disabled={enrollable.length === 0 || full}
             >
               <UserPlus className="h-4 w-4" />
@@ -181,7 +181,7 @@ export function ParentStageCard({ stage, wording, selfService }: Props) {
             {selfService ? null : (
               <ul className="divide-y rounded-md border">
                 {enrollable.map((a) => (
-                  <li key={a.id} className="flex items-center gap-3 px-3 py-2">
+                  <li key={a.id} className="flex min-h-11 items-center gap-3 px-3">
                     <Checkbox
                       id={`p-a-${stage.id}-${a.id}`}
                       checked={selected.has(a.id)}
@@ -189,7 +189,7 @@ export function ParentStageCard({ stage, wording, selfService }: Props) {
                     />
                     <label
                       htmlFor={`p-a-${stage.id}-${a.id}`}
-                      className="cursor-pointer text-sm"
+                      className="flex min-h-11 flex-1 cursor-pointer items-center text-sm"
                     >
                       {a.firstName} {a.lastName}
                     </label>
@@ -200,12 +200,17 @@ export function ParentStageCard({ stage, wording, selfService }: Props) {
             <DialogFooter>
               <Button
                 variant="outline"
+                className="min-h-11 w-full sm:w-auto"
                 onClick={() => setOpen(false)}
                 disabled={isPending}
               >
                 Annulla
               </Button>
-              <Button onClick={onSubmit} disabled={isPending}>
+              <Button
+                className="min-h-11 w-full sm:w-auto"
+                onClick={onSubmit}
+                disabled={isPending}
+              >
                 {isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />

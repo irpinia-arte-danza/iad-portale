@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { AlertTriangle, ChevronLeft, ShieldAlert } from "lucide-react"
+import { ChevronLeft, ShieldAlert } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,8 +13,10 @@ import {
 } from "@/components/ui/card"
 import { prisma } from "@/lib/prisma"
 import { requireTeacher } from "@/lib/auth/require-teacher"
-import { classifyCert } from "@/lib/medical-certificates/certificate-status"
+import { classifyCert, type CertStatus } from "@/lib/medical-certificates/certificate-status"
+import { statusTone, TONE_BADGE, TONE_TEXT } from "@/lib/status/tone"
 import { formatDateShort } from "@/lib/utils/format"
+import { cn } from "@/lib/utils"
 
 import { getCourseRoster } from "../../_actions/queries"
 
@@ -31,6 +33,14 @@ const DAY_OF_WEEK_LABELS = [
   "Venerdì",
   "Sabato",
 ]
+
+// Il certificato è l'unica cosa che blocca la lezione, e il colore lo
+// decide statusTone (§17.43): rosso se manca o è scaduto, ambra in scadenza
+const CERT_LABEL: Record<Exclude<CertStatus, "valid">, string> = {
+  missing: "Senza certificato",
+  expired: "Certificato scaduto",
+  expiring: "Certificato in scadenza",
+}
 
 export default async function TeacherCourseDetailPage({ params }: PageProps) {
   const { teacherId } = await requireTeacher()
@@ -169,6 +179,8 @@ export default async function TeacherCourseDetailPage({ params }: PageProps) {
                     ? Math.round((stats.present / stats.total) * 100)
                     : null
 
+                const tone = statusTone({ kind: "certificate", status: certStatus })
+
                 return (
                   <li key={a.id} className="flex flex-col gap-2 p-3">
                     <div className="flex items-center gap-3">
@@ -186,42 +198,27 @@ export default async function TeacherCourseDetailPage({ params }: PageProps) {
                           </p>
                         ) : null}
                       </div>
-                      {certStatus === "missing" ? (
-                        <Badge variant="destructive" className="gap-1">
-                          <ShieldAlert className="h-3 w-3" />
-                          Cert. mancante
-                        </Badge>
-                      ) : certStatus === "expired" ? (
-                        <Badge variant="destructive" className="gap-1">
-                          <ShieldAlert className="h-3 w-3" />
-                          Scaduto
-                        </Badge>
-                      ) : certStatus === "expiring" ? (
-                        <Badge className="gap-1 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-                          <AlertTriangle className="h-3 w-3" />
-                          In scadenza
+                      {certStatus !== "valid" ? (
+                        <Badge variant="outline" className={cn("gap-1", TONE_BADGE[tone])}>
+                          <ShieldAlert className="h-3 w-3" aria-hidden />
+                          {CERT_LABEL[certStatus]}
                         </Badge>
                       ) : null}
                     </div>
 
+                    {tone === "block" ? (
+                      <p className={cn("text-xs", TONE_TEXT[tone])}>
+                        Senza certificato valido non può fare lezione.
+                      </p>
+                    ) : null}
 
                     {stats.total > 0 ? (
                       <p className="text-xs text-muted-foreground">
-                        Ultimi 30gg:{" "}
-                        <span className="text-emerald-700 dark:text-emerald-400">
-                          {stats.present}P
-                        </span>{" "}
-                        ·{" "}
-                        <span className="text-red-700 dark:text-red-400">
-                          {stats.absent}A
-                        </span>{" "}
-                        ·{" "}
-                        <span className="text-amber-700 dark:text-amber-400">
-                          {stats.justified}G
-                        </span>
-                        {presentRatio !== null
-                          ? ` · ${presentRatio}% presenza`
-                          : null}
+                        Ultimi 30 giorni: {stats.present}{" "}
+                        {stats.present === 1 ? "presente" : "presenti"} · {stats.absent}{" "}
+                        {stats.absent === 1 ? "assente" : "assenti"} · {stats.justified}{" "}
+                        {stats.justified === 1 ? "giustificata" : "giustificate"}
+                        {presentRatio !== null ? ` · ${presentRatio}% presenza` : null}
                       </p>
                     ) : null}
                   </li>
