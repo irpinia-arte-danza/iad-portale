@@ -916,6 +916,60 @@ Stesso blocco del login: 15 minuti per quell'email e per quell'IP (`login_attemp
 
 ---
 
+## Accessi admin e avvisi di sicurezza
+
+Da Sicurezza 5 ogni accesso a un account **admin** lascia una riga in
+`admin_logins` (esito, dispositivo, paese, ip; 90 giorni, pulizia nel cron
+notturno `academic-year-rollover`). Genitori e insegnanti no: per loro resta
+il solo contatore `login_attempts`. Pagina: **Impostazioni › Accessi**; nel
+footer della barra laterale «Ultimo accesso: …» è l'accesso riuscito
+**precedente** a questa sessione, quello che l'admin deve riconoscere come suo.
+
+### Quando arriva un'email (a entrambi gli admin)
+
+Solo in quattro casi: accesso riuscito da un **dispositivo nuovo**; accesso
+riuscito da un **paese diverso dall'Italia**; **cinque tentativi falliti**
+in dieci minuti su un account admin (una sola email, al quinto; i successivi
+sono «bloccati» per 15 minuti e non ne mandano altre); **azzeramento del
+secondo fattore** (chi l'ha fatto, per chi). Tutte finiscono in `EmailLog`
+con `milestoneKey` `SECURITY_*`. Se Resend non risponde, il login va avanti e
+l'errore è nei log di Vercel.
+
+### Al primo deploy: due avvisi che non devono spaventare
+
+Il dispositivo si riconosce da un cookie (`iad_device`, un anno) che prima
+non esisteva: **al primo accesso dopo il deploy ogni dispositivo è nuovo**.
+Giuseppina entra dall'iPad → email «Accesso al portale da un dispositivo
+nuovo» a lei e a Federico; Federico entra dal Mac → un'altra a entrambi.
+Sono attese. Dal secondo accesso dallo stesso browser non arriva più niente,
+finché non si cambia dispositivo, si cancellano i cookie o si tocca
+«Dimentica» in Accessi. Da dire a Giuseppina prima del deploy, in una riga:
+«la prima volta che entri ti arriva un'email che dice che sei entrata da un
+dispositivo nuovo: è giusto così, è il portale che impara a conoscere
+l'iPad».
+
+### Se arriva un avviso che non torna
+
+1. Cambiare subito la password da Impostazioni › Account (serve il codice
+   dell'app: con la sola password non si cambia).
+2. Avvisare l'altro admin.
+3. In Impostazioni › Accessi, «Dimentica» i dispositivi che non si
+   riconoscono; se il dubbio è sul secondo fattore, l'altro admin lo azzera
+   da Impostazioni › Admin (riga nell'audit e email a entrambi).
+
+### Cose da sapere
+
+- Il **paese** arriva dall'header `x-vercel-ip-country` di Vercel: in locale
+  manca, e senza paese non si avvisa mai «dall'estero». Per provarlo in
+  locale si mette davanti al dev server un proxy che aggiunge l'header.
+- L'**iPad** si presenta a Safari come un Mac: lo distingue il browser
+  (schermo touch, `device-hint.ts`). Se JavaScript non lo manda (link aperto
+  da un'app, ad esempio), la riga dice «Safari su Mac»: non è un intruso.
+- Il dispositivo è il **browser**, non la macchina: Safari e Chrome sullo
+  stesso Mac sono due dispositivi.
+
+---
+
 ## Endas / CSEN — invio tesseramenti
 
 Non esiste API: il flusso resta manuale.

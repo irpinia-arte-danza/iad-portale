@@ -25,6 +25,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { touchMacHint } from "@/lib/auth/device-hint"
 
 import { login } from "./actions"
 
@@ -57,7 +58,7 @@ export function LoginForm({ errorMessage }: Props) {
 
   async function onSubmit(values: LoginFormValues) {
     setIsSubmitting(true)
-    const result = await login(values)
+    const result = await login({ ...values, touchMac: touchMacHint() })
     if (result?.error) {
       toast.error(result.error)
       setIsSubmitting(false)

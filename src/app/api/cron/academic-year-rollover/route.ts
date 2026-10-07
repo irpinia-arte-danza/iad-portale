@@ -5,6 +5,7 @@ import { EmailStatus, EmailTrigger, UserRole } from "@prisma/client"
 import { syncFiscalYears } from "@/lib/fiscal-years"
 import { prisma } from "@/lib/prisma"
 import { authorizeCron } from "@/lib/auth/cron-auth"
+import { purgeOldAdminLogins } from "@/lib/auth/admin-logins"
 import { purgeOldLoginAttempts } from "@/lib/auth/login-attempts"
 import { sendEmail } from "@/lib/resend/send-email"
 import {
@@ -105,7 +106,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     deleted: await purgeOldLoginAttempts(),
   }))
 
-  const ok = [academicYear, fiscalYear, nextAcademicYear, loginAttempts].every(
+  // Lo storico degli accessi admin si tiene 90 giorni (admin-logins.ts)
+  const adminLogins = await runStep("admin-logins", async () => ({
+    action: "purged" as const,
+    ...(await purgeOldAdminLogins()),
+  }))
+
+  const ok = [academicYear, fiscalYear, nextAcademicYear, loginAttempts, adminLogins].every(
     (step) => step.action !== "error",
   )
 
@@ -117,6 +124,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       fiscalYear,
       nextAcademicYear,
       loginAttempts,
+      adminLogins,
     },
     { status: ok ? 200 : 500 },
   )

@@ -4,6 +4,7 @@ import { z } from "zod"
 
 import { redirect } from "next/navigation"
 
+import { recordAdminFailure, recordAdminSuccess } from "@/lib/auth/admin-logins"
 import { getDashboardPath } from "@/lib/auth/dashboard-path"
 import {
   attemptEmail,
@@ -37,10 +38,12 @@ const totpSchema = z.object({
     .string()
     .trim()
     .regex(/^\d{6}$/, { message: "Scrivi i sei numeri che compaiono nell'app" }),
+  touchMac: z.boolean().optional(),
 })
 
 const recoverySchema = z.object({
   code: z.string().trim().min(8, { message: "Scrivi un codice di recupero" }).max(20),
+  touchMac: z.boolean().optional(),
 })
 
 const WRONG_CODE = "Il codice non corrisponde. Aspetta che nell'app compaia il prossimo e riprova."
@@ -62,15 +65,19 @@ export type SecondFactorResult = ActionResult<{ next: string }>
 export async function verifySecondFactor(
   values: z.infer<typeof totpSchema>,
 ): Promise<SecondFactorResult> {
-  await requireAdminFirstFactor()
+  const { userId } = await requireAdminFirstFactor()
   const parsed = totpSchema.safeParse(values)
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Codice non valido" }
   }
+  const hint = { touchMac: parsed.data.touchMac === true }
 
   const key = await attemptKeyFor()
   if (!key) return { ok: false, error: GENERIC_ERROR_MESSAGE }
-  if (await attemptsBlockedUntil(key)) return { ok: false, error: TOO_MANY_ATTEMPTS_MESSAGE }
+  if (await attemptsBlockedUntil(key)) {
+    await recordAdminFailure(userId, "BLOCKED", hint)
+    return { ok: false, error: TOO_MANY_ATTEMPTS_MESSAGE }
+  }
 
   const supabase = await createClient()
   const factor = await verifiedTotpFactor(supabase)
@@ -79,11 +86,15 @@ export async function verifySecondFactor(
   const outcome = await verifyTotpCode(supabase, factor.id, parsed.data.code)
   if (outcome === "wrong-code") {
     await recordLoginAttempt(key, false)
+    await recordAdminFailure(userId, "WRONG_MFA", hint)
     return { ok: false, error: WRONG_CODE }
   }
   if (outcome === "error") return { ok: false, error: GENERIC_ERROR_MESSAGE }
 
   await recordLoginAttempt(key, true)
+  // Accesso completo: riga «riuscito», cookie del dispositivo, eventuale avviso
+  const level = await getSessionLevel()
+  await recordAdminSuccess({ userId, sessionId: level.sessionId, hint })
   return { ok: true, data: { next: getDashboardPath("ADMIN") } }
 }
 
@@ -96,9 +107,13 @@ export async function redeemRecoveryCode(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Codice non valido" }
   }
 
+  const hint = { touchMac: parsed.data.touchMac === true }
   const key = await attemptKeyFor()
   if (!key) return { ok: false, error: GENERIC_ERROR_MESSAGE }
-  if (await attemptsBlockedUntil(key)) return { ok: false, error: TOO_MANY_ATTEMPTS_MESSAGE }
+  if (await attemptsBlockedUntil(key)) {
+    await recordAdminFailure(userId, "BLOCKED", hint)
+    return { ok: false, error: TOO_MANY_ATTEMPTS_MESSAGE }
+  }
 
   // Il lasciapassare è legato alla sessione: senza il suo id (non dovrebbe
   // mai mancare in un JWT di Supabase) non si può emettere
@@ -108,11 +123,13 @@ export async function redeemRecoveryCode(
   const result = await consumeRecoveryCode(userId, parsed.data.code)
   if (!result.ok) {
     await recordLoginAttempt(key, false)
+    await recordAdminFailure(userId, "WRONG_MFA", hint)
     return { ok: false, error: WRONG_RECOVERY_CODE }
   }
 
   await recordLoginAttempt(key, true)
   await issueRecoveryPass(userId, level.sessionId, result.remaining)
+  await recordAdminSuccess({ userId, sessionId: level.sessionId, hint })
   // La pagina, ricaricata, mostra «Ti restano n codici» e il tasto Continua
   return { ok: true, data: { next: MFA_VERIFY_PATH } }
 }

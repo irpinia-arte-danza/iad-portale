@@ -1,4 +1,10 @@
-import { adminHasVerifiedFactor } from "@/lib/auth/mfa"
+import {
+  currentDeviceId,
+  listAdminLogins,
+  listKnownDevices,
+  previousSuccessfulLogin,
+} from "@/lib/auth/admin-logins"
+import { adminHasVerifiedFactor, getSessionLevel } from "@/lib/auth/mfa"
 import { countUnusedRecoveryCodes } from "@/lib/auth/recovery-codes"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { loadNumberingPreviewContext } from "@/lib/receipts/numbering-context"
@@ -25,19 +31,39 @@ import {
   previewCronReminders,
 } from "./reminder-actions"
 
-export default async function SettingsPage() {
-  const { userId } = await requireAdmin()
+type PageProps = { searchParams: Promise<{ tab?: string }> }
 
-  const [brand, receipt, profile, adminUsers, auditRows, reminder, reminderPreview] =
-    await Promise.all([
-      getBrandSettings(),
-      getReceiptSettings(),
-      getUserProfile(userId),
-      getAdminUsers(),
-      getSettingsAuditLog(50),
-      getReminderConfig(),
-      previewCronReminders(),
-    ])
+export default async function SettingsPage({ searchParams }: PageProps) {
+  const { userId } = await requireAdmin()
+  const { tab } = await searchParams
+
+  const level = await getSessionLevel()
+  const [
+    brand,
+    receipt,
+    profile,
+    adminUsers,
+    auditRows,
+    reminder,
+    reminderPreview,
+    logins,
+    devices,
+    deviceId,
+    previousLogin,
+  ] = await Promise.all([
+    getBrandSettings(),
+    getReceiptSettings(),
+    getUserProfile(userId),
+    getAdminUsers(),
+    getSettingsAuditLog(50),
+    getReminderConfig(),
+    previewCronReminders(),
+    // Accessi: i propri, degli ultimi 90 giorni, e i propri dispositivi
+    listAdminLogins(userId),
+    listKnownDevices(userId),
+    currentDeviceId(),
+    previousSuccessfulLogin(userId, level.sessionId),
+  ])
 
   // Il secondo fattore vive in Supabase Auth: una chiamata per admin (sono due)
   const admins = await Promise.all(
@@ -125,6 +151,7 @@ export default async function SettingsPage() {
       <ResourceContent>
         <SettingsShell
           currentUserId={userId}
+          initialTab={tab}
           initialAssociation={initialAssociation}
           initialBrand={initialBrand}
           initialRicevute={initialRicevute}
@@ -134,6 +161,7 @@ export default async function SettingsPage() {
           initialProfile={initialProfile}
           admins={admins}
           auditRows={auditRows}
+          access={{ logins, devices, currentDeviceId: deviceId, previousLogin }}
         />
       </ResourceContent>
     </>

@@ -8,7 +8,7 @@ import { logError } from "@/lib/logging/log-error"
 type LogParams = {
   userId: string
   action: AuditAction
-  entityType: "BrandSettings" | "ReceiptSettings" | "User"
+  entityType: "BrandSettings" | "ReceiptSettings" | "User" | "AdminDevice"
   entityId?: string | null
   changes?: Record<string, unknown> | null
 }

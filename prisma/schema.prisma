@@ -53,6 +53,8 @@ model User {
   parentProfile  Parent?
   teacherProfile Teacher?
   mfaRecoveryCodes MfaRecoveryCode[]
+  adminLogins      AdminLogin[]
+  adminDevices     AdminDevice[]
   athleteProfile Athlete?
   auditLogs      AuditLog[]
   emailsSent     EmailLog[] @relation("EmailsSent")
@@ -1574,4 +1576,54 @@ model MfaRecoveryCode {
 
   @@index([userId])
   @@map("mfa_recovery_codes")
+}
+
+// ============================================================================
+// SECURITY: storico degli accessi degli admin e dispositivi conosciuti
+// ============================================================================
+// Solo per il ruolo ADMIN: genitori e insegnanti restano in login_attempts.
+// È uno storico (90 giorni, pulito dal cron notturno), non un contatore.
+
+enum AdminLoginOutcome {
+  OK
+  WRONG_PASSWORD
+  WRONG_MFA
+  BLOCKED
+}
+
+model AdminLogin {
+  id      String            @id @default(uuid()) @db.Uuid
+  userId  String            @map("user_id") @db.Uuid
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outcome AdminLoginOutcome
+  ip      String
+  // ISO 3166-1 alpha-2 dall'header x-vercel-ip-country; null se manca (locale)
+  country String?
+  // Lo user agent ridotto a «Safari su iPad»: mai la stringa intera
+  device  String
+  // L'id del cookie iad_device; null se il browser non ce l'aveva
+  deviceId  String?  @map("device_id")
+  newDevice Boolean  @default(false) @map("new_device")
+  // session_id del JWT: distingue l'accesso di questa sessione dal precedente
+  sessionId String?  @map("session_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("admin_logins")
+}
+
+model AdminDevice {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId    String    @map("device_id")
+  label       String
+  firstSeenAt DateTime  @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  // «Dimentica»: da qui in poi quel dispositivo torna nuovo
+  forgottenAt DateTime? @map("forgotten_at") @db.Timestamptz(6)
+
+  @@unique([userId, deviceId])
+  @@map("admin_devices")
 }

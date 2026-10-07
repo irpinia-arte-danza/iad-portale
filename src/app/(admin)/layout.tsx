@@ -2,6 +2,8 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { NO_ACCESS_ROUTE } from "@/lib/auth/account-state"
+import { previousSuccessfulLogin } from "@/lib/auth/admin-logins"
+import { getSessionLevel } from "@/lib/auth/mfa"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { prisma } from "@/lib/prisma"
 import {
@@ -23,8 +25,10 @@ export default async function AdminLayout({
   children: React.ReactNode
 }) {
   const { userId } = await requireAdmin()
+  // Già letto da requireAdmin nella stessa richiesta: qui serve il session_id
+  const level = await getSessionLevel()
 
-  const [cookieStore, user, brand, currentYear, counters] = await Promise.all([
+  const [cookieStore, user, brand, currentYear, counters, lastAccess] = await Promise.all([
     cookies(),
     prisma.user.findUnique({
       where: { id: userId },
@@ -49,6 +53,9 @@ export default async function AdminLayout({
     // Lavoro in sospeso accanto alle voci: si ricalcola a ogni navigazione,
     // perché il menu è l'unico posto sempre a portata di mano
     getNavCounters(),
+    // L'accesso riuscito prima di questo: un orario che l'admin non
+    // riconosce si nota subito, nel footer
+    previousSuccessfulLogin(userId, level.sessionId),
   ])
 
   // SidebarProvider scrive già il cookie quando la sidebar si apre o si
@@ -71,6 +78,7 @@ export default async function AdminLayout({
           asdName: brand?.asdName ?? null,
         }}
         counters={counters}
+        lastAccess={lastAccess}
       />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 lg:h-14">

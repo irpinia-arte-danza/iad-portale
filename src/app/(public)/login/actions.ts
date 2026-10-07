@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { resolveAccountState } from "@/lib/auth/account-state";
+import { adminUserByEmail, recordAdminFailure } from "@/lib/auth/admin-logins";
 import { getDashboardPath } from "@/lib/auth/dashboard-path";
 import {
   attemptEmail,
@@ -18,6 +19,8 @@ import { createClient } from "@/lib/supabase/server";
 type LoginValues = {
   email: string;
   password: string;
+  // Dal browser: schermo touch su piattaforma Mac = iPad (device-hint.ts)
+  touchMac?: boolean;
 };
 
 export async function login(
@@ -30,7 +33,11 @@ export async function login(
     email: attemptEmail(values.email),
     ip: await clientIp(),
   };
+  const hint = { touchMac: values.touchMac === true };
   if (await attemptsBlockedUntil(key)) {
+    // Solo per gli admin resta traccia nello storico degli accessi
+    const adminId = await adminUserByEmail(key.email);
+    if (adminId) await recordAdminFailure(adminId, "BLOCKED", hint);
     return { error: TOO_MANY_ATTEMPTS_MESSAGE };
   }
 
@@ -43,6 +50,8 @@ export async function login(
 
   if (error) {
     await recordLoginAttempt(key, false);
+    const adminId = await adminUserByEmail(key.email);
+    if (adminId) await recordAdminFailure(adminId, "WRONG_PASSWORD", hint);
     return { error: loginErrorMessage(error.message) };
   }
   await recordLoginAttempt(key, true);
