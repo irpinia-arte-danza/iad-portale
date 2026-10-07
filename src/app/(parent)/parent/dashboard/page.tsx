@@ -1,14 +1,9 @@
 import Link from "next/link"
-import {
-  AlertCircle,
-  AlertTriangle,
-  CalendarClock,
-  CheckCircle2,
-  FileText,
-  Sparkles,
-} from "lucide-react"
+import { CalendarClock, Receipt, Sparkles, Wallet } from "lucide-react"
 
+import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -17,32 +12,48 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { requirePortalAccess } from "@/lib/auth/require-portal-access"
+import { buildPaymentReference, type PaymentReferenceItem } from "@/lib/payments/payment-reference"
 import { portalWording } from "@/lib/portal/wording"
-import { associationFeeDescription } from "@/lib/fees/association-fee-label"
-import { receiptPdfHref } from "@/lib/receipts/types"
-import { FEE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
+import { isScheduleOverdue } from "@/lib/portal/schedule-status"
+import { receiptPdfDownloadHref } from "@/lib/receipts/types"
+import { normalizeIban, prettyIban } from "@/lib/schemas/fiscal-validators"
+import { PAYMENT_METHOD_LABELS } from "@/lib/schemas/payment"
+import { statusTone, TONE_BADGE } from "@/lib/status/tone"
 import { formatDateShort, formatEuro } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
 import {
-  getBrandIban,
+  getBrandPaymentInfo,
   getGeneralCourseSchedules,
   getMyAthleteCards,
+  getMyAthleteCertificates,
   getMyAthletes,
   getMyAthleteSchedules,
   getMyAttendanceStats,
   getMyOpenSchedules,
   getMyPayments,
   getPortalProfile,
-  type MyOpenSchedule,
-  type MyPayment,
   type GeneralCourseSchedule,
   type MyAthleteSchedule,
+  type MyOpenSchedule,
+  type MyPayment,
 } from "../_actions/queries"
 import { countOpenStagesForPortal } from "../_actions/stages"
 
 import { AthleteCardBlock } from "./_components/athlete-card-block"
-import { IbanCard } from "./_components/iban-card"
+import { CertificateBlock } from "./_components/certificate-block"
+import { PaymentInstructions } from "./_components/payment-instructions"
+
+// ─────────────────────────────────────────────────────────────────────────
+// La dashboard della famiglia, dal telefono. Nell'ordine in cui serve:
+// cosa c'è da pagare, come si paga, le ricevute, lo stato di certificato e
+// tessera per ogni figlia, gli stage, l'orario. Niente grafici, una colonna,
+// tasti alti 44 px. Le query sono filtrate per ambito (queries.ts): di una
+// figlia maggiorenne restano rate, pagamenti e ricevute intestate a chi
+// guarda; fra due genitori nessuno vede le ricevute dell'altro.
+// ─────────────────────────────────────────────────────────────────────────
+
+export const dynamic = "force-dynamic"
 
 const DAY_OF_WEEK_LABELS = [
   "Domenica",
@@ -54,29 +65,30 @@ const DAY_OF_WEEK_LABELS = [
   "Sabato",
 ]
 
-const DAYS_AHEAD_THRESHOLD = 7
-
-function classifySchedule(s: MyOpenSchedule): "overdue" | "soon" | "due" {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const due = new Date(s.dueDate)
-  due.setHours(0, 0, 0, 0)
-  if (s.status === "OVERDUE" || due.getTime() < today.getTime()) return "overdue"
-  const diffDays = (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  if (diffDays <= DAYS_AHEAD_THRESHOLD) return "soon"
-  return "due"
-}
-
-function groupByDay<T extends { dayOfWeek: number }>(
-  items: T[],
-): Map<number, T[]> {
-  const map = new Map<number, T[]>()
+function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
+  const map = new Map<string, T[]>()
   for (const item of items) {
-    const list = map.get(item.dayOfWeek) ?? []
-    list.push(item)
-    map.set(item.dayOfWeek, list)
+    const k = key(item)
+    map.set(k, [...(map.get(k) ?? []), item])
   }
   return map
+}
+
+// Causale per allieva, composta dalle sue rate aperte
+function referencesFor(schedules: MyOpenSchedule[]) {
+  const byAthlete = groupBy(schedules, (s) => s.athleteId)
+  return [...byAthlete.entries()].map(([athleteId, rows]) => {
+    const items: PaymentReferenceItem[] = rows.map((s) =>
+      s.feeType === "MONTHLY"
+        ? { kind: "month", month: s.dueDate }
+        : { kind: "other", label: s.description },
+    )
+    return {
+      athleteId,
+      athleteName: rows[0].athleteName,
+      reference: buildPaymentReference({ athleteName: rows[0].athleteName, items }),
+    }
+  })
 }
 
 export default async function ParentDashboardPage() {
@@ -87,6 +99,7 @@ export default async function ParentDashboardPage() {
     profile,
     athletes,
     athleteCards,
+    athleteCertificates,
     openSchedules,
     payments,
     myAthleteSchedules,
@@ -98,89 +111,164 @@ export default async function ParentDashboardPage() {
     getPortalProfile(scope),
     getMyAthletes(scope),
     getMyAthleteCards(scope),
+    getMyAthleteCertificates(scope),
     getMyOpenSchedules(scope),
     getMyPayments(scope),
     getMyAthleteSchedules(scope),
     getGeneralCourseSchedules(),
-    getBrandIban(),
+    getBrandPaymentInfo(),
     getMyAttendanceStats(scope),
     countOpenStagesForPortal(scope),
   ])
 
-  const overdue = openSchedules.filter((s) => classifySchedule(s) === "overdue")
-  const soon = openSchedules.filter((s) => classifySchedule(s) === "soon")
-
-  const totalOverdueCents = overdue.reduce((acc, s) => acc + s.amountCents, 0)
-  const totalSoonCents = soon.reduce((acc, s) => acc + s.amountCents, 0)
-
-  // Schedules per allieva (mappa athleteId → MyOpenSchedule[])
-  const schedulesByAthlete = new Map<string, MyOpenSchedule[]>()
-  for (const s of openSchedules) {
-    const list = schedulesByAthlete.get(s.athleteId) ?? []
-    list.push(s)
-    schedulesByAthlete.set(s.athleteId, list)
-  }
-
-  // Last 3 payments per allieva (per "ultimi pagamenti" inline nella card)
-  const paymentsByAthlete = new Map<string, MyPayment[]>()
-  for (const p of payments) {
-    const list = paymentsByAthlete.get(p.athleteId) ?? []
-    if (list.length < 3) list.push(p)
-    paymentsByAthlete.set(p.athleteId, list)
-  }
+  const today = new Date()
+  const totalOpenCents = openSchedules.reduce((acc, s) => acc + s.amountCents, 0)
+  const overdueCount = openSchedules.filter((s) => isScheduleOverdue(s, today)).length
+  const paymentsByAthlete = groupBy(payments, (p) => p.athleteId)
+  const iban = brand?.iban ? normalizeIban(brand.iban) : ""
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5">
-      {/* Header welcome */}
+    <div className="mx-auto w-full max-w-2xl space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">
           Ciao {profile?.firstName ?? wording.greetingFallback}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Benvenuta nella tua area riservata.
+          {openSchedules.length === 0
+            ? "Nessuna rata da pagare: tutto in regola."
+            : overdueCount > 0
+              ? `${overdueCount === 1 ? "Una rata è" : `${overdueCount} rate sono`} da pagare.`
+              : "Le prossime rate sono qui sotto, con la scadenza."}
         </p>
       </header>
 
-      {/* Alert riassuntivo */}
-      <SummaryAlert
-        overdueCount={overdue.length}
-        overdueCents={totalOverdueCents}
-        soonCount={soon.length}
-        soonCents={totalSoonCents}
-      />
-
-      {/* IBAN bonifico */}
-      <IbanCard
-        iban={brand?.asdIban ?? null}
-        asdName={brand?.asdName ?? null}
-        asdEmail={brand?.asdEmail ?? null}
-      />
-
-      {/* Stage aperti */}
-      {openStagesCount > 0 && (
-        <Link
-          href="/parent/stages"
-          className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
-        >
-          <Card className="border-purple-300 bg-purple-50 text-purple-900 transition-colors hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-100 dark:hover:bg-purple-950/60">
-            <CardContent className="flex items-center gap-3 py-4">
-              <Sparkles className="h-5 w-5 shrink-0" />
-              <div className="flex-1 text-sm">
-                <p className="font-semibold">
-                  {openStagesCount === 1
-                    ? "1 stage aperto all'iscrizione"
-                    : `${openStagesCount} stage aperti all'iscrizione`}
-                </p>
-                <p className="text-xs">{wording.stagesCardHint}</p>
-              </div>
+      {/* ── Da pagare ─────────────────────────────────────────────────── */}
+      <section aria-labelledby="da-pagare" className="space-y-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="da-pagare" className="text-lg font-semibold">
+            Da pagare
+          </h2>
+          {openSchedules.length > 0 ? (
+            <span className="font-mono text-sm tabular-nums text-muted-foreground">
+              totale {formatEuro(totalOpenCents)}
+            </span>
+          ) : null}
+        </div>
+        {openSchedules.length === 0 ? (
+          <Card>
+            <CardContent className="p-0">
+              <EmptyState
+                icon={Wallet}
+                title="Nessuna rata da pagare"
+                description="Quando la segreteria registra una scadenza la trovi qui, con il mese, l'importo e la data entro cui pagare."
+                className="py-8"
+              />
             </CardContent>
           </Card>
-        </Link>
-      )}
+        ) : (
+          <ul className="space-y-2">
+            {openSchedules.map((s) => {
+              const overdue = isScheduleOverdue(s, today)
+              const tone = statusTone({ kind: "contributions", overdue })
+              return (
+                <li key={s.id}>
+                  <Card>
+                    <CardContent className="space-y-2 py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-0.5">
+                          <Link
+                            href={`#allieva-${s.athleteId}`}
+                            className="flex min-h-11 items-center text-sm font-semibold underline-offset-4 hover:underline"
+                          >
+                            <span className="truncate">{s.athleteName}</span>
+                          </Link>
+                          <p className="text-sm">{s.description}</p>
+                        </div>
+                        <span className="shrink-0 font-mono text-base font-semibold tabular-nums">
+                          {formatEuro(s.amountCents)}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        {overdue ? (
+                          <Badge variant="outline" className={cn(TONE_BADGE[tone])}>
+                            Da pagare
+                          </Badge>
+                        ) : null}
+                        <span>
+                          {overdue ? "Scadeva il" : "Scade il"} {formatDateShort(s.dueDate)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
 
-      {/* Chi segue: le figlie di un genitore, o sé stessa */}
-      <section id="figlie" className="space-y-3">
-        <h2 className="text-lg font-semibold">{wording.peopleSectionTitle}</h2>
+      {/* ── Come pagare: solo con l'IBAN compilato ────────────────────── */}
+      {iban ? (
+        <section aria-label="Come pagare">
+          <PaymentInstructions
+            accountHolder={brand?.accountHolder ?? ""}
+            ibanPretty={prettyIban(iban)}
+            ibanElectronic={iban}
+            references={referencesFor(openSchedules)}
+          />
+        </section>
+      ) : null}
+
+      {/* ── Ricevute ──────────────────────────────────────────────────── */}
+      <section aria-labelledby="ricevute" className="space-y-3">
+        <h2 id="ricevute" className="text-lg font-semibold">
+          Ricevute
+        </h2>
+        {payments.length === 0 ? (
+          <Card>
+            <CardContent className="p-0">
+              <EmptyState
+                icon={Receipt}
+                title="Nessuna ricevuta ancora"
+                description={wording.receiptsEmptyDescription}
+                className="py-8"
+              />
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {athletes
+              .filter((a) => paymentsByAthlete.has(a.id))
+              .map((athlete) => (
+                <ReceiptsCard
+                  key={athlete.id}
+                  athleteId={athlete.id}
+                  athleteName={`${athlete.firstName} ${athlete.lastName}`}
+                  payments={paymentsByAthlete.get(athlete.id) ?? []}
+                />
+              ))}
+            {/* Pagamenti di allieve archiviate: niente scheda sopra, ma le
+                ricevute restano della famiglia */}
+            {[...paymentsByAthlete.entries()]
+              .filter(([athleteId]) => !athletes.some((a) => a.id === athleteId))
+              .map(([athleteId, rows]) => (
+                <ReceiptsCard
+                  key={athleteId}
+                  athleteId={athleteId}
+                  athleteName={rows[0].athleteName}
+                  archived
+                  payments={rows}
+                />
+              ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Le mie figlie: certificato, tessera, corsi, presenze ─────── */}
+      <section aria-labelledby="figlie" className="space-y-3">
+        <h2 id="figlie" className="text-lg font-semibold">
+          {wording.peopleSectionTitle}
+        </h2>
         {athletes.length === 0 ? (
           <Card>
             <CardContent className="py-6 text-center text-sm text-muted-foreground">
@@ -189,194 +277,41 @@ export default async function ParentDashboardPage() {
           </Card>
         ) : (
           athletes.map((athlete) => {
-            const athleteSchedules = schedulesByAthlete.get(athlete.id) ?? []
-            const athletePayments = paymentsByAthlete.get(athlete.id) ?? []
+            const stats = attendance.byAthlete.get(athlete.id)
             return (
-              <Card key={athlete.id}>
+              <Card key={athlete.id} id={`allieva-${athlete.id}`} className="scroll-mt-20">
                 <CardHeader>
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold uppercase">
-                      {athlete.firstName.charAt(0)}
-                      {athlete.lastName.charAt(0)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <CardTitle className="text-base">
-                        {athlete.firstName} {athlete.lastName}
-                      </CardTitle>
-                      <CardDescription className="mt-0.5 truncate">
-                        {athlete.enrollments.length === 0
-                          ? "Nessun corso attivo"
-                          : athlete.enrollments
-                              .map((e) => e.courseName)
-                              .join(" · ")}
-                      </CardDescription>
-                    </div>
-                  </div>
+                  <CardTitle className="text-base">
+                    {athlete.firstName} {athlete.lastName}
+                  </CardTitle>
+                  <CardDescription>
+                    {athlete.enrollments.length === 0
+                      ? "Nessun corso attivo"
+                      : athlete.enrollments.map((e) => e.courseName).join(" · ")}
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Scadenze aperte */}
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Scadenze aperte
-                    </h3>
-                    {athleteSchedules.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        Tutto in regola ✓
-                      </p>
-                    ) : (
-                      <ul className="divide-y rounded-md border">
-                        {athleteSchedules.map((s) => {
-                          const cls = classifySchedule(s)
-                          return (
-                            <li
-                              key={s.id}
-                              className="flex items-center justify-between gap-3 px-3 py-2"
-                            >
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">
-                                  {s.feeType === "ASSOCIATION"
-                                    ? associationFeeDescription(
-                                        s.academicYearLabel,
-                                      )
-                                    : FEE_TYPE_LABELS[s.feeType]}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  Scadenza {formatDateShort(s.dueDate)}
-                                </p>
-                              </div>
-                              <div className="flex shrink-0 items-center gap-2">
-                                <span className="font-mono text-sm tabular-nums">
-                                  {formatEuro(s.amountCents)}
-                                </span>
-                                {cls === "overdue" ? (
-                                  <Badge variant="destructive">Scaduta</Badge>
-                                ) : cls === "soon" ? (
-                                  <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-                                    In scadenza
-                                  </Badge>
-                                ) : null}
-                              </div>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    )}
-                  </div>
-
-                  {/* Ultimi pagamenti */}
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Ultimi pagamenti
-                    </h3>
-                    {athletePayments.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        Nessun pagamento registrato.
-                      </p>
-                    ) : (
-                      <ul className="divide-y rounded-md border">
-                        {athletePayments.map((p) => (
-                          <li
-                            key={p.id}
-                            className="flex items-center justify-between gap-3 px-3 py-2"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium">
-                                {p.feeLabel}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatDateShort(p.paymentDate)}
-                                {p.status === "REVERSED" ? " · stornato" : ""}
-                              </p>
-                            </div>
-                            <span
-                              className={cn(
-                                "shrink-0 font-mono text-sm tabular-nums",
-                                p.status === "REVERSED" &&
-                                  "text-muted-foreground line-through",
-                              )}
-                            >
-                              {formatEuro(p.amountCents)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
+                <CardContent className="space-y-3">
                   {athlete.personalDataVisible ? (
                     <>
-                      {/* Presenze AA corrente */}
-                      <div className="space-y-2">
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Presenze
-                          {attendance.academicYearLabel
-                            ? ` ${attendance.academicYearLabel}`
-                            : ""}
-                        </h3>
-                        {(() => {
-                          const stats = attendance.byAthlete.get(athlete.id)
-                          if (!stats || stats.totalLessons === 0) {
-                            return (
-                              <p className="text-sm text-muted-foreground">
-                                Nessuna lezione registrata ancora.
-                              </p>
-                            )
-                          }
-                          return (
-                            <>
-                              <div className="grid grid-cols-3 gap-2 rounded-md border p-3">
-                                <div className="text-center">
-                                  <div className="text-lg font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
-                                    {stats.presentCount}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Presenti
-                                  </div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-lg font-semibold tabular-nums text-red-700 dark:text-red-300">
-                                    {stats.absentCount}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Assenti
-                                  </div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-lg font-semibold tabular-nums text-amber-700 dark:text-amber-300">
-                                    {stats.justifiedCount}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Giustificate
-                                  </div>
-                                </div>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                Frequenza:{" "}
-                                <strong className="tabular-nums">
-                                  {stats.attendanceRate}%
-                                </strong>{" "}
-                                su {stats.totalLessons}{" "}
-                                {stats.totalLessons === 1 ? "lezione" : "lezioni"}
-                              </p>
-                            </>
-                          )
-                        })()}
-                      </div>
-
-                      {/* Tessera dell'ente = copertura assicurativa */}
-                      <AthleteCardBlock
-                        card={athleteCards.get(athlete.id) ?? null}
+                      <CertificateBlock
+                        expiryDate={athleteCertificates.get(athlete.id)?.expiryDate ?? null}
                       />
+                      <AthleteCardBlock card={athleteCards.get(athlete.id) ?? null} />
+                      <p className="text-sm text-muted-foreground">
+                        {!stats || stats.totalLessons === 0
+                          ? "Presenze: nessuna lezione registrata ancora."
+                          : `Presenze ${attendance.academicYearLabel ?? ""}: ${stats.presentCount} ${
+                              stats.presentCount === 1 ? "presente" : "presenti"
+                            }, ${stats.absentCount} ${
+                              stats.absentCount === 1 ? "assente" : "assenti"
+                            }${stats.justifiedCount > 0 ? `, ${stats.justifiedCount} giustificate` : ""} su ${
+                              stats.totalLessons
+                            } ${stats.totalLessons === 1 ? "lezione" : "lezioni"}.`}
+                      </p>
                     </>
                   ) : (
-                    // Figlia maggiorenne: i suoi dati li vede lei. Qui
-                    // restano scadenze, pagamenti e le ricevute intestate a
-                    // chi guarda (vedi portal-visibility.ts)
-                    <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-                      {athlete.firstName} è maggiorenne: presenze, certificato
-                      e tessera li vede lei dalla sua area riservata. Qui
-                      restano le scadenze, i pagamenti e le ricevute intestate
-                      a te.
+                    <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                      {wording.adultDaughterNote.replace("{nome}", athlete.firstName)}
                     </p>
                   )}
                 </CardContent>
@@ -386,119 +321,50 @@ export default async function ParentDashboardPage() {
         )}
       </section>
 
-      {/* Storico pagamenti globale */}
-      <section id="storico" className="space-y-3">
-        <h2 className="text-lg font-semibold">Storico pagamenti</h2>
+      {/* ── Stage ─────────────────────────────────────────────────────── */}
+      <section aria-labelledby="stage" className="space-y-3">
+        <h2 id="stage" className="text-lg font-semibold">
+          Prossimi stage
+        </h2>
         <Card>
-          <CardContent className="p-0">
-            {payments.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                Nessun pagamento ancora registrato.
-              </p>
-            ) : (
-              <ul className="divide-y">
-                {payments.map((p) => (
-                  <li
-                    key={p.id}
-                    className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">
-                        {p.feeLabel} ·{" "}
-                        <span className="font-normal">{p.athleteName}</span>
-                        {p.athleteArchived ? (
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            (archiviata)
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateShort(p.paymentDate)} ·{" "}
-                        {PAYMENT_METHOD_LABELS[p.method]}
-                        {p.receipt ? (
-                          <>
-                            {" "}·{" "}
-                            <span className="font-mono">
-                              ricevuta n. {p.receipt.receiptNumber}
-                            </span>
-                          </>
-                        ) : null}
-                      </p>
-                      {p.lines.length > 0 ? (
-                        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-                          {p.lines.map((line, index) => (
-                            <li
-                              key={`${index}-${line.description}`}
-                              className="flex justify-between gap-3"
-                            >
-                              <span>{line.description}</span>
-                              <span className="shrink-0 font-mono tabular-nums">
-                                {formatEuro(line.amountCents)}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                      {p.status === "REVERSED" ? (
-                        <Badge variant="destructive" className="mt-1">
-                          Pagamento stornato
-                        </Badge>
-                      ) : p.receiptHeldByOther ? (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Ricevuta intestata a un&apos;altra persona: la trova
-                          lei nella sua area riservata.
-                        </p>
-                      ) : !p.receipt ? (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Ricevuta non ancora emessa: sarà disponibile qui
-                          appena la segreteria la prepara.
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center justify-between gap-3 sm:justify-end">
-                      <span
-                        className={cn(
-                          "font-mono text-sm tabular-nums",
-                          p.status === "REVERSED" &&
-                            "text-muted-foreground line-through",
-                        )}
-                      >
-                        {formatEuro(p.amountCents)}
-                      </span>
-                      {p.receipt ? (
-                        <a
-                          href={receiptPdfHref(p.receipt.id)}
-                          className="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm font-medium hover:bg-muted"
-                        >
-                          <FileText className="h-4 w-4" />
-                          Ricevuta PDF
-                        </a>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <CardContent className="space-y-3 py-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+              <div className="space-y-0.5 text-sm">
+                <p className="font-medium">
+                  {openStagesCount === 0
+                    ? "Nessuno stage aperto all'iscrizione"
+                    : openStagesCount === 1
+                      ? "1 stage aperto all'iscrizione"
+                      : `${openStagesCount} stage aperti all'iscrizione`}
+                </p>
+                <p className="text-muted-foreground">
+                  {openStagesCount === 0
+                    ? "Quando la scuola ne apre uno lo trovi qui."
+                    : wording.stagesCardHint}
+                </p>
+              </div>
+            </div>
+            <Button asChild variant={openStagesCount > 0 ? "default" : "outline"} className="min-h-11 w-full">
+              <Link href="/parent/stages">Vedi gli stage</Link>
+            </Button>
           </CardContent>
         </Card>
       </section>
 
-      {/* Orari lezioni */}
-      <section id="orari" className="space-y-3">
-        <h2 className="text-lg font-semibold">Orario lezioni</h2>
-
+      {/* ── Orario ────────────────────────────────────────────────────── */}
+      <section aria-labelledby="orari" className="space-y-3">
+        <h2 id="orari" className="text-lg font-semibold">
+          Orario lezioni
+        </h2>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
-              {wording.scheduleCardTitle}
-            </CardTitle>
-            <CardDescription>
-              Corsi attivi dell&apos;anno accademico in corso.
-            </CardDescription>
+            <CardTitle className="text-base">{wording.scheduleCardTitle}</CardTitle>
+            <CardDescription>Corsi attivi dell&apos;anno accademico in corso.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {myAthleteSchedules.length === 0 ? (
-              <p className="px-4 pb-4 pt-0 text-sm text-muted-foreground">
+              <p className="px-4 pb-4 text-sm text-muted-foreground">
                 {wording.scheduleCardEmpty}
               </p>
             ) : (
@@ -508,7 +374,7 @@ export default async function ParentDashboardPage() {
         </Card>
 
         <details className="group rounded-lg border bg-card">
-          <summary className="flex cursor-pointer items-center justify-between gap-2 p-4 text-base font-medium">
+          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-4 py-3 text-sm font-medium">
             <span className="flex items-center gap-2">
               <CalendarClock className="h-4 w-4 text-muted-foreground" />
               Orario completo della scuola
@@ -523,7 +389,7 @@ export default async function ParentDashboardPage() {
                 Nessun corso attivo registrato.
               </p>
             ) : (
-              <ScheduleList items={generalSchedules} showCourseType />
+              <ScheduleList items={generalSchedules} />
             )}
           </div>
         </details>
@@ -532,93 +398,112 @@ export default async function ParentDashboardPage() {
   )
 }
 
-function SummaryAlert({
-  overdueCount,
-  overdueCents,
-  soonCount,
-  soonCents,
+// Le ricevute di un'allieva: una riga per pagamento, con «Scarica» a tutta
+// larghezza. Il PDF lo serve /ricevute/[id] con la sessione di chi lo apre e
+// gli stessi controlli di ambito delle query (canSeeReceipt): l'altro
+// genitore vede che una ricevuta esiste, non a chi è intestata né il file.
+function ReceiptsCard({
+  athleteId,
+  athleteName,
+  payments,
+  archived = false,
 }: {
-  overdueCount: number
-  overdueCents: number
-  soonCount: number
-  soonCents: number
+  athleteId: string
+  athleteName: string
+  payments: MyPayment[]
+  archived?: boolean
 }) {
-  if (overdueCount > 0) {
-    return (
-      <Card className="border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100">
-        <CardContent className="flex items-start gap-3 py-4">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-          <div className="space-y-1 text-sm">
-            <p className="font-semibold">
-              {overdueCount === 1
-                ? "1 contributo scaduto"
-                : `${overdueCount} contributi scaduti`}{" "}
-              · {formatEuro(overdueCents)}
-            </p>
-            <p className="text-xs">
-              Salda al più presto per evitare la sospensione della copertura.
-            </p>
-            <a href="#figlie" className="text-xs font-medium underline">
-              Vedi dettaglio
-            </a>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (soonCount > 0) {
-    return (
-      <Card className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-        <CardContent className="flex items-start gap-3 py-4">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-          <div className="space-y-1 text-sm">
-            <p className="font-semibold">
-              {soonCount === 1
-                ? "1 contributo in scadenza"
-                : `${soonCount} contributi in scadenza`}{" "}
-              · {formatEuro(soonCents)}
-            </p>
-            <p className="text-xs">
-              Scadenza entro 7 giorni.
-            </p>
-            <a href="#figlie" className="text-xs font-medium underline">
-              Vedi dettaglio
-            </a>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
-    <Card className="border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
-      <CardContent className="flex items-start gap-3 py-4">
-        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-        <div className="space-y-1 text-sm">
-          <p className="font-semibold">Tutto in regola</p>
-          <p className="text-xs">
-            Nessun contributo in sospeso al momento. Buon allenamento!
-          </p>
-        </div>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">
+          {archived ? (
+            <>
+              {athleteName}{" "}
+              <span className="text-xs font-normal text-muted-foreground">(archiviata)</span>
+            </>
+          ) : (
+            <Link
+              href={`#allieva-${athleteId}`}
+              className="inline-flex min-h-11 items-center underline-offset-4 hover:underline"
+            >
+              {athleteName}
+            </Link>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <ul className="divide-y">
+          {payments.map((p) => (
+            <li key={p.id} className="space-y-2 px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-0.5">
+                  {p.receipt ? (
+                    <p className="font-mono text-sm font-semibold tabular-nums">
+                      n. {p.receipt.receiptNumber}
+                    </p>
+                  ) : null}
+                  <p className="text-sm">{p.feeLabel}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateShort(p.receipt?.issueDate ?? p.paymentDate)} ·{" "}
+                    {PAYMENT_METHOD_LABELS[p.method]}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "shrink-0 font-mono text-sm tabular-nums",
+                    p.status === "REVERSED" && "text-muted-foreground line-through",
+                  )}
+                >
+                  {formatEuro(p.amountCents)}
+                </span>
+              </div>
+              {p.lines.length > 0 ? (
+                <ul className="space-y-0.5 text-xs text-muted-foreground">
+                  {p.lines.map((line, index) => (
+                    <li key={`${index}-${line.description}`} className="flex justify-between gap-3">
+                      <span>{line.description}</span>
+                      <span className="shrink-0 font-mono tabular-nums">
+                        {formatEuro(line.amountCents)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {p.status === "REVERSED" ? (
+                <p className="text-xs text-muted-foreground">Pagamento stornato.</p>
+              ) : p.receipt ? (
+                <Button asChild variant="outline" className="min-h-11 w-full">
+                  <a href={receiptPdfDownloadHref(p.receipt.id)}>
+                    <Receipt className="mr-2 h-4 w-4" />
+                    Scarica la ricevuta
+                  </a>
+                </Button>
+              ) : p.receiptHeldByOther ? (
+                <p className="text-xs text-muted-foreground">
+                  Ricevuta intestata a un&apos;altra persona: la trova lei nella sua area riservata.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Ricevuta non ancora emessa: compare qui appena la segreteria la prepara.
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
       </CardContent>
     </Card>
   )
 }
 
-type ScheduleListItem =
-  | (MyAthleteSchedule & { courseType?: undefined })
-  | GeneralCourseSchedule
+type ScheduleListItem = MyAthleteSchedule | GeneralCourseSchedule
 
-function ScheduleList({
-  items,
-  showCourseType = false,
-}: {
-  items: ScheduleListItem[]
-  showCourseType?: boolean
-}) {
-  const grouped = groupByDay(items)
-  const days = Array.from(grouped.keys()).sort((a, b) => a - b)
+function ScheduleList({ items }: { items: ScheduleListItem[] }) {
+  const grouped = new Map<number, ScheduleListItem[]>()
+  for (const item of items) {
+    grouped.set(item.dayOfWeek, [...(grouped.get(item.dayOfWeek) ?? []), item])
+  }
+  const days = [...grouped.keys()].sort((a, b) => a - b)
 
   return (
     <div className="divide-y">
@@ -629,32 +514,16 @@ function ScheduleList({
           </p>
           <ul className="space-y-2">
             {(grouped.get(d) ?? []).map((item) => (
-              <li
-                key={item.id}
-                className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
-              >
+              <li key={item.id} className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{item.courseName}</p>
                   {item.location ? (
-                    <p className="text-xs text-muted-foreground">
-                      {item.location}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{item.location}</p>
                   ) : null}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "font-mono text-sm tabular-nums text-muted-foreground",
-                    )}
-                  >
-                    {item.startTime}–{item.endTime}
-                  </span>
-                  {showCourseType && "courseType" in item && item.courseType ? (
-                    <Badge variant="secondary" className="text-xs">
-                      {item.courseType.replace(/_/g, " ").toLowerCase()}
-                    </Badge>
-                  ) : null}
-                </div>
+                <span className="shrink-0 font-mono text-sm tabular-nums text-muted-foreground">
+                  {item.startTime}–{item.endTime}
+                </span>
               </li>
             ))}
           </ul>

@@ -16,7 +16,7 @@ export default async function ParentLayout({
 
   const brand = await prisma.brandSettings.findUnique({
     where: { id: 1 },
-    select: { logoUrl: true, logoDarkUrl: true, asdName: true },
+    select: { logoUrl: true, logoDarkUrl: true, asdName: true, asdEmail: true },
   })
 
   const asdName = brand?.asdName ?? "IAD Portale"
@@ -54,10 +54,19 @@ export default async function ParentLayout({
         <LogoutButton />
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 pb-20">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 pb-24">
         {children}
-        <footer className="mt-8 text-center">
+        {/* Privacy e un recapito: a 375 px due righe, una sotto l'altra */}
+        <footer className="mt-8 flex flex-col items-center gap-1 text-center text-xs text-muted-foreground">
           <PrivacyLink />
+          {brand?.asdEmail ? (
+            <a
+              href={`mailto:${brand.asdEmail}`}
+              className="inline-flex min-h-11 items-center underline-offset-4 hover:underline"
+            >
+              {brand.asdEmail}
+            </a>
+          ) : null}
         </footer>
       </main>
 

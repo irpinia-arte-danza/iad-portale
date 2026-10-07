@@ -20,6 +20,12 @@ export type PortalWording = {
   stageSelectNone: string
   scheduleCardTitle: string
   scheduleCardEmpty: string
+  // Stato vuoto delle ricevute: cosa comparirà
+  receiptsEmptyDescription: string
+  // Riquadro di una figlia maggiorenne nella dashboard del genitore; {nome}
+  // è il segnaposto del nome. Per l'allieva stessa non compare mai: il
+  // testo lo ripete solo per non lasciare una stringa vuota.
+  adultDaughterNote: string
 }
 
 export function portalWording(scope: PortalScope): PortalWording {
@@ -38,6 +44,10 @@ export function portalWording(scope: PortalScope): PortalWording {
       stageSelectNone: "Iscrizione non disponibile",
       scheduleCardTitle: "I miei corsi",
       scheduleCardEmpty: "Nessun orario disponibile per i tuoi corsi.",
+      receiptsEmptyDescription:
+        "Quando la segreteria registra un tuo pagamento, la ricevuta compare qui e si scarica in PDF.",
+      adultDaughterNote:
+        "Certificato, tessera e presenze sono qui sotto, insieme alle rate e alle ricevute.",
     }
   }
 
@@ -55,5 +65,9 @@ export function portalWording(scope: PortalScope): PortalWording {
     stageSelectNone: "Seleziona almeno un'allieva",
     scheduleCardTitle: "Le mie figlie",
     scheduleCardEmpty: "Nessun orario disponibile per le tue figlie.",
+    receiptsEmptyDescription:
+      "Quando la segreteria registra un pagamento, la ricevuta intestata a te compare qui e si scarica in PDF.",
+    adultDaughterNote:
+      "{nome} è maggiorenne: certificato, tessera e presenze li vede lei dalla sua area riservata. Qui restano le rate, i pagamenti e le ricevute intestate a te.",
   }
 }
