@@ -91,7 +91,9 @@ export default async function AdminLayout({
             <AcademicYearChip label={currentYear?.label ?? null} />
           </div>
         </header>
-        <div className="flex-1 p-4 md:p-6">{children}</div>
+        {/* min-w-0: è un figlio flex. Senza, una riga larga dentro una lista
+            allargava <main> oltre la finestra invece di restringersi */}
+        <div className="min-w-0 flex-1 p-4 md:p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   )

@@ -48,8 +48,11 @@ export function BilancioEntrateSection({
             Nessuna entrata nel periodo selezionato.
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-[1fr_1.2fr] md:items-center">
-            <div className="h-64 w-full">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:items-center">
+            {/* minmax(0,…) e min-w-0: senza, sul telefono la tabella si
+                prendeva la sua larghezza intera e la colonna «%» usciva dal
+                riquadro; ora scorre dentro la card */}
+            <div className="h-64 w-full min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -87,12 +90,12 @@ export function BilancioEntrateSection({
               </ResponsiveContainer>
             </div>
 
-            <div className="rounded-md border">
+            <div className="min-w-0 rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Causale</TableHead>
-                    <TableHead className="text-right">Nr.</TableHead>
+                    <TableHead className="hidden text-right sm:table-cell">Nr.</TableHead>
                     <TableHead className="text-right">Totale</TableHead>
                     <TableHead className="text-right">%</TableHead>
                   </TableRow>
@@ -109,7 +112,7 @@ export function BilancioEntrateSection({
                           {FEE_TYPE_LABELS[entry.type]}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="hidden text-right font-mono sm:table-cell">
                         {entry.count}
                       </TableCell>
                       <TableCell className="text-right font-mono">
@@ -122,7 +125,7 @@ export function BilancioEntrateSection({
                   ))}
                   <TableRow className="border-t-2 bg-muted/30 hover:bg-muted/30">
                     <TableCell className="font-semibold">Totale</TableCell>
-                    <TableCell />
+                    <TableCell className="hidden sm:table-cell" />
                     <TableCell className="text-right font-mono font-semibold">
                       {formatEuro(totalCents)}
                     </TableCell>

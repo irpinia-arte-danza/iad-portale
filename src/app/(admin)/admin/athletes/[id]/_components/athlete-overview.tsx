@@ -90,11 +90,12 @@ export function AthleteOverview({
 
   return (
     <>
-      <div className="grid gap-4 lg:grid-cols-2 in-panel:grid-cols-1">
-        <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 in-panel:grid-cols-1">
+        <div className="flex min-w-0 flex-col gap-4">
           <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-              <div className="space-y-1.5">
+            {/* flex-wrap: sul telefono «Incassa tutte» va a capo sotto il titolo */}
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+              <div className="min-w-0 space-y-1.5">
                 <CardTitle>Da incassare</CardTitle>
                 <CardDescription>
                   {openSchedules.length === 0
@@ -125,10 +126,13 @@ export function AthleteOverview({
                     return (
                       <li
                         key={s.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+                        // Sotto 1024 (e nel pannello) importo e tasti stanno
+                        // SEMPRE sotto il titolo: con flex-wrap finivano a
+                        // destra o sotto a seconda della lunghezza del titolo
+                        className="flex flex-col gap-2 rounded-md border p-3 lg:flex-row lg:items-center lg:justify-between in-panel:flex-col in-panel:items-stretch"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
+                          <p className="truncate text-sm font-medium" title={s.description}>
                             {s.description}
                           </p>
                           <p
@@ -142,8 +146,8 @@ export function AthleteOverview({
                             {formatDateShort(s.dueDate)} · {due.text}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm">
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                          <span className="mr-auto font-mono text-sm lg:mr-0 in-panel:mr-auto">
                             {formatEuro(s.amountCents)}
                           </span>
                           <Button
@@ -233,7 +237,7 @@ export function AthleteOverview({
           </Card>
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {checklist}
           <Card>
             <CardHeader>
