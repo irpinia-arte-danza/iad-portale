@@ -37,17 +37,20 @@ import type { ScadenzaWithDetails } from "../queries"
 // schermo, su iPad si vedevano allieva, contatto, corso e metà importo, e
 // Incassa e Sollecita stavano nel menu ⋯ dell'ultima colonna, cioè fuori.
 // Qui le aree sono fisse e si ridispongono: una riga da 1024 in su, due righe
-// su tablet, una card sul telefono. Le due azioni si vedono sempre.
+// su tablet, una card sul telefono. Da 768 le due azioni si vedono sempre;
+// sul telefono, come nelle altre liste, c'è un tasto solo (Incassa) e il
+// resto, Sollecita compreso, sta nel menu «…» da 44 px: con i tre tasti
+// impilati 58 scadenze erano 18.000 px di pagina.
 // ─────────────────────────────────────────────────────────────────────────
 
 const GRID = cn(
   "grid items-center gap-x-3 gap-y-2",
-  // Telefono: nome in cima, poi importo e scadenza, poi il pagante, e le
-  // azioni larghe quanto la card
-  "grid-cols-[auto_auto_minmax(0,1fr)]",
+  // Telefono: nome e importo sulla prima riga, pagante e scadenza sulla
+  // seconda, e le azioni larghe quanto la card
+  "grid-cols-[auto_minmax(0,1fr)_auto]",
   // "vuoto" e non ".": Tailwind mangia l'underscore dopo il punto e il
   // template uscirebbe con una riga da due celle invece di tre, cioè invalido
-  "[grid-template-areas:'sel_nome_nome'_'vuoto_importo_scadenza'_'vuoto_pagante_pagante'_'azioni_azioni_azioni']",
+  "[grid-template-areas:'sel_nome_importo'_'vuoto_pagante_scadenza'_'azioni_azioni_azioni']",
   // Tablet: due righe, il pagante sotto il nome
   "md:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]",
   "md:[grid-template-areas:'sel_nome_importo_scadenza_azioni'_'sel_pagante_pagante_pagante_azioni']",
@@ -92,7 +95,7 @@ export function ScadenzaRow({
       data-state={selected ? "selected" : undefined}
       className={cn(
         GRID,
-        "border-b px-3 py-3 last:border-b-0 data-[state=selected]:bg-muted/50",
+        "border-b px-3 py-3 last:border-b-0 data-[state=selected]:bg-muted/50 max-md:py-2",
       )}
     >
       <div className="[grid-area:sel] self-start md:self-center">
@@ -146,7 +149,7 @@ export function ScadenzaRow({
         )}
       </div>
 
-      <div className="[grid-area:importo] md:text-right">
+      <div className="text-right [grid-area:importo]">
         <p className="font-mono text-sm font-medium">
           {formatEuro(s.amountCents)}
         </p>
@@ -162,7 +165,7 @@ export function ScadenzaRow({
         />
       </div>
 
-      <div className="[grid-area:scadenza] md:text-right">
+      <div className="text-right [grid-area:scadenza]">
         <p className="font-mono text-xs text-muted-foreground">
           {formatDateShort(s.dueDate)}
         </p>
@@ -174,10 +177,10 @@ export function ScadenzaRow({
         </Badge>
       </div>
 
-      <div className="flex flex-col gap-2 [grid-area:azioni] sm:flex-row md:justify-end">
+      <div className="flex items-center gap-2 [grid-area:azioni] md:justify-end">
         <Button
           size="sm"
-          className="h-11 md:h-9"
+          className="h-11 flex-1 md:h-9 md:flex-none"
           onClick={onIncassa}
         >
           <Wallet className="h-4 w-4" />
@@ -186,7 +189,8 @@ export function ScadenzaRow({
         <Button
           size="sm"
           variant="outline"
-          className="h-11 md:h-9"
+          // Sul telefono è nel menu «…»
+          className="hidden h-11 md:inline-flex md:h-9"
           onClick={onSollecita}
           disabled={!canRemind}
           title={canRemind ? undefined : remindBlocker}
@@ -199,11 +203,25 @@ export function ScadenzaRow({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {/* La misura la decide la variante: 44 col dito, 32 col mouse */}
-            <Button variant="ghost" size="icon" aria-label="Altre azioni">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Altre azioni"
+              className="max-md:size-11 max-md:shrink-0"
+            >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {/* Solo sul telefono, e solo se c'è qualcuno da sollecitare: una
+                voce spenta su ogni riga è rumore, e il motivo è già scritto
+                in rosso nella card */}
+            {canRemind ? (
+              <DropdownMenuItem className="md:hidden" onSelect={onSollecita}>
+                <MessageCircle className="h-4 w-4" />
+                Sollecita
+              </DropdownMenuItem>
+            ) : null}
             {s.status !== "PAID" ? (
               <DropdownMenuItem
                 onSelect={(e) => {
