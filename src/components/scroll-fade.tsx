@@ -38,6 +38,16 @@ export function ScrollFade({
       const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
       setMore((prev) => (prev.left === left && prev.right === right ? prev : { left, right }))
     }
+    // La voce attiva (scheda o filtro) deve vedersi: se è oltre il bordo, la
+    // riga parte già scorsa fin lì
+    const active = el.querySelector<HTMLElement>(
+      '[aria-pressed="true"], [data-state="active"], [aria-current="page"]',
+    )
+    if (active) {
+      const overflowRight = active.offsetLeft + active.offsetWidth - (el.scrollLeft + el.clientWidth)
+      if (overflowRight > 0) el.scrollLeft += overflowRight + FADE
+      else if (active.offsetLeft < el.scrollLeft) el.scrollLeft = Math.max(0, active.offsetLeft - FADE)
+    }
     update()
     el.addEventListener("scroll", update, { passive: true })
     const observer = new ResizeObserver(update)

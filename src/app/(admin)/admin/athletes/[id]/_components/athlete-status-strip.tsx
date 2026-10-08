@@ -25,7 +25,7 @@ function StatusCard({
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-3 rounded-lg border p-3",
+        "flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-2 rounded-lg border p-3",
         TONE_SURFACE[item.tone],
       )}
     >
@@ -40,7 +40,9 @@ function StatusCard({
           {item.detail ? (
             <p
               className={cn(
-                "truncate text-xs text-muted-foreground",
+                // Va a capo invece di troncarsi: «scaduto il 12/09/2026 ·
+                // carica il nuovo» tagliato a metà non diceva cosa fare
+                "text-xs text-muted-foreground [overflow-wrap:anywhere]",
                 mono && "font-mono",
               )}
             >
@@ -68,7 +70,7 @@ export function AthleteStatusStrip({
   card,
 }: AthleteStatusStripProps) {
   return (
-    <div className="grid gap-3 md:grid-cols-3 in-panel:grid-cols-1">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-3 in-panel:grid-cols-1">
       <StatusCard
         item={certificate}
         icon={<Stethoscope className="h-4 w-4" />}

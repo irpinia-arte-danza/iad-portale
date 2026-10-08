@@ -4,6 +4,7 @@ import { useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { X } from "lucide-react"
 
+import { ScrollFade } from "@/components/scroll-fade"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -120,10 +121,13 @@ export function AthletesFilters({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Sul telefono i filtri stanno su una riga che scorre (erano tre
+          righe da 44 px prima ancora della prima allieva) */}
+      <ScrollFade>
       <div
         role="group"
         aria-label="Filtra le allieve"
-        className="flex flex-wrap gap-2"
+        className="flex w-max gap-2 sm:w-auto sm:flex-wrap"
       >
         {chips.map((chip) => {
           const active = chip.filter === filter
@@ -159,8 +163,9 @@ export function AthletesFilters({
           </Button>
         ) : null}
       </div>
+      </ScrollFade>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:items-center sm:gap-3">
         <Select
           value={courseId ?? ALL}
           onValueChange={(value) => updateParams({ corso: value })}
@@ -203,7 +208,7 @@ export function AthletesFilters({
         <div
           role="group"
           aria-label="Allieve da mostrare"
-          className="inline-flex w-full rounded-lg border p-0.5 sm:w-auto"
+          className="col-span-2 inline-flex w-full rounded-lg border p-0.5 sm:w-auto"
         >
           {(
             [

@@ -107,9 +107,10 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
   }
 
   // ── Colonne ─────────────────────────────────────────────────────────────
-  // Alta: allieva, importo, ricevuta — chi ha pagato quanto, e se il
-  // documento è stato fatto. Poi data e tipo, infine metodo, periodo e
-  // scadenze coperte.
+  // Alta (da 768): allieva, data, tipo, importo, ricevuta — chi ha pagato
+  // cosa, quando e quanto, e se il documento è stato fatto. Data e tipo
+  // erano da 1024: su iPad restava un vuoto al centro e mancava proprio la
+  // data. Da 1280 metodo, periodo e scadenze coperte.
   const columns: ListColumn<PaymentListItem>[] = [
     {
       key: "allieva",
@@ -128,8 +129,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
     {
       key: "data",
       header: "Data",
-      priority: "medium",
-      width: "md:w-24",
+      width: "md:w-20 lg:w-24",
       cell: (p) => (
         <span className="font-mono text-xs">
           {formatDateShort(p.paymentDate)}
@@ -139,8 +139,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
     {
       key: "tipo",
       header: "Tipo",
-      priority: "medium",
-      width: "md:w-40",
+      width: "md:w-24 lg:w-40",
       cell: (p) => (
         // h-auto e whitespace-normal: il chip va a capo invece di tagliarsi
         // a metà altezza. Il testo intero resta nel title.
@@ -156,7 +155,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
     {
       key: "importo",
       header: "Importo",
-      width: "md:w-28",
+      width: "md:w-24 lg:w-28",
       align: "right",
       cell: (p) => (
         <span className="font-mono text-sm">{formatEuro(p.amountCents)}</span>
@@ -214,7 +213,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
     {
       key: "stato",
       header: "Stato",
-      width: "md:w-24",
+      width: "md:w-20 lg:w-24",
       cell: (p) => statusBadge(p),
     },
   ]

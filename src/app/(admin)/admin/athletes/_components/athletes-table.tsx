@@ -11,7 +11,7 @@ import {
 import { CertStatusBadge } from "@/components/medical-certificates/cert-status-badge"
 import { Badge } from "@/components/ui/badge"
 import type { AthleteListRow } from "../queries"
-import { statusTone, TONE_TEXT } from "@/lib/status/tone"
+import { statusTone, TONE_TEXT, type StatusTone } from "@/lib/status/tone"
 import { cn } from "@/lib/utils"
 import { computeAge } from "@/lib/utils/date-helpers"
 import { formatDateShort, formatEuro } from "@/lib/utils/format"
@@ -127,6 +127,25 @@ function OverdueCell({ athlete }: { athlete: AthleteListRow }) {
   )
 }
 
+// Il testo neutro resta grigio come il resto della riga; rosso e ambra no
+function toneClass(tone: StatusTone): string | undefined {
+  return tone === "neutral" ? undefined : TONE_TEXT[tone]
+}
+
+// Le parole dei badge, per le righe di stato della card
+const CERT_WORD: Record<AthleteListRow["certificate"]["status"], string> = {
+  valid: "valido",
+  expiring: "in scadenza",
+  expired: "scaduto",
+  missing: "mancante",
+}
+const CARD_WORD: Record<AthleteListRow["card"]["status"], string> = {
+  valid: "valida",
+  expiring: "in scadenza",
+  expired: "scaduta",
+  missing: "assente",
+}
+
 export function AthletesTable({ athletes, empty }: AthletesTableProps) {
   // ── Colonne ─────────────────────────────────────────────────────────────
   // Alta (da 768): nome, certificato, chi paga, contributi — chi è, se può
@@ -137,22 +156,21 @@ export function AthletesTable({ athletes, empty }: AthletesTableProps) {
       key: "nome",
       header: "Nome",
       width: "md:flex-1",
-      // flex-wrap solo sotto 768, dove il corso va a capo sotto il nome: da
-      // 768 la riga resta una riga di testo e i nomi lunghi si troncano
-      // invece di mandare a capo il corso
+      // Una riga di testo a ogni larghezza: a cedere spazio è il corso,
+      // non il nome: «Capobianco 27 Chi…» accanto a un corso leggibile era
+      // la priorità al contrario
       cell: (athlete) => (
-        <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 md:flex-nowrap">
+        <span className="flex min-w-0 items-baseline gap-x-1.5">
           <Link
             href={`/admin/athletes/${athlete.id}`}
-            className="truncate font-medium hover:underline"
+            className="max-w-full shrink-0 truncate font-medium hover:underline"
           >
             {listName(athlete)}
           </Link>
-          {/* Il corso dell'anno: sotto il nome sul telefono, accanto da 768.
-              Sotto anche da 768 farebbe ogni riga alta due righe di testo, e
-              a 1440 si tornerebbe a vedere dieci allieve. */}
+          {/* Il corso dell'anno accanto al nome, anche sul telefono: sotto,
+              ogni card era una riga più alta */}
           {athlete.currentCourses.length > 0 ? (
-            <span className="block w-full truncate text-xs text-muted-foreground md:inline md:w-auto">
+            <span className="min-w-0 shrink truncate text-xs text-muted-foreground">
               {athlete.currentCourses.map((c) => c.name).join(" · ")}
             </span>
           ) : null}
@@ -191,13 +209,13 @@ export function AthletesTable({ athletes, empty }: AthletesTableProps) {
     {
       key: "pagante",
       header: "Chi paga",
-      width: "md:w-40",
+      width: "md:w-36 lg:w-40",
       cell: (athlete) => <PayerCell athlete={athlete} />,
     },
     {
       key: "contributi",
       header: "Contributi",
-      width: "md:w-32 lg:w-40",
+      width: "md:w-28 lg:w-40",
       cell: (athlete) => <OverdueCell athlete={athlete} />,
     },
   ]
@@ -217,11 +235,18 @@ export function AthletesTable({ athletes, empty }: AthletesTableProps) {
       // Le due righe della card sotto 768: documenti e contributi, le stesse
       // informazioni delle colonne che lì non ci stanno
       cardLines={(athlete) => [
-        <span key="documenti" className="flex flex-wrap items-center gap-1.5">
-          <CertStatusBadge status={athlete.certificate.status} />
-          <CardStatusBadge status={athlete.card.status} />
+        // Testo colorato e non badge: due righe da 16 px invece di una da
+        // 22 più una da 20. Su 58 allieve sono più di mille pixel.
+        <span key="documenti" className="block truncate">
+          <span className={toneClass(statusTone({ kind: "certificate", status: athlete.certificate.status }))}>
+            Certificato {CERT_WORD[athlete.certificate.status]}
+          </span>
+          {" · "}
+          <span className={toneClass(statusTone({ kind: "card", status: athlete.card.status }))}>
+            Tessera {CARD_WORD[athlete.card.status]}
+          </span>
         </span>,
-        <span key="contributi" className="flex flex-wrap items-center gap-1.5">
+        <span key="contributi" className="flex min-w-0 items-center gap-1.5 [&_*]:text-xs">
           {athlete.overdue.count > 0 ? (
             <OverdueCell athlete={athlete} />
           ) : (
@@ -246,6 +271,7 @@ export function AthletesTable({ athletes, empty }: AthletesTableProps) {
       actions={(athlete) => (
         <AthleteRowActions
           layout="responsive"
+          hasOverdue={athlete.overdue.count > 0}
           athlete={{
             id: athlete.id,
             firstName: athlete.firstName,

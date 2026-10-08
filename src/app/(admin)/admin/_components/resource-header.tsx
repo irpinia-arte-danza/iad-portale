@@ -58,8 +58,10 @@ export function ResourceHeader({
         </nav>
       )}
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-1">
+      {/* Sotto 640 titolo e tasto non stanno affiancati: il tasto va sotto, a
+          tutta larghezza e alto 44 px. Vale per ogni pagina. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
             {titleAddon}
@@ -68,7 +70,11 @@ export function ResourceHeader({
             <p className="text-sm text-muted-foreground">{description}</p>
           )}
         </div>
-        {action && <div>{action}</div>}
+        {action && (
+          <div className="flex flex-col gap-2 max-sm:[&_[data-slot=button]]:h-11 max-sm:[&_[data-slot=button]]:w-full max-sm:[&>*]:w-full max-sm:[&>div]:flex-col sm:shrink-0 sm:flex-row sm:items-center">
+            {action}
+          </div>
+        )}
       </div>
       {notice}
     </header>

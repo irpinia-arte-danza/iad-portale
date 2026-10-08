@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import type { AccessInvitePreview } from "@/lib/auth/access-emails"
 import { planAccessInvites } from "@/lib/auth/access-invite-plan"
 import type { AccessStatus } from "@/lib/auth/access-status-types"
+import { cn } from "@/lib/utils"
 import { listName } from "@/lib/utils/person-name"
 import { whatsappHref } from "@/lib/utils/whatsapp"
 
@@ -55,14 +56,18 @@ function figlieLabel(count: number): string {
 
 // Il telefono si tocca: da iPad prima andava ricopiato a mano. Numero in
 // Geist Mono, e WhatsApp apre la chat con quel numero.
-function PhoneCell({ phone }: { phone: string | null }) {
+// In card (`compact`) solo il numero: WhatsApp è il tasto della card.
+function PhoneCell({ phone, compact = false }: { phone: string | null; compact?: boolean }) {
   if (!phone) return <span className="text-sm text-muted-foreground">—</span>
-  const whatsapp = whatsappHref(phone)
+  const whatsapp = compact ? null : whatsappHref(phone)
   return (
     <span className="flex min-w-0 items-center gap-2">
       <a
         href={`tel:${phone.replace(/\s+/g, "")}`}
-        className="inline-flex h-11 items-center truncate font-mono text-sm underline-offset-4 hover:underline"
+        className={cn(
+          "inline-flex items-center truncate font-mono text-sm underline-offset-4 hover:underline",
+          !compact && "h-11",
+        )}
       >
         {phone}
       </a>
@@ -70,7 +75,7 @@ function PhoneCell({ phone }: { phone: string | null }) {
         <Button asChild variant="outline" size="sm" className="h-11 shrink-0">
           <a href={whatsapp} target="_blank" rel="noopener noreferrer">
             <MessageCircle className="h-4 w-4" />
-            WhatsApp
+            <span className="sr-only lg:not-sr-only">WhatsApp</span>
           </a>
         </Button>
       ) : null}
@@ -150,14 +155,15 @@ export function ParentsTable({
     {
       key: "telefono",
       header: "Telefono",
-      priority: "medium",
-      width: "md:w-64",
+      // Da 768: il numero è quello che serve su iPad. Sotto 1024 WhatsApp
+      // resta un'icona, il testo compare quando c'è spazio
+      width: "md:w-44 lg:w-64",
       cell: (parent) => <PhoneCell phone={parent.phone} />,
     },
     {
       key: "allieve",
       header: "Allieve",
-      width: "md:w-20",
+      width: "md:w-14 lg:w-20",
       align: "center",
       cell: (parent) => (
         <span className="text-sm">{parent._count.athleteRelations}</span>
@@ -166,7 +172,7 @@ export function ParentsTable({
     {
       key: "accesso",
       header: "Accesso",
-      width: "md:w-40",
+      width: "md:w-32 lg:w-40",
       cell: (parent) => <AccessStatusBadge status={statusOf(parent.id)} />,
     },
   ]
@@ -202,7 +208,7 @@ export function ParentsTable({
               showDetail={false}
             />
           </span>,
-          <PhoneCell key="telefono" phone={parent.phone} />,
+          <PhoneCell key="telefono" phone={parent.phone} compact />,
         ]}
         actions={(parent) => (
           <ParentRowActions

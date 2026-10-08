@@ -66,6 +66,8 @@ export function PaymentRowActions({
               key: "issue",
               label: "Emetti ricevuta",
               icon: FileText,
+              // Il tasto della card: è il lavoro rimasto da fare sul pagamento
+              primary: true,
               onSelect: () => receiptFlow.begin(payment.id),
             } satisfies RowAction,
           ]
@@ -88,22 +90,21 @@ export function PaymentRowActions({
           } satisfies RowAction,
         ]
       : []),
-    receipt
-      ? {
-          key: "delete",
-          label: "Elimina (ricevuta emessa: usa Storna)",
-          icon: Trash2,
-          disabled: true,
-          separatorBefore: true,
-        }
-      : {
-          key: "delete",
-          label: "Elimina",
-          icon: Trash2,
-          destructive: true,
-          separatorBefore: true,
-          onSelect: () => setDeleteOpen(true),
-        },
+    // Con una ricevuta emessa il pagamento non si elimina, si storna: la
+    // voce «Elimina» compare solo quando si può usare. Prima era un tasto
+    // spento su ogni riga, con la spiegazione nell'etichetta.
+    ...(!receipt
+      ? [
+          {
+            key: "delete",
+            label: "Elimina",
+            icon: Trash2,
+            destructive: true,
+            separatorBefore: true,
+            onSelect: () => setDeleteOpen(true),
+          } satisfies RowAction,
+        ]
+      : []),
   ]
 
   return (

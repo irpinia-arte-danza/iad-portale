@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Pencil, RefreshCw, Send, Trash2 } from "lucide-react"
+import { MessageCircle, Pencil, RefreshCw, Send, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { AccessStatus } from "@/lib/auth/access-status-types"
+import { whatsappHref } from "@/lib/utils/whatsapp"
 
 import { useSendAccessInvite } from "../../_components/access/use-send-access-invite"
 import { softDeleteParent } from "../actions"
@@ -79,7 +80,24 @@ export function ParentRowActions({
 
   const showAccessItem = accessStatus && accessStatus.kind !== "ACTIVE"
 
+  const whatsapp = parent.phone ? whatsappHref(parent.phone) : null
+
   const actions: RowAction[] = [
+    // Il tasto della card: scrivere al genitore è il motivo per cui si apre
+    // l'elenco dal telefono. In tabella c'è già nella colonna Telefono.
+    ...(whatsapp
+      ? [
+          {
+            key: "whatsapp",
+            label: "WhatsApp",
+            icon: MessageCircle,
+            href: whatsapp,
+            external: true,
+            primary: true,
+            cardOnly: true,
+          } satisfies RowAction,
+        ]
+      : []),
     {
       key: "edit",
       label: "Modifica",
