@@ -50,3 +50,14 @@ describe("header sulle route", () => {
     expect(values.some((v) => v.includes("frame-ancestors 'none'"))).toBe(false)
   })
 })
+
+describe("redirect", () => {
+  it("/admin porta alla dashboard, e non è permanente", async () => {
+    const rules = (await nextConfig.redirects?.()) ?? []
+    expect(rules).toContainEqual({
+      source: "/admin",
+      destination: "/admin/dashboard",
+      permanent: false,
+    })
+  })
+})

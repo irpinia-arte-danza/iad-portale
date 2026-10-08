@@ -64,6 +64,12 @@ const nextConfig: NextConfig = {
   },
   // Header di sicurezza su tutte le risposte; la CSP è in solo report
   // (src/lib/security/headers.ts)
+  // /admin da solo non è una pagina: porta alla dashboard
+  async redirects() {
+    return [
+      { source: "/admin", destination: "/admin/dashboard", permanent: false },
+    ];
+  },
   async headers() {
     return [
       {
