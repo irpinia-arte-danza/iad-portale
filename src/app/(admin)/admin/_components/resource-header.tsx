@@ -71,7 +71,7 @@ export function ResourceHeader({
           )}
         </div>
         {action && (
-          <div className="flex flex-col gap-2 max-sm:[&_[data-slot=button]]:h-11 max-sm:[&_[data-slot=button]]:w-full max-sm:[&>*]:w-full max-sm:[&>div]:flex-col sm:shrink-0 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-2 max-sm:[&_a]:h-11 max-sm:[&_a]:w-full max-sm:[&_button]:h-11 max-sm:[&_button]:w-full max-sm:[&>*]:w-full max-sm:[&>div]:flex-col max-sm:[&>div]:items-stretch sm:shrink-0 sm:flex-row sm:items-center">
             {action}
           </div>
         )}
