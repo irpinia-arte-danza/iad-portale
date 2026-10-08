@@ -188,9 +188,13 @@ export function splitCardActions(actions: RowAction[]): {
 export function RowActionsCard({
   actions,
   label,
+  inline = false,
 }: {
   actions: RowAction[]
   label?: string
+  // Tasto compatto accanto al nome invece che su una riga sua: per le card
+  // corte (un nome e uno stato), dove una riga in più raddoppia l'elenco
+  inline?: boolean
 }) {
   const { primary, rest } = splitCardActions(actions)
   if (!primary && rest.length === 0) return null
@@ -210,10 +214,14 @@ export function RowActionsCard({
       {primary.label}
     </>
   )
+  const primaryClass = inline ? "h-11 shrink-0 px-3" : "h-11 min-w-0 flex-1"
   return (
-    <div className="flex items-center gap-2">
+    <div
+      data-row-actions-inline={inline ? "" : undefined}
+      className={inline ? "flex items-center gap-1" : "flex items-center gap-2"}
+    >
       {primary.href !== undefined ? (
-        <Button asChild className="h-11 min-w-0 flex-1">
+        <Button asChild className={primaryClass}>
           {primary.external ? (
             <a href={primary.href} target="_blank" rel="noopener noreferrer">
               {content}
@@ -223,7 +231,7 @@ export function RowActionsCard({
           )}
         </Button>
       ) : (
-        <Button className="h-11 min-w-0 flex-1" onClick={primary.onSelect}>
+        <Button className={primaryClass} onClick={primary.onSelect}>
           {content}
         </Button>
       )}
@@ -244,10 +252,12 @@ export function RowActionsRenderer({
   actions,
   layout = "menu",
   label,
+  cardInline = false,
 }: {
   actions: RowAction[]
   layout?: RowActionsLayout
   label?: string
+  cardInline?: boolean
 }) {
   const tableActions = actions.filter((a) => !a.cardOnly)
   if (layout === "stacked") return <RowActionsStack actions={tableActions} />
@@ -261,7 +271,7 @@ export function RowActionsRenderer({
   return (
     <>
       <div className="md:hidden">
-        <RowActionsCard actions={actions} label={label} />
+        <RowActionsCard actions={actions} label={label} inline={cardInline} />
       </div>
       <div className="hidden md:block">
         <RowActionsMenu actions={tableActions} label={label} />

@@ -235,7 +235,7 @@ export function ResponsiveList<T>({
               className={cn(
                 // In card: se la riga ha solo il menu «…», sta nell'angolo in
                 // alto a destra e il contenuto gli lascia posto (pr-14)
-                "relative flex flex-col gap-1.5 border-b px-3 py-3 last:border-b-0 data-[state=selected]:bg-muted/50 max-md:py-1.5 max-md:has-[[data-row-menu-only]]:pr-14 md:flex-row md:items-center md:gap-3",
+                "relative flex flex-col gap-1.5 border-b px-3 py-3 last:border-b-0 data-[state=selected]:bg-muted/50 max-md:py-1.5 max-md:has-[[data-row-menu-only]]:pr-14 max-md:has-[[data-row-actions-inline]]:pr-40 md:flex-row md:items-center md:gap-3",
                 onRowClick && "cursor-pointer hover:bg-muted/50",
                 rowClassName?.(item),
               )}
@@ -290,7 +290,7 @@ export function ResponsiveList<T>({
 
               {actions ? (
                 <div
-                  className="max-md:has-[[data-row-menu-only]]:absolute max-md:has-[[data-row-menu-only]]:top-1 max-md:has-[[data-row-menu-only]]:right-1 md:ml-auto md:shrink-0"
+                  className="max-md:has-[[data-row-actions-inline]]:absolute max-md:has-[[data-row-actions-inline]]:top-1 max-md:has-[[data-row-actions-inline]]:right-1 max-md:has-[[data-row-menu-only]]:absolute max-md:has-[[data-row-menu-only]]:top-1 max-md:has-[[data-row-menu-only]]:right-1 md:ml-auto md:shrink-0"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {actions(item)}

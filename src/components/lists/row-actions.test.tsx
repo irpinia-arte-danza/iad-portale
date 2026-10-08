@@ -61,6 +61,13 @@ describe("RowActionsCard", () => {
     expect(html).not.toContain("flex-1")
   })
 
+  it("inline: il tasto è compatto e la card lo tiene accanto al nome", () => {
+    const html = renderToStaticMarkup(<RowActionsCard actions={ACTIONS} inline />)
+    expect(html).toContain("data-row-actions-inline")
+    expect(html).not.toContain("flex-1")
+    expect(html).toContain("Incassa")
+  })
+
   it("niente azioni, niente markup", () => {
     expect(renderToStaticMarkup(<RowActionsCard actions={[]} />)).toBe("")
   })
