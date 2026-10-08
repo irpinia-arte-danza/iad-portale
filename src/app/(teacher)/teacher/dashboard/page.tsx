@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { requireTeacher } from "@/lib/auth/require-teacher"
-import { formatDateShort } from "@/lib/utils/format"
+import { formatDateShort, formatDayLongRome } from "@/lib/utils/format"
 
 import {
   getMyCourses,
@@ -34,15 +34,6 @@ const DAY_OF_WEEK_LABELS = [
   "Venerdì",
   "Sabato",
 ]
-
-function todayLongLabel(): string {
-  return new Intl.DateTimeFormat("it-IT", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "Europe/Rome",
-  }).format(new Date())
-}
 
 type TodayItem = {
   scheduleId: string
@@ -113,7 +104,7 @@ export default async function TeacherDashboardPage({ searchParams }: PageProps) 
         <h1 className="text-2xl font-semibold tracking-tight">
           Buongiorno {profile?.firstName ?? "Insegnante"}
         </h1>
-        <p className="text-sm text-muted-foreground">{todayLongLabel()}</p>
+        <p className="text-sm text-muted-foreground">{formatDayLongRome(new Date())}</p>
       </header>
 
       {/* Il valore arriva dall'indirizzo: non si mostra, si dice solo che

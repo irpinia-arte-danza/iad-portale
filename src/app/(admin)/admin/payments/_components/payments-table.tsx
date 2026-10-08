@@ -111,7 +111,11 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
   // cosa, quando e quanto, e se il documento è stato fatto. Data e tipo
   // erano da 1024: su iPad restava un vuoto al centro e mancava proprio la
   // data. Da 1280 metodo, periodo e scadenze coperte.
-  const columns: ListColumn<PaymentListItem>[] = [
+  // «Stato» parla solo per le eccezioni (lo storno): se nessuna riga a
+  // schermo ne ha una, la colonna non c'è e lo spazio va al nome
+  const anyException = payments.some((p) => statusBadge(p) !== null)
+
+  const allColumns: ListColumn<PaymentListItem>[] = [
     {
       key: "allieva",
       header: "Allieva",
@@ -217,6 +221,9 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
       cell: (p) => statusBadge(p),
     },
   ]
+  const columns = anyException
+    ? allColumns
+    : allColumns.filter((column) => column.key !== "stato")
 
   return (
     <>
