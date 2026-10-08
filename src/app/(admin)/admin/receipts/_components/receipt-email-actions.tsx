@@ -25,6 +25,7 @@ import {
 } from "@/lib/receipts/receipt-email"
 import { NEVER_SHARED, shareStateLabel } from "@/lib/receipts/receipt-share"
 import { receiptPdfDownloadHref, receiptPdfHref } from "@/lib/receipts/types"
+import { cn } from "@/lib/utils"
 import { formatDateShort } from "@/lib/utils/format"
 
 import {
@@ -33,6 +34,11 @@ import {
   sendReceiptByEmail,
   type ReceiptDeliveryInfo,
 } from "../actions"
+import {
+  RECEIPT_ACTION_CLASS,
+  RECEIPT_ACTION_LAST_ODD_CLASS,
+  ReceiptActionsGrid,
+} from "./receipt-actions-grid"
 import { ShareReceiptButton } from "./share-receipt-button"
 import { useFileShareSupport } from "./use-file-share-support"
 
@@ -164,14 +170,16 @@ export function ReceiptEmailActions({
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Button asChild variant="outline" className="min-h-11 flex-1">
+      {/* 2×2 sotto 640 px di contenitore (telefono, pannello, dialog), una
+          riga sopra: vedi receipt-actions-grid.tsx */}
+      <ReceiptActionsGrid>
+        <Button asChild variant="outline" className={RECEIPT_ACTION_CLASS}>
           <a href={receiptPdfHref(receiptId)} target="_blank" rel="noopener noreferrer">
             <Printer className="h-4 w-4" />
             Apri
           </a>
         </Button>
-        <Button asChild variant="outline" className="min-h-11 flex-1">
+        <Button asChild variant="outline" className={RECEIPT_ACTION_CLASS}>
           <a href={receiptPdfDownloadHref(receiptId)}>
             <Download className="h-4 w-4" />
             Scarica
@@ -184,11 +192,16 @@ export function ReceiptEmailActions({
           receiptNumber={receiptNumber}
           athleteName={athleteName}
           buttonVariant={canShareFiles ? "default" : "outline"}
+          className={RECEIPT_ACTION_CLASS}
           onShared={reload}
         />
         <Button
           variant={canShareFiles ? "outline" : "default"}
-          className="min-h-11 flex-1"
+          // Senza «Condividi» i tasti sono tre: questo prende tutta la riga
+          className={cn(
+            RECEIPT_ACTION_CLASS,
+            !canShareFiles && RECEIPT_ACTION_LAST_ODD_CLASS,
+          )}
           onClick={send}
           disabled={sending || blocker !== null || email === null}
         >
@@ -199,9 +212,11 @@ export function ReceiptEmailActions({
           ) : (
             <Mail className="h-4 w-4" />
           )}
-          {sending ? "Invio…" : email ? sendButtonLabel(email) : "Invia per email"}
+          <span className="truncate">
+            {sending ? "Invio…" : email ? sendButtonLabel(email) : "Invia per email"}
+          </span>
         </Button>
-      </div>
+      </ReceiptActionsGrid>
 
       {/* Vale per tutte, non solo per quelle senza email: una ricevuta
           stampata e data allo sportello è consegnata, e il gestionale non

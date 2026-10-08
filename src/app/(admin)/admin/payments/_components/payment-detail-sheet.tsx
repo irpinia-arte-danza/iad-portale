@@ -109,7 +109,11 @@ export function PaymentDetailSheet({
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        {/* data-[side=right]:w-full e non w-full: il componente ha
+            data-[side=right]:w-3/4, che vince su una classe semplice. Sul
+            telefono il pannello restava largo tre quarti (293 px a 390) e
+            «Invia per email» si troncava. */}
+        <SheetContent className="overflow-y-auto data-[side=right]:w-full sm:max-w-md">
           <SheetHeader>
             <SheetTitle>Dettaglio pagamento</SheetTitle>
             <SheetDescription>

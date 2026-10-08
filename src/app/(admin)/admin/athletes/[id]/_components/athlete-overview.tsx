@@ -206,12 +206,14 @@ export function AthleteOverview({
                         </span>
                       </div>
                       {p.receipt ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                        // In colonna: accanto al numero i tasti avevano 200 px
+                        // e «Invia per email» si troncava
+                        <div className="mt-2 flex flex-col gap-2">
                           <a
                             href={receiptPdfHref(p.receipt.id)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="font-mono text-xs underline underline-offset-4"
+                            className="self-start font-mono text-xs underline underline-offset-4"
                           >
                             {p.receipt.receiptNumber}
                           </a>
