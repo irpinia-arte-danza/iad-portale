@@ -22,7 +22,12 @@ const DATE_SHORT_IT = new Intl.DateTimeFormat("it-IT", {
   year: "numeric",
 })
 
+// La data lunga, una sola: "giovedì 1 ottobre 2026", in minuscolo come si
+// scrive in italiano (niente `capitalize` nei componenti: «Giovedì 1 Ottobre
+// 2026» è inglese). Fuso forzato come DAY_LONG_ROME: le date di calendario
+// sono a mezzanotte UTC (§17.40).
 const DATE_LONG_IT = new Intl.DateTimeFormat("it-IT", {
+  timeZone: "Europe/Rome",
   weekday: "long",
   day: "numeric",
   month: "long",

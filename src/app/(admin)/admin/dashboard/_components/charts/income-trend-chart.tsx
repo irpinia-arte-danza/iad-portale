@@ -10,7 +10,8 @@ import {
   YAxis,
 } from "recharts"
 
-import { formatEuro } from "@/lib/utils/format"
+import { niceAxisTicks } from "@/lib/bilancio/axis"
+import { formatEuro, formatEuroAxis } from "@/lib/utils/format"
 
 import type { IncomeTrendPoint } from "../../analytics-queries"
 
@@ -19,11 +20,6 @@ interface IncomeTrendChartProps {
 }
 
 const INCOME_COLOR = "hsl(142 76% 36%)"
-
-function formatAxisEur(value: number): string {
-  if (value >= 100_000) return `€${Math.round(value / 100 / 1000)}k`
-  return `€${Math.round(value / 100)}`
-}
 
 export function IncomeTrendChart({ data }: IncomeTrendChartProps) {
   const hasData = data.some((p) => p.totalCents > 0)
@@ -36,8 +32,13 @@ export function IncomeTrendChart({ data }: IncomeTrendChartProps) {
     )
   }
 
+  // Stesse tacche tonde e stesso formato del grafico del Bilancio
+  // (niceAxisTicks + formatEuroAxis): «€30 · €60 · €90 · €120» qui e
+  // «500 € · 1.000 €» là erano due modi di scrivere lo stesso asse
+  const axis = niceAxisTicks(data.reduce((max, p) => Math.max(max, p.totalCents), 0))
+
   return (
-    <div className="h-64 w-full">
+    <div className="h-64 w-full min-w-0">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={data}
@@ -60,8 +61,10 @@ export function IncomeTrendChart({ data }: IncomeTrendChartProps) {
             fontSize={11}
             tickLine={false}
             axisLine={false}
-            tickFormatter={formatAxisEur}
-            width={55}
+            ticks={axis.ticks}
+            domain={[0, axis.topCents]}
+            tickFormatter={formatEuroAxis}
+            width={64}
           />
           <Tooltip
             formatter={(value) => [

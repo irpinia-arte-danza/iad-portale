@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Pencil, Trash2 } from "lucide-react"
+import { Pencil, Trash2, Wallet } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -33,6 +33,8 @@ import { AthleteForm } from "./athlete-form"
 interface AthleteRowActionsProps {
   // "responsive": tasti a tutta larghezza in card, menu ⋯ in tabella
   layout?: RowActionsLayout
+  // Contributi in ritardo: in card compare il tasto «Incassa»
+  hasOverdue?: boolean
   athlete: {
     id: string
     firstName: string
@@ -57,6 +59,7 @@ interface AthleteRowActionsProps {
 export function AthleteRowActions({
   athlete,
   layout,
+  hasOverdue = false,
 }: AthleteRowActionsProps) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -75,6 +78,21 @@ export function AthleteRowActions({
   }
 
   const actions: RowAction[] = [
+    // In card è il tasto della riga, e solo se c'è qualcosa in ritardo: apre
+    // la scheda, che comincia da «Da incassare». In tabella c'è già la
+    // colonna Contributi accanto al nome, che è il link alla stessa scheda.
+    ...(hasOverdue
+      ? [
+          {
+            key: "collect",
+            label: "Incassa",
+            icon: Wallet,
+            href: `/admin/athletes/${athlete.id}`,
+            primary: true,
+            cardOnly: true,
+          } satisfies RowAction,
+        ]
+      : []),
     {
       key: "edit",
       label: "Modifica",

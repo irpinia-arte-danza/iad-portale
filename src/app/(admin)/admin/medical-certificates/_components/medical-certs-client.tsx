@@ -3,10 +3,11 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Camera, MessageCircle, Search, UserPlus, X } from "lucide-react"
+import { Camera, MessageCircle, Search, UserCircle, UserPlus, X } from "lucide-react"
 
 import { AthleteCardLink } from "@/components/athletes/athlete-card-link"
 import { EmptyState } from "@/components/empty-state"
+import { RowActionsMenu, type RowAction } from "@/components/lists/row-actions"
 import { CertStatusBadge } from "@/components/medical-certificates/cert-status-badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -55,9 +56,11 @@ const ALL = "__all__"
 
 const GRID = cn(
   "grid items-center gap-x-3 gap-y-2",
-  // Telefono: card, con i due tasti larghi in fondo
+  // Telefono: card come nelle altre liste — un tasto (Carica) e il menu «…»
+  // da 44 px con «Chiedi al genitore». Erano due tasti impilati per riga:
+  // 58 allieve facevano 15.700 px di pagina.
   "grid-cols-[auto_minmax(0,1fr)]",
-  "[grid-template-areas:'sel_nome'_'vuoto_stato'_'vuoto_dest'_'vuoto_rich'_'azioni_azioni']",
+  "[grid-template-areas:'sel_nome'_'vuoto_stato'_'vuoto_dest'_'azioni_azioni']",
   // Tablet e laptop: due righe, i tasti a destra
   "md:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto]",
   "md:[grid-template-areas:'sel_nome_stato_azioni'_'sel_dest_rich_azioni']",
@@ -336,7 +339,7 @@ export function MedicalCertsClient({
                   data-state={isSelected ? "selected" : undefined}
                   className={cn(
                     GRID,
-                    "border-b px-3 py-3 last:border-b-0 data-[state=selected]:bg-muted/50",
+                    "border-b px-3 py-3 last:border-b-0 data-[state=selected]:bg-muted/50 max-md:gap-y-1 max-md:py-2",
                   )}
                 >
                   <div className="self-start [grid-area:sel] md:self-center">
@@ -379,15 +382,17 @@ export function MedicalCertsClient({
                     <StatusCell row={row} />
                   </div>
 
-                  <div className="min-w-0 [grid-area:rich]">
+                  {/* Sul telefono la traccia della richiesta non ha una riga
+                      sua: si legge aprendo «Chiedi al genitore» */}
+                  <div className="hidden min-w-0 [grid-area:rich] md:block">
                     <p className="truncate text-xs text-muted-foreground">
                       {certRequestLabel(row.lastRequest)}
                     </p>
                   </div>
 
-                  <div className="flex flex-col gap-2 [grid-area:azioni] sm:flex-row md:flex-col md:items-stretch xl:flex-row">
+                  <div className="flex items-center gap-2 [grid-area:azioni] md:flex-col md:items-stretch xl:flex-row">
                     <Button
-                      className="h-11"
+                      className="h-11 min-w-0 flex-1 md:flex-none"
                       variant={row.status === "valid" ? "outline" : "default"}
                       onClick={() => setUploadFor(row)}
                     >
@@ -397,7 +402,8 @@ export function MedicalCertsClient({
                     {/* Spento solo con un motivo, e il motivo si legge */}
                     <Button
                       variant="outline"
-                      className="h-11"
+                      // Sul telefono è nel menu «…»
+                      className="hidden h-11 md:inline-flex"
                       disabled={blocker !== null}
                       title={blocker ?? undefined}
                       onClick={() => openRequest([row])}
@@ -405,6 +411,32 @@ export function MedicalCertsClient({
                       <MessageCircle className="h-4 w-4" />
                       Chiedi al genitore
                     </Button>
+                    <div className="md:hidden">
+                      <RowActionsMenu
+                        label={`Altre azioni per ${row.athleteName}`}
+                        triggerClassName="size-11 shrink-0"
+                        actions={[
+                          // Solo se c'è qualcuno a cui chiederlo: il motivo,
+                          // quando manca, è già scritto nella card
+                          ...(blocker === null
+                            ? [
+                                {
+                                  key: "request",
+                                  label: "Chiedi al genitore",
+                                  icon: MessageCircle,
+                                  onSelect: () => openRequest([row]),
+                                } satisfies RowAction,
+                              ]
+                            : []),
+                          {
+                            key: "open",
+                            label: "Apri scheda allieva",
+                            icon: UserCircle,
+                            href: `/admin/athletes/${row.athleteId}?tab=documenti`,
+                          },
+                        ]}
+                      />
+                    </div>
                   </div>
                 </li>
               )

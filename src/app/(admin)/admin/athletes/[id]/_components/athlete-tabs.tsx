@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useTransition } from "react"
 
+import { ScrollFade } from "@/components/scroll-fade"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ATHLETE_TABS,
@@ -38,8 +39,9 @@ export function AthleteTabs({
   }
 
   return (
-    <Tabs value={value} onValueChange={change} className="gap-4">
-      <div className="-mx-1 overflow-x-auto px-1 pb-1">
+    <Tabs value={value} onValueChange={change} className="min-w-0 gap-4">
+      {/* Scorrono le schede dentro il loro contenitore, non la pagina */}
+      <ScrollFade className="pb-1">
         <TabsList className="w-max">
           {ATHLETE_TABS.map((tab) => (
             <TabsTrigger key={tab.id} value={tab.id} className="min-h-11">
@@ -47,7 +49,7 @@ export function AthleteTabs({
             </TabsTrigger>
           ))}
         </TabsList>
-      </div>
+      </ScrollFade>
       {ATHLETE_TABS.map((tab) => (
         <TabsContent key={tab.id} value={tab.id} className="mt-0">
           {panels[tab.id]}

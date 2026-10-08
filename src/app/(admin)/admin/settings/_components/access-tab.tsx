@@ -103,7 +103,7 @@ export function AccessTab({ logins, devices, currentDeviceId, previousLogin }: P
                 Ultimo accesso riuscito prima di questo:{" "}
                 <strong className="text-foreground">{formatAccessMoment(previousLogin.at)}</strong>
                 {" · "}
-                {previousLogin.device} · {countryName(previousLogin.country)}
+                {previousLogin.device} · {countryName(previousLogin.country)}.
               </>
             ) : (
               "Questo è il primo accesso da quando il portale tiene lo storico."

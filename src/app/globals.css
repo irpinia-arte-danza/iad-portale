@@ -161,3 +161,20 @@
     @apply font-sans;
   }
 }
+
+/* Il menu laterale che scorre e lo fa vedere: barra sottile e un'ombra sul
+   bordo dove c'è altro (le prime due sfumature «coprono» l'ombra quando si è
+   in cima o in fondo, perché scorrono con il contenuto). */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--sidebar-foreground) 30%, transparent) transparent;
+  background-image:
+    linear-gradient(var(--sidebar) 35%, transparent),
+    linear-gradient(transparent, var(--sidebar) 65%),
+    linear-gradient(to bottom, color-mix(in oklch, var(--sidebar-foreground) 22%, transparent), transparent),
+    linear-gradient(to top, color-mix(in oklch, var(--sidebar-foreground) 22%, transparent), transparent);
+  background-position: top, bottom, top, bottom;
+  background-size: 100% 36px, 100% 36px, 100% 12px, 100% 12px;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}

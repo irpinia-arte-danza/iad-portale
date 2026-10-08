@@ -121,8 +121,8 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
     {
       key: "contributo",
       header: "Contributo mensile",
-      priority: "medium",
-      width: "md:w-36",
+      // Da 768: è il dato che si cerca in questo elenco
+      width: "md:w-28 lg:w-36",
       align: "right",
       cell: (course) => (
         <span className="font-mono text-sm">
@@ -160,7 +160,7 @@ export function CoursesTable({ courses, teachers }: CoursesTableProps) {
     {
       key: "iscritte",
       header: "Iscritte",
-      width: "md:w-24",
+      width: "md:w-20 lg:w-24",
       align: "center",
       cell: (course) => (
         <span className="text-sm">

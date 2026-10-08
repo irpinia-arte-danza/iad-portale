@@ -26,23 +26,33 @@ interface KpiCardsProps {
 }
 
 export function KpiCards({ stats }: KpiCardsProps) {
+  // «Attive» uguale a «Totali» è lo stesso numero scritto due volte: la
+  // card compare solo quando dice qualcosa in più
+  const allActive = stats.athletesActive === stats.athletesTotal
+
   const cards = [
     {
       title: "Allieve totali",
       value: stats.athletesTotal,
       icon: GraduationCap,
       href: "/admin/athletes",
-      description: "Iscritte (escluse eliminate)",
+      description: allActive
+        ? "Tutte con iscrizione confermata"
+        : "Iscritte (escluse eliminate)",
       emphasis: false,
     },
-    {
-      title: "Attive",
-      value: stats.athletesActive,
-      icon: UserCheck,
-      href: "/admin/athletes",
-      description: "Iscrizione confermata",
-      emphasis: false,
-    },
+    ...(allActive
+      ? []
+      : [
+          {
+            title: "Attive",
+            value: stats.athletesActive,
+            icon: UserCheck,
+            href: "/admin/athletes",
+            description: "Iscrizione confermata",
+            emphasis: false,
+          },
+        ]),
     {
       title: "In prova",
       value: stats.athletesTrial,
@@ -62,7 +72,16 @@ export function KpiCards({ stats }: KpiCardsProps) {
   ]
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    // Mai una card sola su una riga: quattro stanno 2×2 e poi in fila, tre
+    // stanno in fila da 640 in su (prima, a tre colonne, la quarta restava
+    // sola sotto le altre)
+    <div
+      className={
+        cards.length === 4
+          ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          : "grid gap-4 sm:grid-cols-3"
+      }
+    >
       {cards.map((card) => {
         const Icon = card.icon
         return (

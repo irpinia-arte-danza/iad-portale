@@ -63,7 +63,7 @@ export function CorrispettiviTable({
                 >
                   <TableCell
                     colSpan={5}
-                    className="font-semibold capitalize"
+                    className="font-semibold"
                   >
                     {formatDateLong(day.date)}
                   </TableCell>

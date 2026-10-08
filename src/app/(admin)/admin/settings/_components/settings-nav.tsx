@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ScrollFade } from "@/components/scroll-fade"
 import { cn } from "@/lib/utils"
 
 export type SettingsTabKey =
@@ -76,11 +77,14 @@ export function SettingsNav({ active, onChange }: SettingsNavProps) {
       </div>
 
       {/* Desktop: horizontal tabs */}
-      <nav
+      <ScrollFade className="hidden border-b md:block">
+        <nav
         aria-label="Sezioni impostazioni"
         // Su iPad le sei schede non stanno in una riga: scorrono in
-        // orizzontale invece di andare a capo su due righe
-        className="hidden gap-1 overflow-x-auto border-b md:flex"
+        // orizzontale invece di andare a capo su due righe, e il bordo destro
+          // sfuma finché ce ne sono altre (ScrollFade): «Admin» restava fuori
+          // schermo senza indizio
+          className="flex w-max min-w-full gap-1"
       >
         {SETTINGS_TABS.map((t) => {
           const Icon = t.icon
@@ -102,7 +106,8 @@ export function SettingsNav({ active, onChange }: SettingsNavProps) {
             </button>
           )
         })}
-      </nav>
+        </nav>
+      </ScrollFade>
     </>
   )
 }

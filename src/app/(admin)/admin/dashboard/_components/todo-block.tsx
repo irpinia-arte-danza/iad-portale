@@ -10,6 +10,7 @@ import {
 import { todoSections, type TodoTile } from "@/lib/dashboard/todo-tiles"
 import { TONE_SURFACE, TONE_TEXT } from "@/lib/status/tone"
 import { formatEuro } from "@/lib/utils/format"
+import { todoGridClasses } from "@/lib/dashboard/todo-grid"
 import { cn } from "@/lib/utils"
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -58,6 +59,24 @@ function TodoTileLink({ tile }: { tile: TodoTile }) {
   )
 }
 
+function TodoGrid({ tiles }: { tiles: TodoTile[] }) {
+  const { grid, last } = todoGridClasses(tiles.length)
+  return (
+    <div className={grid}>
+      {tiles.map((tile, index) => (
+        // L'involucro serve all'ultimo riquadro, che quando le colonne non
+        // tornano prende tutta la riga
+        <div
+          key={tile.id}
+          className={cn("grid", index === tiles.length - 1 && last)}
+        >
+          <TodoTileLink tile={tile} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function TodoBlock({ tiles }: { tiles: TodoTile[] }) {
   const sections = todoSections(tiles)
 
@@ -86,13 +105,9 @@ export function TodoBlock({ tiles }: { tiles: TodoTile[] }) {
             <CardTitle className="text-base">{section.title}</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* auto-fill: a 1440 i riquadri riempiono la riga, su iPad
-                verticale vanno a capo da soli */}
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3">
-              {section.tiles.map((tile) => (
-                <TodoTileLink key={tile.id} tile={tile} />
-              ))}
-            </div>
+            {/* Le colonne si scelgono dal numero dei riquadri: mai uno solo
+                sull'ultima riga (cinque stavano 4 + 1). Vedi todo-grid.ts */}
+            <TodoGrid tiles={section.tiles} />
           </CardContent>
         </Card>
       ))}

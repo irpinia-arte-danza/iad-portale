@@ -123,6 +123,10 @@ export function AdminSidebar({
             key={group.label ?? `gruppo-${index}`}
             className={cn(
               // Il gruppo di servizio va in fondo, sopra il footer
+              // shrink-0: i gruppi non si schiacciano, è il contenitore che
+              // scorre. mt-auto spinge in fondo il gruppo di servizio solo
+              // se avanza spazio: quando non basta vale zero e si scorre
+              "shrink-0",
               group.atBottom && "mt-auto",
               // In modalità icona le etichette scompaiono (ci pensa
               // SidebarGroupLabel) e senza di loro i gruppi si confondono:

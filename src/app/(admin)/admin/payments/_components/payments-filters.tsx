@@ -60,7 +60,7 @@ export function PaymentsFilters({
           updateParam("feeType", value === ALL ? null : value)
         }
       >
-        <SelectTrigger className="sm:w-48">
+        <SelectTrigger className="h-11 w-full sm:w-48">
           <SelectValue placeholder="Tutti i tipi" />
         </SelectTrigger>
         <SelectContent>
@@ -79,7 +79,7 @@ export function PaymentsFilters({
           updateParam("status", value === ALL ? null : value)
         }
       >
-        <SelectTrigger className="sm:w-40">
+        <SelectTrigger className="h-11 w-full sm:w-40">
           <SelectValue placeholder="Tutti gli stati" />
         </SelectTrigger>
         <SelectContent>

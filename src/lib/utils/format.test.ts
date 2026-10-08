@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 
-import { formatEuro, formatEuroAxis } from "./format"
+import {
+  formatDateLong,
+  formatDayLongRome,
+  formatEuro,
+  formatEuroAxis,
+} from "./format"
 
 // Lo spazio prima del simbolo è un NBSP (U+00A0): Intl lo mette così, e i
 // test lo normalizzano per restare leggibili
@@ -46,5 +51,21 @@ describe("formatEuroAxis", () => {
     expect(axis(50000)).toBe("500 €")
     expect(axis(100000)).toBe("1.000 €")
     expect(axis(150000)).toBe("1.500 €")
+  })
+})
+
+describe("data lunga", () => {
+  it("è in minuscolo, come si scrive in italiano: giorno, numero, mese, anno", () => {
+    expect(formatDateLong(new Date("2026-10-01T00:00:00Z"))).toBe("giovedì 1 ottobre 2026")
+    expect(formatDateLong(new Date("2026-01-05T00:00:00Z"))).toBe("lunedì 5 gennaio 2026")
+  })
+
+  it("senza anno per le intestazioni di oggi", () => {
+    expect(formatDayLongRome(new Date("2026-10-08T10:00:00Z"))).toBe("giovedì 8 ottobre")
+  })
+
+  it("il giorno è quello di Roma, non quello del server", () => {
+    // 23:30 UTC del 30 settembre è già il primo ottobre a Roma
+    expect(formatDateLong(new Date("2026-09-30T23:30:00Z"))).toBe("giovedì 1 ottobre 2026")
   })
 })

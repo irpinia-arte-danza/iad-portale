@@ -102,6 +102,9 @@ const ALIGN_CLASS = {
 function cellClasses<T>(column: ListColumn<T>, index: number): string {
   return cn(
     "min-w-0 items-center",
+    // In card il nome sta su una riga da 20 px: con 58 allieve ogni pixel
+    // di riga sono 58 pixel di elenco
+    index === 0 && "max-md:text-[15px] max-md:leading-5",
     visibilityClass(columnPriority(column, index), index === 0),
     column.width ?? (index === 0 ? "md:flex-1" : "md:flex-none"),
     ALIGN_CLASS[column.align ?? "left"],
@@ -230,7 +233,9 @@ export function ResponsiveList<T>({
               data-state={isSelected ? "selected" : undefined}
               onClick={onRowClick ? () => onRowClick(item) : undefined}
               className={cn(
-                "flex flex-col gap-2 border-b px-3 py-3 last:border-b-0 data-[state=selected]:bg-muted/50 md:flex-row md:items-center md:gap-3",
+                // In card: se la riga ha solo il menu «…», sta nell'angolo in
+                // alto a destra e il contenuto gli lascia posto (pr-14)
+                "relative flex flex-col gap-1.5 border-b px-3 py-3 last:border-b-0 data-[state=selected]:bg-muted/50 max-md:py-1.5 max-md:has-[[data-row-menu-only]]:pr-14 max-md:has-[[data-row-actions-inline]]:pr-40 md:flex-row md:items-center md:gap-3",
                 onRowClick && "cursor-pointer hover:bg-muted/50",
                 rowClassName?.(item),
               )}
@@ -256,7 +261,7 @@ export function ResponsiveList<T>({
                   </div>
                 ) : null}
 
-                <div className="flex min-w-0 flex-1 flex-col gap-1 md:contents">
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5 md:contents">
                   {columns.map((column, index) => (
                     <div
                       key={column.key}
@@ -285,7 +290,7 @@ export function ResponsiveList<T>({
 
               {actions ? (
                 <div
-                  className="md:ml-auto md:shrink-0"
+                  className="max-md:has-[[data-row-actions-inline]]:absolute max-md:has-[[data-row-actions-inline]]:top-1 max-md:has-[[data-row-actions-inline]]:right-1 max-md:has-[[data-row-menu-only]]:absolute max-md:has-[[data-row-menu-only]]:top-1 max-md:has-[[data-row-menu-only]]:right-1 md:ml-auto md:shrink-0"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {actions(item)}
