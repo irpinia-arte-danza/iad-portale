@@ -146,7 +146,7 @@ Vedi `prisma/schema.prisma` per lo schema completo. In sintesi:
 | UI | **shadcn/ui + Tailwind CSS v4 + Radix UI** | Controllo totale, look moderno, codice nel repo. Config brand (colori, font, breakpoint) vive in `src/app/globals.css` via `@theme`, **non più** in `tailwind.config.ts` |
 | Icone | **Lucide React** | Set completo, coerente con shadcn |
 | Font | **Geist Sans** (UI) + **Geist Mono** (numeri monetari) | Moderno, leggibile, ottimo per tabelle |
-| Tema | **Dark + Light** con toggle utente | `prefers-color-scheme` al primo accesso, poi salvato |
+| Tema | **Scuro di default**, chiaro a scelta | next-themes senza tema di sistema; scelta in localStorage, cambio dal menu utente (vedi `src/lib/theme/theme-config.ts`) |
 | Form | **React Hook Form + Zod** | Validation condivisa client/server |
 | Tabelle | **TanStack Table** (DataTable shadcn) | Sort, filter, pagination, row selection |
 | Toast | **Sonner** | Integrato con shadcn |
@@ -168,8 +168,11 @@ Vedi `prisma/schema.prisma` per lo schema completo. In sintesi:
 
 ### Tema
 - **Dark mode** e **Light mode** gestiti con CSS variables (pattern shadcn)
-- All'avvio: rispetta `prefers-color-scheme` del sistema
-- Toggle utente persistito (cookie server-side per SSR consistency)
+- **Scuro per tutti di default** (`defaultTheme="dark"`, `enableSystem=false`): `<html class="dark">` già dal server, niente flash bianco
+- Scuro/Chiaro si cambia **solo dal menu utente in alto** (`src/components/auth/user-menu.tsx`, lo stesso di Esci) in admin, referente, genitori e insegnanti; la scelta resta in localStorage (next-themes)
+- Pagine di accesso (login, password, secondo fattore, conferma invito) sempre scure
+- Meta `color-scheme` e `theme-color` seguono il tema attivo (barra di Safari su iPad)
+- Email e PDF delle ricevute restano chiari
 - Colori accenti limitati: verdi per entrate/successo, rossi per uscite/errori, ambra per warning, viola per compensi, blu per info
 
 ### Tipografia
@@ -221,7 +224,7 @@ Il target principale di queste due aree è lo **smartphone** (iPhone Safari + An
   - `inputMode="decimal"` per quantità con virgola
   - `inputMode="tel"` per telefoni (apre tastierino)
 - **Date picker nativo** su `<md`: `<input type="date">` (iOS/Android picker sistema) invece di calendario shadcn custom, che su mobile piccolo è scomodo
-- **Dark mode default in /teacher**: rileva automatico dark mode OS, preferibile in sala di ballo con luci basse (meno affaticamento)
+- **Dark mode default ovunque** (vedi «Tema»), comodo anche in sala di ballo con luci basse
 - **Pull-to-refresh** su /parent dashboard e /teacher calendario (nice-to-have)
 
 **Testing obbligatorio prima di chiudere una PR**:
@@ -348,7 +351,7 @@ Sprint onboarding (settembre 2026). Regole stabili:
 - **Inviti espliciti**: `createParent` e `createTeacher` **non inviano email**. L'accesso si manda con "Invia accesso" / "Reinvia accesso" (singolo da lista o scheda, multiplo dalla lista genitori). Ogni invio genera un link nuovo e invalida il precedente.
 - **Stato accesso a 4 valori**, ricavato senza campi duplicati (`auth.users` + `EmailLog`): Senza email · Mai invitato · Invitato (data) · Attivo (ultimo accesso). Logica in `src/lib/auth/access-status.ts`.
 - **Link personali** (invito e recupero) generati con `auth.admin.generateLink` e inviati con Resend, mai con l'SMTP di Supabase. Destinazione `/auth/confirm`. Dettagli e limiti in `docs/email-system.md`.
-- **Impostazione password**: `/imposta-password`, unica per tutti i ruoli (primo accesso e recupero). `/parent/set-password` e `/teacher/set-password` restano solo come redirect per i link vecchi.
+- **Impostazione password**: `/imposta-password`, unica per tutti i ruoli (primo accesso e recupero). Finché `app_metadata.password_set` non è `true` (lo scrive solo `setOwnPassword`, con la service role), una sessione nata da un link non apre nessuna area: proxy e `requireXxx()` mandano a `/imposta-password` (regola in `src/lib/auth/password-gate.ts`; chi è entrato con la password passa anche senza flag). `/parent/set-password` e `/teacher/set-password` restano solo come redirect per i link vecchi.
 - **Recupero password**: `/password-dimenticata`, risposta identica per email registrate e non.
 - **Account senza profilo attivo** (utente disattivato, genitore/insegnante nel Cestino, utente senza profilo): `requireXxx()` manda a `/auth/no-access` (logout) → `/accesso-non-attivo`. **Mai** `redirect("/login")`: il proxy rimanda gli autenticati alla dashboard e si crea un loop.
 - **Cestino**: spostare un genitore/insegnante nel Cestino disattiva l'utente collegato; il ripristino lo riattiva.

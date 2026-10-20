@@ -32,6 +32,10 @@ type Props = {
 
 export function SetPasswordForm({ requireCurrentPassword }: Props) {
   const [busy, setBusy] = React.useState(false)
+  // Il ref blocca subito il secondo tap: lo stato busy arriva al tasto solo
+  // al render successivo, e fra la validazione e quel render un secondo
+  // invio passava
+  const sending = React.useRef(false)
 
   const form = useForm<SetOwnPasswordValues>({
     resolver: zodResolver(setOwnPasswordSchema),
@@ -48,6 +52,7 @@ export function SetPasswordForm({ requireCurrentPassword }: Props) {
       const result = await setOwnPassword(values)
       if (result && !result.ok) {
         toast.error(result.error)
+        sending.current = false
         setBusy(false)
       }
       // on success: server action redirects, component unmounts
@@ -57,6 +62,7 @@ export function SetPasswordForm({ requireCurrentPassword }: Props) {
       // rilanciato, altrimenti compare un falso "salvataggio non riuscito".
       unstable_rethrow(error)
       toast.error("Salvataggio non riuscito: controlla la connessione e riprova")
+      sending.current = false
       setBusy(false)
     }
   }
@@ -64,7 +70,17 @@ export function SetPasswordForm({ requireCurrentPassword }: Props) {
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit(onSubmit)}
+        onSubmit={(event) => {
+          if (sending.current) {
+            event.preventDefault()
+            return
+          }
+          sending.current = true
+          void form.handleSubmit(onSubmit, () => {
+            // Validazione non passata: il modulo si può rimandare
+            sending.current = false
+          })(event)
+        }}
         className="space-y-4"
         noValidate
       >
@@ -134,8 +150,12 @@ export function SetPasswordForm({ requireCurrentPassword }: Props) {
             ? " Dopo il salvataggio le altre sessioni aperte verranno chiuse e riceverai un'email di avviso."
             : " Riceverai un'email di avviso."}
         </p>
-        <Button type="submit" className="w-full min-h-11" disabled={busy}>
-          {busy ? (
+        <Button
+          type="submit"
+          className="w-full min-h-11"
+          disabled={busy || form.formState.isSubmitting}
+        >
+          {busy || form.formState.isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Salvataggio...

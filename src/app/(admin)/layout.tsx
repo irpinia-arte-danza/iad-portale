@@ -6,6 +6,7 @@ import { previousSuccessfulLogin } from "@/lib/auth/admin-logins"
 import { getSessionLevel } from "@/lib/auth/mfa"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { prisma } from "@/lib/prisma"
+import { UserMenu } from "@/components/auth/user-menu"
 import {
   SidebarProvider,
   SidebarInset,
@@ -87,8 +88,9 @@ export default async function AdminLayout({
           {/* Al posto del titolo: su una barra da 500 px "IAD Portale —
               Admin" diceva a Giuseppina una cosa che sapeva già */}
           <AdminSearch />
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
             <AcademicYearChip label={currentYear?.label ?? null} />
+            <UserMenu label={user.email} />
           </div>
         </header>
         {/* min-w-0: è un figlio flex. Senza, una riga larga dentro una lista

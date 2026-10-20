@@ -2,7 +2,7 @@ import Image from "next/image"
 
 import { requireTeacher } from "@/lib/auth/require-teacher"
 import { prisma } from "@/lib/prisma"
-import { LogoutButton } from "@/components/auth/logout-button"
+import { UserMenu } from "@/components/auth/user-menu"
 import { PrivacyLink } from "@/components/privacy-link"
 
 import { TeacherTabbar } from "./_components/teacher-tabbar"
@@ -51,7 +51,7 @@ export default async function TeacherLayout({
           ) : null}
           <span className="text-sm font-semibold">{asdName}</span>
         </div>
-        <LogoutButton />
+        <UserMenu />
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 pb-20">

@@ -6,6 +6,11 @@ import { NO_ACCESS_ROUTE, resolveAccountState } from "@/lib/auth/account-state"
 import { getDashboardPath } from "@/lib/auth/dashboard-path"
 import { recoveryPassIsValid } from "@/lib/auth/mfa"
 import { adminGate, MFA_VERIFY_PATH } from "@/lib/auth/mfa-gate"
+import {
+  needsPassword,
+  passwordGateExempt,
+  SET_PASSWORD_PATH,
+} from "@/lib/auth/password-gate"
 import { RECOVERY_PASS_COOKIE } from "@/lib/auth/mfa-recovery-pass"
 // Aree per ruolo e matcher: in src/lib/auth/proxy-matcher.ts, con i test
 import { areaOf, wrongAreaRedirect } from "@/lib/auth/proxy-matcher"
@@ -17,7 +22,7 @@ import { updateSession } from "@/lib/supabase/middleware"
 export async function proxy(request: NextRequest) {
   // Step 1: refresh session (critico — cookies Supabase hanno TTL
   // breve e devono essere refreshati sulle request)
-  const { supabaseResponse, user, level } = await updateSession(request)
+  const { supabaseResponse, user, level, claims } = await updateSession(request)
 
   const pathname = request.nextUrl.pathname
 
@@ -26,6 +31,18 @@ export async function proxy(request: NextRequest) {
   if (!user && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
+    return NextResponse.redirect(url)
+  }
+
+  // Step 2b: chi è entrato da un link personale e non ha ancora scelto la
+  // password non va da nessuna parte se non a /imposta-password. Prima del
+  // passo 3, così anche /login e /password-dimenticata ci portano (è il
+  // ricaricamento dopo un doppio tap su «Attiva il mio accesso»). Regola e
+  // pagine esenti in src/lib/auth/password-gate.ts.
+  if (user && !passwordGateExempt(pathname) && needsPassword(user, claims)) {
+    const url = request.nextUrl.clone()
+    url.pathname = SET_PASSWORD_PATH
+    url.search = "?tipo=benvenuto"
     return NextResponse.redirect(url)
   }
 

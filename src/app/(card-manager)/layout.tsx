@@ -1,6 +1,6 @@
 import Image from "next/image"
 
-import { LogoutButton } from "@/components/auth/logout-button"
+import { UserMenu } from "@/components/auth/user-menu"
 import { PrivacyLink } from "@/components/privacy-link"
 import { requireCardManager } from "@/lib/auth/require-card-manager"
 import { prisma } from "@/lib/prisma"
@@ -44,7 +44,7 @@ export default async function CardManagerLayout({ children }: { children: React.
           ) : null}
           <span className="truncate text-sm font-semibold">{asdName}</span>
         </div>
-        <LogoutButton />
+        <UserMenu />
       </header>
 
       <main className="flex-1 overflow-x-hidden p-4 pb-12">

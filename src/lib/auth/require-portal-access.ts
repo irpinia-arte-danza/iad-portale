@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { NO_ACCESS_ROUTE } from "./account-state"
-import { getCurrentAccount } from "./current-account"
+import { getCurrentAccount, requirePasswordSet } from "./current-account"
 import { getDashboardPath } from "./dashboard-path"
 import { portalScopeOf, type PortalScope } from "./portal-scope"
 
@@ -23,6 +23,7 @@ export async function requirePortalAccess(): Promise<PortalAccess> {
 
   if (account.state === "anonymous") redirect("/login")
   if (account.state === "blocked") redirect(NO_ACCESS_ROUTE)
+  await requirePasswordSet()
 
   const scope = portalScopeOf(account)
   if (!scope) redirect(getDashboardPath(account.role))

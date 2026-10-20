@@ -6,11 +6,12 @@ import { after } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 
 import { NO_ACCESS_ROUTE } from "@/lib/auth/account-state"
-import { getCurrentAccount } from "@/lib/auth/current-account"
+import { getCurrentAccount, passwordMissing } from "@/lib/auth/current-account"
 import { getDashboardPath } from "@/lib/auth/dashboard-path"
 import { getSessionLevel, hasRecoveryPass, verifiedTotpFactor } from "@/lib/auth/mfa"
 import { adminGate, MFA_VERIFY_PATH } from "@/lib/auth/mfa-gate"
 import { sendPasswordChangedNotice } from "@/lib/auth/password-changed-email"
+import { PASSWORD_SET_KEY } from "@/lib/auth/password-gate"
 import { isRecentOtpSession } from "@/lib/auth/recent-otp"
 import { prisma } from "@/lib/prisma"
 import {
@@ -18,6 +19,7 @@ import {
   type SetOwnPasswordValues,
 } from "@/lib/schemas/admin-settings"
 import type { ActionResult } from "@/lib/schemas/common"
+import { createAdminClient } from "@/lib/supabase/admin-client"
 import { createClient } from "@/lib/supabase/server"
 
 const SESSION_EXPIRED =
@@ -46,6 +48,14 @@ export async function sessionFromRecentLink(): Promise<boolean> {
   const { data, error } = await supabase.auth.getClaims()
   if (error || !data?.claims) return false
   return isRecentOtpSession(data.claims)
+}
+
+// Serve la password attuale? No se la sessione viene da un link appena
+// aperto, e no se una password non c'è mai stata (invito aperto e poi
+// lasciato a metà: password-gate.ts). Stessa regola per pagina e action.
+export async function currentPasswordRequired(): Promise<boolean> {
+  if (await sessionFromRecentLink()) return false
+  return !(await passwordMissing())
 }
 
 // La password attuale si verifica con un client senza cookie: se è giusta
@@ -107,7 +117,7 @@ export async function setOwnPassword(
     }
   }
 
-  if (!(await sessionFromRecentLink())) {
+  if (await currentPasswordRequired()) {
     const current = parsed.data.currentPassword
     if (!current) {
       return {
@@ -127,6 +137,19 @@ export async function setOwnPassword(
   if (error) {
     console.error("[set-password] updateUser failed", { code: error.code })
     return { ok: false, error: mapPasswordError(error.code) }
+  }
+
+  // Il flag che apre le aree (password-gate.ts). In app_metadata, che solo
+  // la service role scrive: l'utente non può metterselo da solo. Si unisce
+  // a quello che c'è già (provider, providers). Se fallisce la password
+  // resta salvata, ma il proxy rimanderebbe qui: meglio dirlo subito.
+  const { error: flagError } = await createAdminClient().auth.admin.updateUserById(
+    user.id,
+    { app_metadata: { ...user.app_metadata, [PASSWORD_SET_KEY]: true } },
+  )
+  if (flagError) {
+    console.error("[set-password] password_set flag failed", { code: flagError.code })
+    return { ok: false, error: "Password salvata, ma non è stato possibile completare l'accesso: riprova." }
   }
 
   // Le altre sessioni (altro telefono, altro browser) cadono: resta solo

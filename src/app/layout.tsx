@@ -6,6 +6,11 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { prisma } from "@/lib/prisma";
+import {
+  DEFAULT_THEME,
+  THEME_COLORS,
+  THEME_STORAGE_CLEANUP_SCRIPT,
+} from "@/lib/theme/theme-config";
 import "./globals.css";
 
 const getBrandForMetadata = cache(async () => {
@@ -50,18 +55,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // Scuro già dal server: lo script di next-themes passa a "light" prima
+    // del disegno solo se l'utente l'ha scelto (src/lib/theme/theme-config.ts)
     <html
       lang="it"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${DEFAULT_THEME} h-full antialiased`}
+      style={{ colorScheme: DEFAULT_THEME }}
       suppressHydrationWarning
     >
+      <head>
+        <meta name="color-scheme" content={DEFAULT_THEME} />
+        <meta name="theme-color" content={THEME_COLORS[DEFAULT_THEME]} />
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_STORAGE_CLEANUP_SCRIPT }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <ThemeProvider>
           <TooltipProvider>
             {children}
             <Toaster />

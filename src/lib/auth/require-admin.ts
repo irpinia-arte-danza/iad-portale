@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { UserRole } from "@prisma/client"
 
 import { NO_ACCESS_ROUTE } from "./account-state"
-import { getCurrentAccount } from "./current-account"
+import { getCurrentAccount, requirePasswordSet } from "./current-account"
 import { getDashboardPath } from "./dashboard-path"
 import { getSessionLevel, hasRecoveryPass } from "./mfa"
 import { adminGate, MFA_VERIFY_PATH } from "./mfa-gate"
@@ -18,6 +18,7 @@ export async function requireAdminFirstFactor(): Promise<AdminAccess> {
 
   if (account.state === "anonymous") redirect("/login")
   if (account.state === "blocked") redirect(NO_ACCESS_ROUTE)
+  await requirePasswordSet()
   if (account.role !== UserRole.ADMIN) {
     redirect(getDashboardPath(account.role))
   }

@@ -20,8 +20,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { LogoutButton } from "@/components/auth/logout-button"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { formatAccessMoment } from "@/lib/auth/access-format"
 import type { PreviousLogin } from "@/lib/auth/admin-logins"
 import type { NavCounters } from "@/lib/dashboard/todo-tiles"
@@ -194,10 +192,6 @@ export function AdminSidebar({
               ? `Ultimo accesso: ${formatAccessMoment(lastAccess.at, { year: false })} · ${lastAccess.device}`
               : "Ultimo accesso: primo da quando c'è lo storico"}
           </Link>
-        </div>
-        <div className="flex items-center justify-between gap-2 px-2 py-1">
-          <LogoutButton />
-          <ThemeToggle />
         </div>
       </SidebarFooter>
     </Sidebar>

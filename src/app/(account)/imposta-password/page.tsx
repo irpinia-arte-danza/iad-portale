@@ -12,7 +12,7 @@ import { PrivacyLink } from "@/components/privacy-link"
 import { NO_ACCESS_ROUTE } from "@/lib/auth/account-state"
 import { getCurrentAccount } from "@/lib/auth/current-account"
 
-import { sessionFromRecentLink } from "./actions"
+import { currentPasswordRequired } from "./actions"
 import { SetPasswordForm } from "./_components/set-password-form"
 
 type PageProps = {
@@ -36,8 +36,9 @@ export default async function SetPasswordPage({ searchParams }: PageProps) {
 
   const { tipo } = await searchParams
   const isWelcome = tipo === "benvenuto"
-  // Senza un link appena aperto il modulo chiede anche la password attuale
-  const requireCurrentPassword = !(await sessionFromRecentLink())
+  // Senza un link appena aperto il modulo chiede anche la password attuale,
+  // tranne a chi una password non l'ha mai scelta
+  const requireCurrentPassword = await currentPasswordRequired()
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-4">
