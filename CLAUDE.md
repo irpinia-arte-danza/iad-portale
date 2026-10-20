@@ -25,6 +25,7 @@ Il gestionale sostituisce il lavoro manuale della titolare **Giuseppina Ciociola
 | **Admin** | Giuseppina (titolare) | Tutto: anagrafiche, presenze, pagamenti, ricevute, contabilità, reportistica, impostazioni |
 | **Teacher** | Insegnanti (es. aiutante di Giuseppina) | Interfaccia minimale: vede calendario proprio, segna presenze, consulta anagrafica alunne del suo corso |
 | **Parent** | Genitori/tutori | Area riservata self-service (vedi permessi sotto) |
+| **Card manager** | Referente tessere ENDAS (socio) | Solo `/tessere`: coda da tesserare con i dati anagrafici che chiede l'ente, elenco da scaricare, caricamento dei PDF delle tessere. Niente contatti, genitori, certificati, pagamenti. Query sue in `src/lib/cards/manager-queries.ts`; guardie `requireCardManager()` e `requireCardUploader()` |
 
 ⚠️ **Non c'è ruolo "Atleta"** nell'auth. Le atlete sono **entità anagrafiche**, non utenti che fanno login. Chi fa login è il **genitore** (o l'atleta stessa se maggiorenne).
 

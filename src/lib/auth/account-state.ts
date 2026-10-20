@@ -26,7 +26,8 @@ export type AccountState =
     }
 
 // Un account è utilizzabile solo se: utente Prisma esiste, è attivo e (per
-// PARENT/TEACHER/ATHLETE) ha un profilo non nel cestino.
+// PARENT/TEACHER/ATHLETE) ha un profilo non nel cestino. ADMIN e
+// CARD_MANAGER non hanno profilo: basta l'utente attivo.
 export async function resolveAccountState(userId: string): Promise<AccountState> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -79,6 +80,17 @@ export async function resolveAccountState(userId: string): Promise<AccountState>
         }
       }
       return { state: "blocked", userId, reason: "no-profile" }
+    // Nessun profilo: il referente tessere è l'utente stesso. Basta che sia
+    // attivo (la revoca lo disattiva, e il controllo sopra lo ferma)
+    case UserRole.CARD_MANAGER:
+      return {
+        state: "ok",
+        userId,
+        role: user.role,
+        parentId: null,
+        teacherId: null,
+        athleteId: null,
+      }
     case UserRole.ATHLETE:
       if (user.athleteProfile && !user.athleteProfile.deletedAt) {
         return {

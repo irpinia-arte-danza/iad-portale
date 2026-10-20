@@ -136,7 +136,7 @@ async function getBrandVars(): Promise<{ asd_nome: string; asd_email: string }> 
 // Le variabili dell'invito che non dipendono dal link: le stesse per
 // l'invio vero e per l'anteprima dell'invio di gruppo
 function accessInviteVars(
-  kind: AccessProfileKind,
+  kind: AccessProfileKind | "CARD_MANAGER",
   recipientName: string,
   appUrl: string,
 ): Record<string, string> {
@@ -147,13 +147,17 @@ function accessInviteVars(
         ? "area genitori"
         : kind === "TEACHER"
           ? "area insegnanti"
-          : "area riservata",
+          : kind === "CARD_MANAGER"
+            ? "area del tesseramento ENDAS"
+            : "area riservata",
     descrizione_area:
       kind === "PARENT"
         ? "consultare contributi, ricevute, presenze e orari delle tue figlie"
         : kind === "TEACHER"
           ? "vedere le tue classi e segnare le presenze"
-          : "consultare i tuoi contributi, le ricevute, le presenze e gli orari",
+          : kind === "CARD_MANAGER"
+            ? "vedere chi è da tesserare, scaricare l'elenco e caricare le tessere che ti manda l'ente: il tuo accesso per il tesseramento ENDAS"
+            : "consultare i tuoi contributi, le ricevute, le presenze e gli orari",
     link_recupero: `${appUrl}/password-dimenticata`,
     link_privacy: privacyUrl(appUrl),
   }
@@ -410,6 +414,11 @@ function describeConflict(
 ): string | null {
   if (user.role === UserRole.ADMIN) {
     return "Questa email appartiene a un account amministratore: usa un indirizzo diverso."
+  }
+  // Il referente tessere non ha un profilo: senza questo controllo l'invito
+  // a un genitore con la stessa email gli cambierebbe il ruolo in silenzio
+  if (user.role === UserRole.CARD_MANAGER) {
+    return "Questa email è del referente tessere: usa un indirizzo diverso."
   }
   const parent = user.parentProfile
   if (parent && !parent.deletedAt && !(kind === "PARENT" && parent.id === profileId)) {
@@ -767,6 +776,176 @@ async function sendAccessInviteUnsafe({
   })
 
   return { ok: true, reinvite }
+}
+
+// ─── invito del referente tessere (admin) ────────────────────────────────
+
+type CardManagerInviteParams = {
+  email: string
+  firstName: string
+  lastName: string
+  adminUserId: string
+}
+
+export type CardManagerInviteResult =
+  | { ok: true; userId: string; reinvite: boolean }
+  | { ok: false; code: AccessInviteErrorCode; error: string }
+
+/**
+ * Invito del referente tessere (CARD_MANAGER). Non ha un profilo come
+ * genitori e insegnanti: l'account è l'utente stesso, con nome e cognome.
+ * Stesso link personale, stesso modello di email (con il testo adattato),
+ * stesso EmailLog. Un'email già usata da un admin, un genitore,
+ * un'insegnante o un'allieva non si può riusare: un account, un ruolo.
+ */
+export async function sendCardManagerInviteCore(
+  params: CardManagerInviteParams,
+): Promise<CardManagerInviteResult> {
+  try {
+    return await sendCardManagerInviteUnsafe(params)
+  } catch (error) {
+    console.error("[card manager invite] unexpected error", {
+      message: error instanceof Error ? error.message : "unknown",
+    })
+    return {
+      ok: false,
+      code: "SEND_FAILED",
+      error: "Errore imprevisto durante l'invio: riprova tra qualche istante.",
+    }
+  }
+}
+
+async function sendCardManagerInviteUnsafe({
+  email: rawEmail,
+  firstName,
+  lastName,
+  adminUserId,
+}: CardManagerInviteParams): Promise<CardManagerInviteResult> {
+  const failWith = (code: AccessInviteErrorCode, error: string) =>
+    ({ ok: false, code, error }) as const
+
+  const email = normalizeEmail(rawEmail)
+  if (!email) return failWith("NO_EMAIL", "Manca l'indirizzo email.")
+  const appUrl = getAppUrl()
+  if (!appUrl) {
+    console.error("[card manager invite] NEXT_PUBLIC_APP_URL missing")
+    return failWith(
+      "CONFIG",
+      "Configurazione del portale incompleta (indirizzo del sito mancante): contatta l'assistenza.",
+    )
+  }
+
+  // Account con la stessa email: si riusa solo se è già un referente
+  const authByEmail = await findAuthUserByEmail(email)
+  const candidates = await prisma.user.findMany({
+    where: {
+      OR: [
+        { email: { equals: email, mode: "insensitive" } },
+        ...(authByEmail ? [{ id: authByEmail.id }] : []),
+      ],
+    },
+    select: USER_WITH_PROFILES_SELECT,
+  })
+  for (const candidate of candidates) {
+    if (candidate.role === UserRole.CARD_MANAGER) continue
+    const conflict =
+      describeConflict(candidate, "PARENT", "—") ??
+      "Questa email è già usata da un altro account del portale: usa un indirizzo diverso."
+    return failWith("EMAIL_CONFLICT", conflict)
+  }
+  if (authByEmail?.hasPassword && candidates.some((c) => c.id === authByEmail.id)) {
+    const existing = candidates.find((c) => c.id === authByEmail.id)
+    const active = await prisma.user.findUnique({
+      where: { id: authByEmail.id },
+      select: { isActive: true, deletedAt: true },
+    })
+    if (existing && active?.isActive && !active.deletedAt) {
+      return failWith(
+        "ALREADY_ACTIVE",
+        "L'accesso è già attivo. Se la password è stata dimenticata si può usare «Password dimenticata» nella pagina di accesso.",
+      )
+    }
+  }
+
+  let link = await generateAuthLink(authByEmail?.emailConfirmedAt ? "recovery" : "invite", email)
+  if (!link.ok && link.code === "email_exists") link = await generateAuthLink("recovery", email)
+  if (!link.ok) {
+    if (link.rateLimited) {
+      return failWith(
+        "RATE_LIMIT",
+        "Il servizio di autenticazione ha ricevuto troppe richieste: attendi qualche minuto e riprova.",
+      )
+    }
+    console.error("[card manager invite] generateLink failed", { code: link.code })
+    return failWith("LINK_FAILED", "Non è stato possibile generare il link di accesso: riprova tra qualche istante.")
+  }
+
+  const authUserId = link.authUserId
+  await prisma.user.upsert({
+    where: { id: authUserId },
+    update: {
+      email,
+      role: UserRole.CARD_MANAGER,
+      firstName,
+      lastName,
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: authUserId,
+      email,
+      role: UserRole.CARD_MANAGER,
+      firstName,
+      lastName,
+      isActive: true,
+    },
+  })
+
+  const previousInvites = await prisma.emailLog.count({
+    where: {
+      recipientEmail: email,
+      milestoneKey: { in: [...ACCESS_MILESTONES] },
+      status: { not: EmailStatus.FAILED },
+      parentId: null,
+      athleteId: null,
+    },
+  })
+  const reinvite = previousInvites > 0
+
+  const recipientName = `${firstName} ${lastName}`.trim()
+  const confirmLink = buildConfirmLink(appUrl, link.hashedToken, link.type, true)
+  const rendered = await renderPersonalEmail(
+    ACCESS_TEMPLATE_SLUG,
+    {
+      ...accessInviteVars("CARD_MANAGER", recipientName, appUrl),
+      link_accesso: confirmLink,
+      ...(await getBrandVars()),
+    },
+    confirmLink,
+  )
+  const delivery = await deliverAndLog({
+    to: email,
+    recipientName,
+    email: rendered,
+    link: confirmLink,
+    sentBy: adminUserId,
+    parentId: null,
+    triggeredBy: EmailTrigger.ADMIN_MANUAL,
+    milestoneKey: reinvite ? ACCESS_REINVITE_MILESTONE : ACCESS_INVITE_MILESTONE,
+  })
+  if (!delivery.ok) return failWith(delivery.failure.code, delivery.failure.error)
+
+  await prisma.auditLog.create({
+    data: {
+      userId: adminUserId,
+      action: "INVITE_CARD_MANAGER",
+      entityType: "User",
+      entityId: authUserId,
+      changes: { email, reinvite, linkType: link.type, emailLogId: delivery.logId },
+    },
+  })
+
+  return { ok: true, userId: authUserId, reinvite }
 }
 
 // ─── recupero password (self-service) ────────────────────────────────────

@@ -45,7 +45,8 @@ export function isProxiedPath(pathname: string): boolean {
 // Le aree riservate per ruolo. Un utente autenticato che chiede l'area di
 // un altro ruolo va rimandato alla propria dashboard: le pagine e le query
 // lo rifiuterebbero comunque, ma il proxy è il primo posto dove si vede.
-const ROLE_AREAS = ["/admin", "/teacher", "/parent"] as const
+// "/tessere" è l'area del referente tessere: "/admin/tessere" resta /admin
+const ROLE_AREAS = ["/admin", "/teacher", "/parent", "/tessere"] as const
 
 export function areaOf(pathname: string): (typeof ROLE_AREAS)[number] | null {
   return (

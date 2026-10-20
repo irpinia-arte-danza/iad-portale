@@ -67,7 +67,7 @@ Allo scadere di questi termini i dati vengono cancellati o resi anonimi.
 
 ## 6. Chi può conoscere i dati
 
-**All'interno dell'associazione**: la titolare e la segreteria, per tutto quanto sopra; le insegnanti, limitatamente alle allieve dei propri corsi (nome e cognome, data di nascita, presenze, stato del certificato medico). Le insegnanti non vedono recapiti dei genitori, dati di pagamento né copie dei certificati.
+**All'interno dell'associazione**: la titolare e la segreteria, per tutto quanto sopra; le insegnanti, limitatamente alle allieve dei propri corsi (nome e cognome, data di nascita, presenze, stato del certificato medico). Le insegnanti non vedono recapiti dei genitori, dati di pagamento né copie dei certificati. Il referente per il tesseramento ENDAS, socio dell'associazione, che tratta i soli dati anagrafici necessari all'iscrizione all'ente (cognome, nome, data e luogo di nascita, codice fiscale, residenza) e carica nel portale le tessere rilasciate; non vede contatti, dati dei genitori, certificati medici né pagamenti.
 
 **Responsabili del trattamento** (articolo 28 del GDPR), che trattano i dati per conto dell'associazione:
 

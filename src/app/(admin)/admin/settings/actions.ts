@@ -9,6 +9,9 @@ import { forgetKnownDevice } from "@/lib/auth/admin-logins"
 import { adminResetSecondFactor } from "@/lib/auth/mfa"
 import { sendSecurityNotice } from "@/lib/auth/security-notice-email"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { sendCardManagerInviteCore } from "@/lib/auth/access-emails"
+import { logAudit } from "@/lib/audit/log-audit"
+import { uuidSchema } from "@/lib/schemas/common"
 import { prisma } from "@/lib/prisma"
 import { todayInRome } from "@/lib/receipts/numbering"
 import { formatReceiptNumber } from "@/lib/receipts/numbering-config"
@@ -28,12 +31,14 @@ import {
 import type { ActionResult } from "@/lib/schemas/common"
 import {
   adminInviteSchema,
+  cardManagerInviteSchema,
   associationSchema,
   brandSchema,
   changePasswordSchema,
   profileSchema,
   ricevuteSchema,
   type AdminInviteValues,
+  type CardManagerInviteValues,
   type AssociationValues,
   type BrandValues,
   type ChangePasswordValues,
@@ -627,6 +632,74 @@ export async function forgetDevice(deviceRowId: string): Promise<ActionResult> {
     return { ok: true }
   } catch (error) {
     logError("[settings] forgetDevice failed", error)
+    return { ok: false, error: GENERIC_ERROR_MESSAGE }
+  }
+}
+
+// ============================================================================
+// Referente tessere: invito, reinvio, revoca (Impostazioni › Admin)
+// ============================================================================
+export async function inviteCardManager(
+  values: CardManagerInviteValues,
+): Promise<ActionResult<{ email: string; reinvite: boolean }>> {
+  const { userId } = await requireAdmin()
+  const parsed = cardManagerInviteSchema.safeParse(values)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dati non validi" }
+  }
+  const result = await sendCardManagerInviteCore({ ...parsed.data, adminUserId: userId })
+  if (!result.ok) return { ok: false, error: result.error }
+  revalidatePath("/admin/settings")
+  revalidatePath("/admin/tessere")
+  return { ok: true, data: { email: parsed.data.email, reinvite: result.reinvite } }
+}
+
+export async function resendCardManagerInvite(
+  cardManagerId: string,
+): Promise<ActionResult<{ email: string }>> {
+  const { userId } = await requireAdmin()
+  const id = uuidSchema.safeParse(cardManagerId)
+  if (!id.success) return { ok: false, error: "Referente non trovato" }
+  const user = await prisma.user.findFirst({
+    where: { id: id.data, role: "CARD_MANAGER", isActive: true, deletedAt: null },
+    select: { email: true, firstName: true, lastName: true },
+  })
+  if (!user) return { ok: false, error: "Referente non trovato" }
+  const result = await sendCardManagerInviteCore({
+    email: user.email,
+    firstName: user.firstName ?? "",
+    lastName: user.lastName ?? "",
+    adminUserId: userId,
+  })
+  if (!result.ok) return { ok: false, error: result.error }
+  revalidatePath("/admin/settings")
+  return { ok: true, data: { email: user.email } }
+}
+
+// La revoca disattiva l'utente: dalla richiesta successiva il proxy lo manda
+// fuori (account non attivo). L'account resta, con il suo storico: un nuovo
+// invito alla stessa email lo riattiva.
+export async function revokeCardManager(cardManagerId: string): Promise<ActionResult> {
+  const { userId } = await requireAdmin()
+  const id = uuidSchema.safeParse(cardManagerId)
+  if (!id.success) return { ok: false, error: "Referente non trovato" }
+  try {
+    const updated = await prisma.user.updateMany({
+      where: { id: id.data, role: "CARD_MANAGER", isActive: true },
+      data: { isActive: false },
+    })
+    if (updated.count === 0) return { ok: false, error: "Referente non trovato" }
+    await logAudit({
+      userId,
+      action: "REVOKE_CARD_MANAGER",
+      entityType: "User",
+      entityId: id.data,
+    })
+    revalidatePath("/admin/settings")
+    revalidatePath("/admin/tessere")
+    return { ok: true }
+  } catch (error) {
+    logError("[settings] revokeCardManager failed", error)
     return { ok: false, error: GENERIC_ERROR_MESSAGE }
   }
 }

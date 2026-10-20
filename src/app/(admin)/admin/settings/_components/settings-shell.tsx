@@ -12,6 +12,8 @@ import type { AdminLoginRow, KnownDevice, PreviousLogin } from "@/lib/auth/admin
 import type { NumberingPreviewContext } from "@/lib/receipts/numbering-context"
 import type { ReminderConfigValues } from "@/lib/schemas/reminder-config"
 
+import type { CardManagerRow } from "@/lib/cards/card-managers"
+
 import type { AuditLogRow } from "../queries"
 import type { CronPreview } from "../reminder-actions"
 
@@ -59,6 +61,7 @@ interface SettingsShellProps {
     recoveryCodesLeft: number
   }[]
   auditRows: AuditLogRow[]
+  cardManagers: CardManagerRow[]
   access: {
     logins: AdminLoginRow[]
     devices: KnownDevice[]
@@ -150,6 +153,7 @@ export function SettingsShell(props: SettingsShellProps) {
             key="admin"
             currentUserId={props.currentUserId}
             admins={props.admins}
+            cardManagers={props.cardManagers}
             auditRows={props.auditRows}
           />
         ) : null}

@@ -35,6 +35,10 @@ enum UserRole {
   // collegato. Vive nella stessa area dei genitori (/parent), perché vede le
   // stesse cose — solo per una persona sola invece che per le figlie.
   ATHLETE
+  // Referente tessere: il referente ENDAS, socio dell'associazione. Vede in
+  // /tessere solo chi è da tesserare (dati anagrafici) e carica le tessere.
+  // Nessun profilo collegato: basta l'utente attivo.
+  CARD_MANAGER
 }
 
 model User {
@@ -1510,6 +1514,9 @@ enum AuditAction {
   // dell'altro admin (migration a sé)
   MFA_ENROLL
   MFA_RESET
+  // Referente tessere: invito e revoca dell'accesso
+  INVITE_CARD_MANAGER
+  REVOKE_CARD_MANAGER
 }
 
 model AuditLog {
