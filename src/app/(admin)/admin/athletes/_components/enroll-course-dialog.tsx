@@ -36,6 +36,12 @@ import { Textarea } from "@/components/ui/textarea"
 
 import { enrollmentPreview } from "@/lib/fees/enrollment-preview"
 import {
+  firstMonthWaiverReason,
+  LATE_ENROLLMENT_AFTER_DAY,
+  needsFirstMonthChoice,
+  type FirstMonthChoiceKind,
+} from "@/lib/fees/first-month"
+import {
   enrollmentCreateSchema,
   type EnrollmentCreateValues,
 } from "@/lib/schemas/enrollment"
@@ -79,6 +85,14 @@ function toDateInputValue(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
+const LATE_DAY = LATE_ENROLLMENT_AFTER_DAY
+
+const FIRST_MONTH_OPTIONS: { value: FirstMonthChoiceKind; label: string }[] = [
+  { value: "FULL", label: "Dovuto intero" },
+  { value: "REDUCED", label: "Dovuto ridotto" },
+  { value: "WAIVED", label: "Non dovuto" },
+]
+
 function monthName(date: Date): string {
   return formatMeseIt(date).toLowerCase()
 }
@@ -100,14 +114,29 @@ export function EnrollCourseDialog({
       courseId: "",
       enrollmentDate: new Date(),
       notes: "",
+      firstMonth: "FULL",
+      firstMonthAmountCents: undefined,
     },
   })
   const watchedCourseId = useWatch({ control: form.control, name: "courseId" })
   const watchedDate = useWatch({ control: form.control, name: "enrollmentDate" })
+  const watchedFirstMonth = useWatch({ control: form.control, name: "firstMonth" })
+  const watchedFirstAmount = useWatch({
+    control: form.control,
+    name: "firstMonthAmountCents",
+  })
 
   function onSubmit(values: EnrollmentCreateValues) {
+    // La scelta del primo mese parte solo se il dialog l'ha mostrata
+    const payload: EnrollmentCreateValues = showFirstMonthChoice
+      ? {
+          ...values,
+          firstMonthAmountCents:
+            values.firstMonth === "REDUCED" ? values.firstMonthAmountCents : undefined,
+        }
+      : { ...values, firstMonth: undefined, firstMonthAmountCents: undefined }
     startTransition(async () => {
-      const result = await createEnrollment(athleteId, values)
+      const result = await createEnrollment(athleteId, payload)
       if (result.ok) {
         toast.success("Iscrizione creata")
         form.reset()
@@ -140,6 +169,16 @@ export function EnrollCourseDialog({
           hasAssociationFee,
         })
       : null
+  // Iscrizione dopo il 15: cosa fare della rata di quel mese
+  // (src/lib/fees/first-month.ts)
+  const showFirstMonthChoice = Boolean(
+    preview?.monthly &&
+      validDate &&
+      needsFirstMonthChoice(validDate, preview.monthly.firstDueDate),
+  )
+  const firstMonthKind: FirstMonthChoiceKind = showFirstMonthChoice
+    ? (watchedFirstMonth ?? "FULL")
+    : "FULL"
   const today = todayDateOnly()
   const yearSlash = currentAcademicYear?.label.replace("-", "/") ?? ""
   const associationNotSet = preview?.association.kind === "not-set"
@@ -251,6 +290,80 @@ export function EnrollCourseDialog({
                 )}
               />
 
+              {showFirstMonthChoice && selectedCourse && validDate ? (
+                <FormField
+                  control={form.control}
+                  name="firstMonth"
+                  render={({ field }) => (
+                    <FormItem>
+                      <fieldset className="space-y-2">
+                        <legend className="text-sm font-medium">
+                          Rata di {monthName(validDate)}
+                        </legend>
+                        <p className="text-xs text-muted-foreground">
+                          Iscrizione dopo il {LATE_DAY}: scegli cosa chiedere per
+                          questo mese. Le rate dei mesi dopo restano intere.
+                        </p>
+                        {FIRST_MONTH_OPTIONS.map((option) => (
+                          <label
+                            key={option.value}
+                            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-muted/50"
+                          >
+                            <input
+                              type="radio"
+                              name={field.name}
+                              value={option.value}
+                              checked={(field.value ?? "FULL") === option.value}
+                              onChange={() => field.onChange(option.value)}
+                              className="size-4 accent-primary"
+                            />
+                            <span>
+                              {option.label}
+                              {option.value === "FULL" ? (
+                                <span className="font-mono text-muted-foreground">
+                                  {" "}
+                                  ({formatEuro(selectedCourse.monthlyFeeCents)})
+                                </span>
+                              ) : null}
+                            </span>
+                          </label>
+                        ))}
+                      </fieldset>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : null}
+
+              {showFirstMonthChoice && firstMonthKind === "REDUCED" ? (
+                <FormField
+                  control={form.control}
+                  name="firstMonthAmountCents"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Importo ridotto (€)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          inputMode="decimal"
+                          value={field.value ? field.value / 100 : ""}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === ""
+                                ? undefined
+                                : Math.round(Number(e.target.value) * 100),
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : null}
+
               {preview && selectedCourse ? (
                 <div
                   className="space-y-2 rounded-md border bg-muted/40 p-3 text-sm"
@@ -285,11 +398,31 @@ export function EnrollCourseDialog({
                       <span className="block text-xs text-muted-foreground">
                         Prima scadenza{" "}
                         {formatDateShort(preview.monthly.firstDueDate)}
-                        {preview.monthly.firstDueDate.getTime() < today.getTime()
+                        {preview.monthly.firstDueDate.getTime() < today.getTime() &&
+                        firstMonthKind !== "WAIVED"
                           ? " — già in ritardo"
                           : ""}
-                        . L&apos;importo ridotto si registra all&apos;incasso.
+                        {firstMonthKind === "FULL"
+                          ? ". L'importo ridotto si registra all'incasso."
+                          : null}
                       </span>
+                      {firstMonthKind === "WAIVED" && validDate ? (
+                        <span className="block text-xs">
+                          Rata di {monthName(preview.monthly.firstDueDate)}: non
+                          dovuta («{firstMonthWaiverReason(validDate)}»).
+                        </span>
+                      ) : null}
+                      {firstMonthKind === "REDUCED" ? (
+                        <span className="block text-xs">
+                          Rata di {monthName(preview.monthly.firstDueDate)}:{" "}
+                          <span className="font-mono tabular-nums">
+                            {watchedFirstAmount
+                              ? formatEuro(watchedFirstAmount)
+                              : "importo da indicare"}
+                          </span>
+                          .
+                        </span>
+                      ) : null}
                     </p>
                   ) : (
                     <p className="flex gap-2 text-amber-700 dark:text-amber-400">

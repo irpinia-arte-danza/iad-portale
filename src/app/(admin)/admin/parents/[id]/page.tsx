@@ -18,6 +18,7 @@ import { ResourceContent } from "../../_components/resource-content"
 import { ResourceHeader } from "../../_components/resource-header"
 import { ParentAnagraficaDisplay } from "../_components/parent-anagrafica-display"
 import { ParentDetailHeader } from "../_components/parent-detail-header"
+import { ParentRelationEditButton } from "../_components/parent-relation-edit-button"
 import { getParentById } from "../queries"
 import { AccessStatusCard } from "../../_components/access/access-status-card"
 import { getAccessStatus } from "@/lib/auth/access-status"
@@ -112,14 +113,19 @@ export default async function ParentDetailPage({ params }: PageProps) {
               ) : (
                 <ul className="space-y-3">
                   {parent.athleteRelations.map((rel) => (
-                    <li key={rel.id}>
+                    // La riga porta alla scheda dell'allieva; «Modifica» sta
+                    // fuori dal link e apre il dialog del grado di parentela
+                    <li
+                      key={rel.id}
+                      className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center"
+                    >
                       <Link
                         href={`/admin/athletes/${rel.athlete.id}`}
-                        className="flex items-start justify-between gap-3 rounded-md border p-3 hover:bg-muted/50"
+                        className="group flex min-w-0 flex-1 items-start justify-between gap-3 rounded-sm"
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium">
+                            <span className="font-medium underline-offset-4 group-hover:underline">
                               {rel.athlete.lastName} {rel.athlete.firstName}
                             </span>
                             <span className="text-xs text-muted-foreground">
@@ -143,6 +149,22 @@ export default async function ParentDetailPage({ params }: PageProps) {
                           {ATHLETE_STATUS_LABELS[rel.athlete.status]}
                         </Badge>
                       </Link>
+                      <ParentRelationEditButton
+                        relation={{
+                          id: rel.id,
+                          relationship: rel.relationship,
+                          isPrimaryContact: rel.isPrimaryContact,
+                          isPrimaryPayer: rel.isPrimaryPayer,
+                          isPickupAuthorized: rel.isPickupAuthorized,
+                          hasParentalAuthority: rel.hasParentalAuthority,
+                          parent: {
+                            firstName: parent.firstName,
+                            lastName: parent.lastName,
+                          },
+                        }}
+                        otherRelations={rel.athlete.parentRelations}
+                        athleteName={`${rel.athlete.firstName} ${rel.athlete.lastName}`}
+                      />
                     </li>
                   ))}
                 </ul>

@@ -165,7 +165,9 @@ function ScheduleRow({ schedule }: { schedule: FlattenedSchedule }) {
   const displayStatus = computeScheduleDisplayStatus(schedule)
 
   return (
-    <li className="flex items-center justify-between gap-4 rounded-md border p-3">
+    // Sul telefono i tasti vanno sotto: Incassa, Non dovuta e «…» in riga
+    // con data, corso e importo non ci stanno
+    <li className="flex flex-col gap-3 rounded-md border p-3 md:flex-row md:items-center md:justify-between md:gap-4">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
         <span className="font-medium">{formatDate(schedule.dueDate)}</span>
         <span className="text-sm text-muted-foreground">

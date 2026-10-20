@@ -43,11 +43,11 @@ export function GuardianRelationFields({
         name="relationship"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Relazione con l&apos;allieva</FormLabel>
+            <FormLabel>Grado di parentela</FormLabel>
             <Select onValueChange={field.onChange} value={field.value}>
               <FormControl>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleziona relazione" />
+                  <SelectValue placeholder="Seleziona il grado di parentela" />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>

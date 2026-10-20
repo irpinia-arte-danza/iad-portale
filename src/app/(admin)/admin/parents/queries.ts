@@ -69,7 +69,23 @@ export async function getParentById(id: string) {
     include: {
       athleteRelations: {
         where: { athlete: { deletedAt: null } },
-        include: { athlete: true },
+        include: {
+          athlete: {
+            include: {
+              // Gli altri genitori di ogni figlia: al dialog «Modifica»
+              // servono per sapere chi è già contatto principale o pagante
+              parentRelations: {
+                where: { parent: { deletedAt: null }, NOT: { parentId: id } },
+                select: {
+                  isPrimaryContact: true,
+                  isPrimaryPayer: true,
+                  parent: { select: { firstName: true, lastName: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { athlete: { lastName: "asc" } },
       },
     },
   })
