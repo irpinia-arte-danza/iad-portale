@@ -17,6 +17,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -31,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useBeforeUnloadGuard } from "@/lib/hooks/use-dirty-form"
+import { passwordPolicyHint } from "@/lib/auth/password-policy"
 import {
   changePasswordSchema,
   profileSchema,
@@ -273,6 +275,7 @@ export function AccountTab({ initial, onDirtyChange }: AccountTabProps) {
                           {...field}
                         />
                       </FormControl>
+                      <FormDescription>{passwordPolicyHint()}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

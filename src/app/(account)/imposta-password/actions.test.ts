@@ -88,7 +88,7 @@ async function redirectOf(fn: () => Promise<unknown>): Promise<string | null> {
   }
 }
 
-const values = { currentPassword: "", newPassword: "unapasswordlunga1", confirmPassword: "unapasswordlunga1" }
+const values = { currentPassword: "", newPassword: "Unapassword1!", confirmPassword: "Unapassword1!" }
 
 describe("setOwnPassword e il flag password_set", () => {
   beforeEach(() => {

@@ -12,6 +12,7 @@ import { getSessionLevel, hasRecoveryPass, verifiedTotpFactor } from "@/lib/auth
 import { adminGate, MFA_VERIFY_PATH } from "@/lib/auth/mfa-gate"
 import { sendPasswordChangedNotice } from "@/lib/auth/password-changed-email"
 import { PASSWORD_SET_KEY } from "@/lib/auth/password-gate"
+import { passwordErrorMessage, SESSION_EXPIRED_MESSAGE } from "@/lib/auth/password-policy"
 import { isRecentOtpSession } from "@/lib/auth/recent-otp"
 import { prisma } from "@/lib/prisma"
 import {
@@ -22,24 +23,7 @@ import type { ActionResult } from "@/lib/schemas/common"
 import { createAdminClient } from "@/lib/supabase/admin-client"
 import { createClient } from "@/lib/supabase/server"
 
-const SESSION_EXPIRED =
-  "La sessione è scaduta. Richiedi un nuovo link da «Password dimenticata»."
-
-function mapPasswordError(code: string | undefined): string {
-  switch (code) {
-    case "same_password":
-      return "La nuova password deve essere diversa da quella precedente."
-    case "weak_password":
-      return "Password troppo debole: usa almeno 10 caratteri, meglio se con lettere e numeri."
-    case "session_not_found":
-    case "session_expired":
-    case "bad_jwt":
-    case "reauthentication_needed":
-      return SESSION_EXPIRED
-    default:
-      return "Non è stato possibile salvare la password, riprova."
-  }
-}
+const SESSION_EXPIRED = SESSION_EXPIRED_MESSAGE
 
 // La sessione viene da un invito o da un recupero aperti negli ultimi 15
 // minuti? Lo dice il claim amr del JWT, letto e verificato da Supabase.
@@ -136,7 +120,7 @@ export async function setOwnPassword(
   })
   if (error) {
     console.error("[set-password] updateUser failed", { code: error.code })
-    return { ok: false, error: mapPasswordError(error.code) }
+    return { ok: false, error: passwordErrorMessage(error) }
   }
 
   // Il flag che apre le aree (password-gate.ts). In app_metadata, che solo

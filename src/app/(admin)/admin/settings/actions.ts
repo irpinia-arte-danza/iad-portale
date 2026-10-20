@@ -7,6 +7,7 @@ import { AuditAction, Prisma, ReceiptCategory } from "@prisma/client"
 
 import { forgetKnownDevice } from "@/lib/auth/admin-logins"
 import { adminResetSecondFactor } from "@/lib/auth/mfa"
+import { passwordErrorMessage } from "@/lib/auth/password-policy"
 import { sendSecurityNotice } from "@/lib/auth/security-notice-email"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { sendCardManagerInviteCore } from "@/lib/auth/access-emails"
@@ -478,7 +479,7 @@ export async function changePassword(
     })
     if (error) {
       logError("[settings] updateUser password failed", { name: "AuthError", code: error.code })
-      return { ok: false, error: "Non è stato possibile cambiare la password, riprova." }
+      return { ok: false, error: passwordErrorMessage(error) }
     }
 
     await logSettingsChange({

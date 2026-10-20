@@ -34,9 +34,9 @@ const loginSchema = z.object({
     .string()
     .min(1, { message: "Email obbligatoria" })
     .email({ message: "Email non valida" }),
-  password: z
-    .string()
-    .min(8, { message: "Password minimo 8 caratteri" }),
+  // Al login nessuna regola di lunghezza: vale quella di quando la password
+  // è stata scelta, e decide Supabase. Qui solo «non vuota».
+  password: z.string().min(1, { message: "Password obbligatoria" }),
 })
 
 type LoginFormValues = z.infer<typeof loginSchema>

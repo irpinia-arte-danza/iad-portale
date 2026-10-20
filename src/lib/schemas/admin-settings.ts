@@ -1,6 +1,13 @@
 import { z } from "zod"
 
 import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_POLICY,
+  passwordPolicyProblems,
+  policyMessage,
+} from "@/lib/auth/password-policy"
+
+import {
   emailRequiredSchema,
   nonEmptyStringSchema,
   phoneSchema,
@@ -147,10 +154,16 @@ export type ProfileValues = z.infer<typeof profileSchema>
 // Password change
 export const changePasswordSchema = z
   .object({
+    // La regola è quella di Supabase, copiata in PASSWORD_POLICY
     newPassword: z
       .string()
-      .min(10, { message: "Minimo 10 caratteri" })
-      .max(72, { message: "Massimo 72 caratteri" }),
+      .max(PASSWORD_MAX_LENGTH, { message: `Massimo ${PASSWORD_MAX_LENGTH} caratteri` })
+      .superRefine((value, ctx) => {
+        const problems = passwordPolicyProblems(value, PASSWORD_POLICY)
+        if (problems.length > 0) {
+          ctx.addIssue({ code: "custom", message: policyMessage(problems) })
+        }
+      }),
     confirmPassword: z.string(),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
