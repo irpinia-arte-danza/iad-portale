@@ -26,6 +26,7 @@ const AREA_LABELS: Record<UserRole, string> = {
   // Allieva che accede per sé: l'area è la stessa dei genitori, ma darle
   // della genitrice sarebbe sbagliato
   ATHLETE: "nella tua area riservata",
+  CARD_MANAGER: "all'area del tesseramento ENDAS",
 }
 
 export default async function SetPasswordPage({ searchParams }: PageProps) {

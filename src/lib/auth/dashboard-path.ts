@@ -6,6 +6,9 @@ export function getDashboardPath(role: UserRole): string {
       return "/admin/dashboard"
     case UserRole.TEACHER:
       return "/teacher/dashboard"
+    // Una pagina sola: la coda da tesserare e il caricamento
+    case UserRole.CARD_MANAGER:
+      return "/tessere"
     case UserRole.PARENT:
     // Un'allieva con accesso proprio vede la stessa area del genitore: le
     // stesse cose, per una persona sola invece che per le figlie. Tenere
@@ -26,6 +29,8 @@ export function getRoleAreaPrefix(role: UserRole): string {
       return "/admin"
     case UserRole.TEACHER:
       return "/teacher"
+    case UserRole.CARD_MANAGER:
+      return "/tessere"
     case UserRole.PARENT:
     case UserRole.ATHLETE:
       return "/parent"

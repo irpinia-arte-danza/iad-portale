@@ -993,6 +993,46 @@ Giuseppina vuole un formato diverso, si cambia in
 
 ---
 
+## Referente tessere (ruolo CARD_MANAGER)
+
+Il referente ENDAS ha un accesso suo: vede la coda «Da tesserare» con i soli
+dati anagrafici che chiede l'ente, scarica l'elenco e carica da sé i PDF
+delle tessere. Pagina unica: `/tessere`. Nessun secondo fattore, nessun
+accesso al resto del portale (il proxy lo rimanda sempre a `/tessere`).
+
+### Invitarlo
+
+1. Impostazioni › Admin › **Referente tessere**: nome, cognome, email, «Invia
+   accesso».
+2. Gli arriva l'email di accesso (stesso modello dei genitori, testo «area
+   del tesseramento ENDAS»): apre il link, sceglie la password, entra in
+   `/tessere`.
+3. Finché non entra, la riga dice «Invitato … · non ancora entrato» e c'è
+   «Reinvia accesso». In `/admin/tessere`, sotto il titolo, compare chi è il
+   referente e quando è entrato l'ultima volta.
+
+L'email non deve essere già usata nel portale (genitore, insegnante,
+allieva, admin): un account, un ruolo. Se il referente è anche un genitore
+di un'allieva, serve un secondo indirizzo.
+
+### Revocarlo
+
+Impostazioni › Admin › Referente tessere › **Revoca**. L'utente viene
+disattivato: alla pagina successiva che apre esce dal portale («accesso non
+attivo»). Le tessere che ha caricato restano, con il suo nome nel registro.
+Per ridargli l'accesso basta invitarlo di nuovo con la stessa email.
+
+### Cosa resta scritto
+
+- Ogni tessera caricata da lui ha `createdBy` = il suo utente e una riga
+  `CARD_IMPORT` nell'AuditLog con il suo id.
+- Invito e revoca: `INVITE_CARD_MANAGER` e `REVOKE_CARD_MANAGER`
+  nell'AuditLog (visibili in Impostazioni › Admin › Attività recente).
+- I suoi accessi stanno in `login_attempts` come quelli di genitori e
+  insegnanti, non in `admin_logins`: non manda avvisi di sicurezza.
+
+---
+
 ## Endas / CSEN — invio tesseramenti
 
 Non esiste API: il flusso resta manuale.

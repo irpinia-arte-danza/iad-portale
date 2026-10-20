@@ -14,6 +14,8 @@ const ACTION_LABELS: Record<string, string> = {
   LOGO_DELETE: "Logo rimosso",
   MFA_ENROLL: "Secondo fattore collegato",
   MFA_RESET: "Secondo fattore azzerato",
+  INVITE_CARD_MANAGER: "Accesso al referente tessere inviato",
+  REVOKE_CARD_MANAGER: "Accesso del referente tessere revocato",
 }
 
 const ACTION_VARIANT: Record<
@@ -30,6 +32,8 @@ const ACTION_VARIANT: Record<
   LOGO_DELETE: "destructive",
   MFA_ENROLL: "default",
   MFA_RESET: "destructive",
+  INVITE_CARD_MANAGER: "default",
+  REVOKE_CARD_MANAGER: "destructive",
 }
 
 function formatWhen(date: Date): string {

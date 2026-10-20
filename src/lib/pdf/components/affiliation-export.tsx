@@ -1,6 +1,28 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer"
 
-import type { TesseramentoRow } from "@/app/(admin)/admin/tessere/queries"
+// I campi anagrafici che servono a tesserare. Sesso e contatto ci sono solo
+// nell'elenco dell'admin: il referente tessere li riceve senza (variant
+// "card-manager"), perché non gli servono e non deve vederli.
+export type AffiliationExportRow = {
+  id: string
+  lastName: string
+  firstName: string
+  dateOfBirth: Date
+  placeOfBirth: string | null
+  provinceOfBirth: string | null
+  fiscalCode: string | null
+  residenceStreet: string | null
+  residenceNumber: string | null
+  residenceCity: string | null
+  residenceProvince: string | null
+  residenceCap: string | null
+  missing: string[]
+  gender?: "F" | "M" | "OTHER"
+  contactEmail?: string | null
+  contactPhone?: string | null
+}
+
+export type AffiliationExportVariant = "admin" | "card-manager"
 
 import { pdfColors, pdfStyles } from "../styles"
 import { IADHeaderMark } from "./iad-header"
@@ -55,17 +77,39 @@ const styles = StyleSheet.create({
   },
 })
 
-const COLUMNS = [
-  { key: "n", label: "#", width: "3%" },
-  { key: "lastName", label: "Cognome", width: "11%" },
-  { key: "firstName", label: "Nome", width: "10%" },
-  { key: "gender", label: "Sesso", width: "4%" },
-  { key: "birth", label: "Nato/a il", width: "8%" },
-  { key: "birthPlace", label: "Luogo di nascita", width: "13%" },
-  { key: "fiscalCode", label: "Codice fiscale", width: "14%" },
-  { key: "residence", label: "Residenza", width: "22%" },
-  { key: "contact", label: "Contatto", width: "15%" },
-] as const
+type ColumnKey =
+  | "n"
+  | "lastName"
+  | "firstName"
+  | "gender"
+  | "birth"
+  | "birthPlace"
+  | "fiscalCode"
+  | "residence"
+  | "contact"
+
+const COLUMNS: Record<AffiliationExportVariant, { key: ColumnKey; label: string; width: string }[]> = {
+  admin: [
+    { key: "n", label: "#", width: "3%" },
+    { key: "lastName", label: "Cognome", width: "11%" },
+    { key: "firstName", label: "Nome", width: "10%" },
+    { key: "gender", label: "Sesso", width: "4%" },
+    { key: "birth", label: "Nato/a il", width: "8%" },
+    { key: "birthPlace", label: "Luogo di nascita", width: "13%" },
+    { key: "fiscalCode", label: "Codice fiscale", width: "14%" },
+    { key: "residence", label: "Residenza", width: "22%" },
+    { key: "contact", label: "Contatto", width: "15%" },
+  ],
+  "card-manager": [
+    { key: "n", label: "#", width: "3%" },
+    { key: "lastName", label: "Cognome", width: "13%" },
+    { key: "firstName", label: "Nome", width: "12%" },
+    { key: "birth", label: "Nato/a il", width: "9%" },
+    { key: "birthPlace", label: "Luogo di nascita", width: "16%" },
+    { key: "fiscalCode", label: "Codice fiscale", width: "16%" },
+    { key: "residence", label: "Residenza", width: "31%" },
+  ],
+}
 
 function formatDateIt(date: Date): string {
   const d = new Date(date)
@@ -74,18 +118,18 @@ function formatDateIt(date: Date): string {
   return `${dd}/${mm}/${d.getUTCFullYear()}`
 }
 
-function genderLetter(g: "F" | "M" | "OTHER"): string {
-  return g === "OTHER" ? "—" : g
+function genderLetter(g: "F" | "M" | "OTHER" | undefined): string {
+  return !g || g === "OTHER" ? "—" : g
 }
 
-function birthPlace(row: TesseramentoRow): string {
+function birthPlace(row: AffiliationExportRow): string {
   if (!row.placeOfBirth) return ""
   return row.provinceOfBirth
     ? `${row.placeOfBirth} (${row.provinceOfBirth})`
     : row.placeOfBirth
 }
 
-function residence(row: TesseramentoRow): string {
+function residence(row: AffiliationExportRow): string {
   const street = [row.residenceStreet, row.residenceNumber]
     .filter(Boolean)
     .join(" ")
@@ -96,7 +140,7 @@ function residence(row: TesseramentoRow): string {
     .join(", ")
 }
 
-function contact(row: TesseramentoRow): string {
+function contact(row: AffiliationExportRow): string {
   return [row.contactEmail, row.contactPhone].filter(Boolean).join(" · ")
 }
 
@@ -119,8 +163,54 @@ function Cell({
   )
 }
 
+function ExportCell({
+  column,
+  width,
+  row,
+  n,
+}: {
+  column: ColumnKey
+  width: string
+  row: AffiliationExportRow
+  n: number
+}) {
+  switch (column) {
+    case "n":
+      return (
+        <View style={{ width }}>
+          <Text style={styles.td}>{n}</Text>
+        </View>
+      )
+    case "gender":
+      return (
+        <View style={{ width }}>
+          <Text style={styles.td}>{genderLetter(row.gender)}</Text>
+        </View>
+      )
+    case "birth":
+      return (
+        <View style={{ width }}>
+          <Text style={styles.td}>{formatDateIt(row.dateOfBirth)}</Text>
+        </View>
+      )
+    case "lastName":
+      return <Cell width={width} value={row.lastName} />
+    case "firstName":
+      return <Cell width={width} value={row.firstName} />
+    case "birthPlace":
+      return <Cell width={width} value={birthPlace(row)} />
+    case "fiscalCode":
+      return <Cell width={width} value={row.fiscalCode ?? ""} mono />
+    case "residence":
+      return <Cell width={width} value={residence(row)} />
+    case "contact":
+      return <Cell width={width} value={contact(row)} />
+  }
+}
+
 export type AffiliationExportProps = {
-  rows: TesseramentoRow[]
+  rows: AffiliationExportRow[]
+  variant?: AffiliationExportVariant
   entity: string
   seasonYear: number
   asdName: string | null
@@ -134,8 +224,10 @@ export function AffiliationExportPDF({
   seasonYear,
   asdName,
   logoUrl,
+  variant = "admin",
   generatedAt = new Date(),
 }: AffiliationExportProps) {
+  const columns = COLUMNS[variant]
   const incomplete = rows.filter((r) => r.missing.length > 0)
 
   return (
@@ -175,7 +267,7 @@ export function AffiliationExportPDF({
         ) : (
           <View style={pdfStyles.table}>
             <View style={pdfStyles.tableHeader} fixed>
-              {COLUMNS.map((c) => (
+              {columns.map((c) => (
                 <View key={c.key} style={{ width: c.width }}>
                   <Text style={styles.th}>{c.label}</Text>
                 </View>
@@ -191,25 +283,9 @@ export function AffiliationExportPDF({
                 }
                 wrap={false}
               >
-                <View style={{ width: COLUMNS[0].width }}>
-                  <Text style={styles.td}>{i + 1}</Text>
-                </View>
-                <Cell width={COLUMNS[1].width} value={row.lastName} />
-                <Cell width={COLUMNS[2].width} value={row.firstName} />
-                <View style={{ width: COLUMNS[3].width }}>
-                  <Text style={styles.td}>{genderLetter(row.gender)}</Text>
-                </View>
-                <View style={{ width: COLUMNS[4].width }}>
-                  <Text style={styles.td}>{formatDateIt(row.dateOfBirth)}</Text>
-                </View>
-                <Cell width={COLUMNS[5].width} value={birthPlace(row)} />
-                <Cell
-                  width={COLUMNS[6].width}
-                  value={row.fiscalCode ?? ""}
-                  mono
-                />
-                <Cell width={COLUMNS[7].width} value={residence(row)} />
-                <Cell width={COLUMNS[8].width} value={contact(row)} />
+                {columns.map((c) => (
+                  <ExportCell key={c.key} column={c.key} width={c.width} row={row} n={i + 1} />
+                ))}
               </View>
             ))}
           </View>

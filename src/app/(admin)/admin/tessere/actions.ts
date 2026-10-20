@@ -6,6 +6,8 @@ import { AffiliationEntity, AffiliationStatus, Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { requireCardUploader } from "@/lib/auth/require-card-manager"
+import { activeCardsData, matchCandidatesData } from "@/lib/cards/import-data"
 import { cardFileError, CARD_MAX_FILES_PER_BATCH } from "@/lib/affiliations/file-rules"
 import type { ExistingCard } from "@/lib/affiliations/import-plan"
 import { matchAthlete, type MatchCandidate } from "@/lib/affiliations/name-match"
@@ -23,7 +25,6 @@ import {
 } from "@/lib/supabase/storage-affiliation-card"
 import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 
-import { getActiveCards, getMatchCandidates } from "./queries"
 import { logError } from "@/lib/logging/log-error"
 import { GENERIC_ERROR_MESSAGE, userFacingMessage } from "@/lib/errors"
 
@@ -31,6 +32,8 @@ const TESSERE_PATH = "/admin/tessere"
 
 function revalidateCards(athleteId?: string) {
   revalidatePath(TESSERE_PATH)
+  // La pagina del referente tessere mostra la stessa coda
+  revalidatePath("/tessere")
   revalidatePath("/admin/athletes")
   if (athleteId) revalidatePath(`/admin/athletes/${athleteId}`)
 }
@@ -111,7 +114,8 @@ export type CardImportPreview = {
 export async function previewCardImport(
   formData: FormData,
 ): Promise<ActionResult<CardImportPreview>> {
-  await requireAdmin()
+  // Admin o referente tessere: la regola è in requireCardUploader
+  await requireCardUploader()
 
   const entity = readEntity(formData)
   if (!entity) return { ok: false, error: "Ente non valido" }
@@ -147,8 +151,8 @@ export async function previewCardImport(
   )
 
   const [athletes, existingCards] = await Promise.all([
-    getMatchCandidates(),
-    getActiveCards(entity as AffiliationEntity),
+    matchCandidatesData(),
+    activeCardsData(entity as AffiliationEntity),
   ])
 
   return { ok: true, data: { files: parsed, athletes, existingCards } }
@@ -166,7 +170,9 @@ export type SavedCard = {
 export async function importCardFile(
   formData: FormData,
 ): Promise<ActionResult<SavedCard>> {
-  const { userId } = await requireAdmin()
+  // Admin o referente tessere. userId è di chi carica davvero: finisce in
+  // createdBy e nell'AuditLog
+  const { userId } = await requireCardUploader()
 
   const entity = readEntity(formData)
   if (!entity) return { ok: false, error: "Ente non valido" }
@@ -201,7 +207,7 @@ export async function importCardFile(
     if (!card.person) {
       return { ok: false, error: "Intestataria non leggibile: abbinala a mano" }
     }
-    const athletes = await getMatchCandidates()
+    const athletes = await matchCandidatesData()
     const match = matchAthlete(card.person, athletes)
     if (match.status !== "matched") {
       return {

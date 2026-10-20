@@ -179,3 +179,12 @@ export const adminInviteSchema = z.object({
 })
 
 export type AdminInviteValues = z.infer<typeof adminInviteSchema>
+
+// Referente tessere: nome e cognome servono (sono nell'email e nell'audit)
+export const cardManagerInviteSchema = z.object({
+  email: emailRequiredSchema,
+  firstName: z.string().trim().min(1, { message: "Nome obbligatorio" }).max(100),
+  lastName: z.string().trim().min(1, { message: "Cognome obbligatorio" }).max(100),
+})
+
+export type CardManagerInviteValues = z.infer<typeof cardManagerInviteSchema>

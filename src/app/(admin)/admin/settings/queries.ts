@@ -1,5 +1,6 @@
 import { cache } from "react"
 
+import { cardManagersData, type CardManagerRow } from "@/lib/cards/card-managers"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
 
@@ -91,6 +92,8 @@ export async function getSettingsAuditLog(
           "LOGO_DELETE",
           "MFA_ENROLL",
           "MFA_RESET",
+          "INVITE_CARD_MANAGER",
+          "REVOKE_CARD_MANAGER",
         ],
       },
     },
@@ -115,4 +118,10 @@ export async function getSettingsAuditLog(
       : null,
     changes: r.changes,
   }))
+}
+
+// Referenti tessere attivi, per la sezione in Impostazioni › Admin
+export async function getCardManagers(): Promise<CardManagerRow[]> {
+  await requireAdmin()
+  return cardManagersData()
 }

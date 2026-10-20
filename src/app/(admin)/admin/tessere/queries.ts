@@ -8,12 +8,16 @@ import {
   classifyCard,
   CURRENT_CARD_ORDER,
   daysUntilExpiry,
-  seasonYearFromAcademicYearStart,
   type CardStatus,
 } from "@/lib/affiliations/card-status"
 import type { ExistingCard } from "@/lib/affiliations/import-plan"
 import type { MatchCandidate } from "@/lib/affiliations/name-match"
-import type { CardEntity } from "@/lib/affiliations/parsers"
+import {
+  activeCardsData,
+  currentSeasonYearData,
+  matchCandidatesData,
+} from "@/lib/cards/import-data"
+import { cardManagersData, type CardManagerRow } from "@/lib/cards/card-managers"
 import { todayDateOnly } from "@/lib/utils/date-only"
 
 export const CARD_SELECT = {
@@ -50,51 +54,24 @@ const STATUS_PRIORITY: Record<CardStatus, number> = {
   valid: 3,
 }
 
-// Anno sociale corrente: l'anno in cui è partito l'anno accademico in corso.
-// La stagione 2026/2027 è l'"Anno sociale 2026" che ENDAS stampa in tessera.
+// Anno sociale corrente, abbinamento e tessere già in archivio: i dati sono
+// in lib/cards/import-data.ts, condivisi con il referente tessere. Qui la
+// porta dell'admin, con la sua guardia come prima cosa.
 export async function getCurrentSeasonYear(): Promise<number> {
   await requireAdmin()
-
-  const year = await prisma.academicYear.findFirst({
-    where: { isCurrent: true },
-    select: { startDate: true },
-  })
-  if (!year) return todayDateOnly().getUTCFullYear()
-  return seasonYearFromAcademicYearStart(year.startDate)
+  return currentSeasonYearData()
 }
 
-// Le allieve contro cui si abbina una tessera letta dal PDF. Le ritirate
-// restano dentro: una tessera arretrata può riguardarle.
 export async function getMatchCandidates(): Promise<MatchCandidate[]> {
   await requireAdmin()
-
-  return prisma.athlete.findMany({
-    where: { deletedAt: null },
-    select: { id: true, firstName: true, lastName: true, dateOfBirth: true },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-  })
+  return matchCandidatesData()
 }
 
 export async function getActiveCards(
   entity: AffiliationEntity,
 ): Promise<ExistingCard[]> {
   await requireAdmin()
-
-  const cards = await prisma.affiliation.findMany({
-    where: { deletedAt: null, entity },
-    select: {
-      athleteId: true,
-      entity: true,
-      cardYear: true,
-      cardNumber: true,
-    },
-  })
-  return cards.map((c) => ({
-    athleteId: c.athleteId,
-    entity: c.entity as CardEntity,
-    cardYear: c.cardYear,
-    cardNumber: c.cardNumber,
-  }))
+  return activeCardsData(entity)
 }
 
 export async function getCardsOverview(
@@ -271,4 +248,12 @@ export async function getTesseramentoQueue(
     if (!row.contactEmail) row.missing.push("email di contatto")
     return row
   })
+}
+
+// Il referente tessere attivo, per l'intestazione della pagina: chi è e
+// quando è entrato l'ultima volta (null se non ce n'è uno)
+export async function getCardManagerSummary(): Promise<CardManagerRow | null> {
+  await requireAdmin()
+  const managers = await cardManagersData()
+  return managers[0] ?? null
 }

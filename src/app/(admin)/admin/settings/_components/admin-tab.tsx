@@ -13,10 +13,13 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
+import type { CardManagerRow } from "@/lib/cards/card-managers"
+
 import type { AuditLogRow } from "../queries"
 
 import { AdminInviteForm } from "./admin-invite-form"
 import { AuditLogList } from "./audit-log-list"
+import { CardManagerSection } from "./card-manager-section"
 import { ResetSecondFactorButton } from "./reset-second-factor-button"
 
 interface AdminRow {
@@ -33,10 +36,11 @@ interface AdminRow {
 interface AdminTabProps {
   currentUserId: string
   admins: AdminRow[]
+  cardManagers: CardManagerRow[]
   auditRows: AuditLogRow[]
 }
 
-export function AdminTab({ currentUserId, admins, auditRows }: AdminTabProps) {
+export function AdminTab({ currentUserId, admins, cardManagers, auditRows }: AdminTabProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -115,6 +119,8 @@ export function AdminTab({ currentUserId, admins, auditRows }: AdminTabProps) {
           <AdminInviteForm />
         </CardContent>
       </Card>
+
+      <CardManagerSection managers={cardManagers} />
 
       <Card>
         <CardHeader>

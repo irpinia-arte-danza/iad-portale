@@ -21,6 +21,7 @@ import { ResourceHeader } from "../_components/resource-header"
 import { SettingsShell } from "./_components/settings-shell"
 import {
   getAdminUsers,
+  getCardManagers,
   getBrandSettings,
   getReceiptSettings,
   getSettingsAuditLog,
@@ -50,6 +51,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     devices,
     deviceId,
     previousLogin,
+    cardManagers,
   ] = await Promise.all([
     getBrandSettings(),
     getReceiptSettings(),
@@ -63,6 +65,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     listKnownDevices(userId),
     currentDeviceId(),
     previousSuccessfulLogin(userId, level.sessionId),
+    getCardManagers(),
   ])
 
   // Il secondo fattore vive in Supabase Auth: una chiamata per admin (sono due)
@@ -161,6 +164,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
           initialReminderPreview={reminderPreview}
           initialProfile={initialProfile}
           admins={admins}
+          cardManagers={cardManagers}
           auditRows={auditRows}
           access={{ logins, devices, currentDeviceId: deviceId, previousLogin }}
         />
