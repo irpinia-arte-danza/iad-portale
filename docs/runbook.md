@@ -916,6 +916,29 @@ Stesso blocco del login: 15 minuti per quell'email e per quell'IP (`login_attemp
 
 ---
 
+## Regola delle password (Supabase e portale)
+
+La regola delle password esiste in **due copie che devono restare uguali**:
+
+| Dove | Cosa |
+|---|---|
+| **Supabase** (quella che decide) | Dashboard → progetto → **Authentication → Sign In / Providers → Email**: *Minimum password length* e *Password requirements* |
+| **Portale** (quella che avvisa prima) | `PASSWORD_POLICY` in `src/lib/auth/password-policy.ts`: controllo del modulo e riga sotto il campo («Almeno 10 caratteri con una minuscola, una maiuscola, un numero e un simbolo.») |
+
+Valori al 20/10/2026:
+- lunghezza minima **10**
+- caratteri richiesti: **minuscole, maiuscole, numeri e simboli** (*Lowercase, uppercase letters, digits and symbols*)
+- *Leaked password protection*: **spenta** (non disponibile sul piano Free)
+- *Secure password change* e *Require current password when updating*: **spenti**. La password attuale la chiede il portale su `/imposta-password` quando la sessione non viene da un link appena aperto.
+
+**Se si cambia uno dei due valori su Supabase, va cambiato lo stesso giorno in `PASSWORD_POLICY`** (e nel test `password-policy.test.ts`, che fissa i valori). Se le copie divergono:
+- **portale più largo di Supabase**: il modulo accetta, Supabase rifiuta. È successo fino al 20/10/2026, con 10 sul portale e 12 su Supabase: `ACAdon92.,.` (11 caratteri) passava il modulo e veniva rifiutata.
+- **portale più stretto**: il modulo blocca password che Supabase accetterebbe.
+
+In tutti e due i casi il messaggio d'errore resta giusto: per `weak_password` il portale legge la regola dal testo di Supabase, non dalla propria copia.
+
+Il login non controlla la lunghezza: vale la regola di quando la password è stata scelta.
+
 ## Accessi admin e avvisi di sicurezza
 
 Da Sicurezza 5 ogni accesso a un account **admin** lascia una riga in

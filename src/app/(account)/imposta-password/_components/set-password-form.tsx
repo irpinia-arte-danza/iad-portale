@@ -17,6 +17,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { passwordPolicyHint } from "@/lib/auth/password-policy"
 import {
   setOwnPasswordSchema,
   type SetOwnPasswordValues,
@@ -145,7 +146,7 @@ export function SetPasswordForm({ requireCurrentPassword }: Props) {
           )}
         />
         <p className="text-xs text-muted-foreground">
-          Almeno 10 caratteri. Scegli una password che non usi su altri siti.
+          {passwordPolicyHint()} Scegli una password che non usi su altri siti.
           {requireCurrentPassword
             ? " Dopo il salvataggio le altre sessioni aperte verranno chiuse e riceverai un'email di avviso."
             : " Riceverai un'email di avviso."}
