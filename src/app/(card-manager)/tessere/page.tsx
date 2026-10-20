@@ -1,7 +1,8 @@
-import { CheckCircle2, ListChecks } from "lucide-react"
+import { CheckCircle2, FileText, ListChecks } from "lucide-react"
 
 import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -153,14 +154,34 @@ export default async function CardManagerPage() {
           ) : (
             <ul className="divide-y rounded-md border">
               {cards.map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="min-w-0 truncate text-sm font-medium">
+                // Telefono: nome e numero sulla prima riga, «Apri PDF» largo
+                // sotto. Da 768 tutto su una riga, il tasto in fondo.
+                <li
+                  key={c.id}
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {c.lastName} {c.firstName}
                   </span>
                   <span className="shrink-0 text-right text-xs text-muted-foreground">
                     <span className="block font-mono text-foreground">n. {c.cardNumber ?? "—"}</span>
                     {c.expiryDate ? `scade il ${formatDateShort(c.expiryDate)}` : null}
                   </span>
+                  {/* Un link, non un tasto con window.open: su iPad Safari
+                      apre l'anteprima del PDF (route /tessere/pdf/[id]) */}
+                  {c.hasFile ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="h-11 w-full md:h-9 md:w-auto"
+                    >
+                      <a href={`/tessere/pdf/${c.id}`} target="_blank" rel="noopener">
+                        <FileText className="h-4 w-4" />
+                        Apri PDF
+                      </a>
+                    </Button>
+                  ) : null}
                 </li>
               ))}
             </ul>

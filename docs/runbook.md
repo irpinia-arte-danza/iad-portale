@@ -1053,6 +1053,11 @@ Per ridargli l'accesso basta invitarlo di nuovo con la stessa email.
   nell'AuditLog (visibili in Impostazioni › Admin › Attività recente).
 - I suoi accessi stanno in `login_attempts` come quelli di genitori e
   insegnanti, non in `admin_logins`: non manda avvisi di sicurezza.
+- Ogni PDF di tessera che apre («Apri PDF» in «Tesserate quest'anno») è una
+  riga `EXPORT` nell'AuditLog con il suo id, `entityType = Affiliation`,
+  l'id della tessera e `changes.change = CARD_PDF_OPEN`. Apre solo le
+  tessere ENDAS della stagione corrente di allieve non ritirate; il link
+  dura 5 minuti e non si salva.
 
 ---
 

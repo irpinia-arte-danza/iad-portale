@@ -1,6 +1,6 @@
 import "server-only"
 
-import { AffiliationEntity } from "@prisma/client"
+import { AffiliationEntity, AthleteStatus, type Prisma } from "@prisma/client"
 
 import { tesseramentoQueueWhere } from "@/app/(admin)/admin/tessere/queries"
 import { requireCardManager } from "@/lib/auth/require-card-manager"
@@ -89,10 +89,26 @@ export async function getCardManagerQueue(
   return athletes.map((a) => ({ ...a, missing: missingCardFields(a) }))
 }
 
+// Le tessere che il referente vede, e le sole che può aprire: ENDAS, della
+// stagione corrente, di allieve attive (non nel cestino, non ritirate: lo
+// stesso «attive» della coda). Un predicato solo per la lista e per il PDF:
+// un id fuori lista non apre niente.
+export function cardManagerCardsWhere(seasonYear: number): Prisma.AffiliationWhereInput {
+  return {
+    deletedAt: null,
+    entity: CARD_MANAGER_ENTITY,
+    cardYear: seasonYear,
+    athlete: { deletedAt: null, status: { not: AthleteStatus.WITHDRAWN } },
+  }
+}
+
+// filePath serve solo a sapere se c'è il PDF: il percorso nel bucket non
+// arriva alla pagina (CardManagerCardRow ha hasFile)
 export const CARD_MANAGER_CARD_SELECT = {
   id: true,
   cardNumber: true,
   expiryDate: true,
+  filePath: true,
   athlete: { select: { lastName: true, firstName: true } },
 } as const
 
@@ -102,18 +118,15 @@ export type CardManagerCardRow = {
   firstName: string
   cardNumber: string | null
   expiryDate: Date | null
+  // C'è un PDF da aprire («Apri PDF»)
+  hasFile: boolean
 }
 
 // Le tessere ENDAS della stagione: sola lettura
 export async function getCardManagerCards(seasonYear: number): Promise<CardManagerCardRow[]> {
   await requireCardManager()
   const cards = await prisma.affiliation.findMany({
-    where: {
-      deletedAt: null,
-      entity: CARD_MANAGER_ENTITY,
-      cardYear: seasonYear,
-      athlete: { deletedAt: null },
-    },
+    where: cardManagerCardsWhere(seasonYear),
     select: CARD_MANAGER_CARD_SELECT,
     orderBy: [{ athlete: { lastName: "asc" } }, { athlete: { firstName: "asc" } }],
   })
@@ -123,5 +136,23 @@ export async function getCardManagerCards(seasonYear: number): Promise<CardManag
     firstName: c.athlete.firstName,
     cardNumber: c.cardNumber,
     expiryDate: c.expiryDate,
+    hasFile: Boolean(c.filePath),
   }))
+}
+
+// Il PDF di una tessera della lista: il percorso nel bucket, solo se la
+// tessera sta nella lista del referente (cardManagerCardsWhere) e ha un file.
+// null in ogni altro caso: id libero, altra stagione, CSEN, allieva ritirata
+// o nel cestino, tessera senza PDF. Lo usa la route /tessere/pdf/[cardId].
+export async function getCardManagerCardFile(
+  cardId: string,
+): Promise<{ userId: string; filePath: string } | null> {
+  const { userId } = await requireCardManager()
+  const seasonYear = await currentSeasonYearData()
+  const card = await prisma.affiliation.findFirst({
+    where: { id: cardId, ...cardManagerCardsWhere(seasonYear) },
+    select: { filePath: true },
+  })
+  if (!card?.filePath) return null
+  return { userId, filePath: card.filePath }
 }
