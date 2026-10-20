@@ -57,8 +57,21 @@ describe("query del referente tessere", () => {
   })
 
   it("delle tessere esce solo numero, scadenza e nome dell'allieva", () => {
-    expect(Object.keys(CARD_MANAGER_CARD_SELECT).sort()).toEqual(["athlete", "cardNumber", "expiryDate", "id"])
+    // filePath si legge solo per sapere se c'è il PDF: non arriva alla pagina
+    expect(Object.keys(CARD_MANAGER_CARD_SELECT).sort()).toEqual([
+      "athlete",
+      "cardNumber",
+      "expiryDate",
+      "filePath",
+      "id",
+    ])
     expect(Object.keys(CARD_MANAGER_CARD_SELECT.athlete.select).sort()).toEqual(["firstName", "lastName"])
+  })
+
+  it("la riga della tessera dice se c'è il PDF, non dove sta", () => {
+    expectTypeOf<keyof CardManagerCardRow>().toEqualTypeOf<
+      "id" | "lastName" | "firstName" | "cardNumber" | "expiryDate" | "hasFile"
+    >()
   })
 
   it("segnala i dati che mancano per tesserare, senza contare i contatti", () => {
