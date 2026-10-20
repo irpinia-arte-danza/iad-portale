@@ -7,6 +7,9 @@ import {
   type ConfirmType,
 } from "@/lib/auth/confirm-page"
 import { getDashboardPath, getRoleAreaPrefix } from "@/lib/auth/dashboard-path"
+import { sessionClaimsOf } from "@/lib/auth/mfa"
+import { SET_PASSWORD_PATH } from "@/lib/auth/password-gate"
+import { isRecentOtpSession } from "@/lib/auth/recent-otp"
 import { safeNextPath } from "@/lib/auth/safe-next"
 import { prisma } from "@/lib/prisma"
 import { createClient } from "@/lib/supabase/server"
@@ -29,6 +32,9 @@ const LINK_INVALID_PATH = "/password-dimenticata?motivo=link-non-valido"
 //        cestino). Non si creano utenti qui: li crea solo l'invito admin.
 //        invite / recovery → /imposta-password (unica pagina per tutti i
 //        ruoli); next validato solo come ripiego.
+//        Token già consumato ma sessione nata da un link negli ultimi minuti
+//        (il secondo di due tap su «Attiva il mio accesso»): si prosegue
+//        verso /imposta-password invece di dire «link non valido».
 function readParams(source: URLSearchParams | FormData) {
   const get = (key: string) => {
     const value = source.get(key)
@@ -89,6 +95,17 @@ export async function POST(request: NextRequest) {
   })
 
   if (error || !data.session || !data.user) {
+    // Il token non dice più di chi era (Supabase lo cancella quando lo
+    // consuma): quello che si può verificare è che la sessione arrivata con
+    // la richiesta sia nata da un link personale pochi minuti fa. È il caso
+    // del doppio tap, quando il secondo POST porta già i cookie del primo.
+    const {
+      data: { user: current },
+    } = await supabase.auth.getUser()
+    if (current && isRecentOtpSession(await sessionClaimsOf(supabase))) {
+      const tipo = type === "invite" || params.intent === "access" ? "benvenuto" : "recupero"
+      return NextResponse.redirect(`${origin}${SET_PASSWORD_PATH}?tipo=${tipo}`, 303)
+    }
     console.error("[auth/confirm] verifyOtp failed", {
       type,
       code: error?.code,

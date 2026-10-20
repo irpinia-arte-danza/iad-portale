@@ -22,7 +22,10 @@ vi.mock("next/navigation", () => ({
     throw new RedirectError(to)
   },
 }))
-vi.mock("./current-account", () => ({ getCurrentAccount: async () => state.account }))
+vi.mock("./current-account", () => ({
+  getCurrentAccount: async () => state.account,
+  requirePasswordSet: async () => {},
+}))
 vi.mock("./mfa", () => ({
   getSessionLevel: async () => state.level,
   hasRecoveryPass: async () => state.pass,

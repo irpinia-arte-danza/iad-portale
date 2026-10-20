@@ -2,7 +2,7 @@ import Image from "next/image"
 
 import { requirePortalAccess } from "@/lib/auth/require-portal-access"
 import { prisma } from "@/lib/prisma"
-import { LogoutButton } from "@/components/auth/logout-button"
+import { UserMenu } from "@/components/auth/user-menu"
 import { PrivacyLink } from "@/components/privacy-link"
 
 import { ParentTabbar } from "./_components/parent-tabbar"
@@ -51,7 +51,7 @@ export default async function ParentLayout({
           ) : null}
           <span className="text-sm font-semibold">{asdName}</span>
         </div>
-        <LogoutButton />
+        <UserMenu />
       </header>
 
       <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 pb-24">

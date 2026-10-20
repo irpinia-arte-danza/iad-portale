@@ -42,13 +42,20 @@ export function decodeJwtPayload(token: string): unknown {
   }
 }
 
-export async function sessionLevelOf(
+// Il payload del JWT della sessione corrente (aal, amr, session_id), o null
+export async function sessionClaimsOf(
   supabase: Pick<SupabaseClient, "auth">,
-): Promise<SessionLevel> {
+): Promise<unknown> {
   const {
     data: { session },
   } = await supabase.auth.getSession()
-  return sessionLevelFromClaims(session ? decodeJwtPayload(session.access_token) : null)
+  return session ? decodeJwtPayload(session.access_token) : null
+}
+
+export async function sessionLevelOf(
+  supabase: Pick<SupabaseClient, "auth">,
+): Promise<SessionLevel> {
+  return sessionLevelFromClaims(await sessionClaimsOf(supabase))
 }
 
 // Memoizzato per request, come getCurrentAccount
