@@ -27,7 +27,7 @@ import { TONE_BADGE } from "@/lib/status/tone"
 import { reminderSummaryLabel } from "@/lib/scadenze/reminder-trace"
 import { formatDateShort, formatEuro } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
-import { WaiveScheduleButton } from "@/app/(admin)/admin/athletes/_components/schedule-waive-buttons"
+import { useWaiveScheduleMenuItem } from "@/app/(admin)/admin/athletes/_components/schedule-waive-actions"
 
 import type { ScadenzaWithDetails } from "../queries"
 
@@ -39,9 +39,9 @@ import type { ScadenzaWithDetails } from "../queries"
 // Incassa e Sollecita stavano nel menu ⋯ dell'ultima colonna, cioè fuori.
 // Qui le aree sono fisse e si ridispongono: una riga da 1024 in su, due righe
 // su tablet, una card sul telefono. Da 768 le due azioni si vedono sempre;
-// sul telefono restano fuori Incassa e Non dovuta, e il resto, Sollecita
-// compreso, sta nel menu «…» da 44 px: con i tre tasti
-// impilati 58 scadenze erano 18.000 px di pagina.
+// sul telefono, come nelle altre liste, c'è un tasto solo (Incassa) e il
+// resto, Sollecita e «Segna come non dovuta» compresi, sta nel menu «…»
+// da 44 px: con i tre tasti impilati 58 scadenze erano 18.000 px di pagina.
 // ─────────────────────────────────────────────────────────────────────────
 
 const GRID = cn(
@@ -87,6 +87,14 @@ export function ScadenzaRow({
   // Senza email e senza telefono non c'è nessuno da sollecitare: il tasto
   // resta, spento, e dice perché
   const canRemind = Boolean(contact?.email || contact?.phone)
+  // «Segna come non dovuta» nel menu «…», il dialog fuori dal menu
+  const waive = useWaiveScheduleMenuItem({
+    id: s.id,
+    status: s.status,
+    courseName: causale,
+    dueDate: s.dueDate,
+    amountCents: s.amountCents,
+  })
   const remindBlocker = !contact
     ? "Nessun genitore collegato"
     : "Il contatto non ha né email né telefono"
@@ -187,17 +195,6 @@ export function ScadenzaRow({
           <Wallet className="h-4 w-4" />
           Incassa
         </Button>
-        {/* Fuori dal menu: nel «…» della scheda allieva non la trovava
-            nessuno. Dopo la conferma la rata esce da qui e dai riquadri */}
-        <WaiveScheduleButton
-          schedule={{
-            id: s.id,
-            status: s.status,
-            courseName: causale,
-            dueDate: s.dueDate,
-            amountCents: s.amountCents,
-          }}
-        />
         <Button
           size="sm"
           variant="outline"
@@ -224,7 +221,7 @@ export function ScadenzaRow({
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="min-w-56">
             {/* Solo sul telefono, e solo se c'è qualcuno da sollecitare: una
                 voce spenta su ogni riga è rumore, e il motivo è già scritto
                 in rosso nella card */}
@@ -245,6 +242,7 @@ export function ScadenzaRow({
                 Modifica importo
               </DropdownMenuItem>
             ) : null}
+            {waive.item}
             <DropdownMenuItem asChild>
               <Link href={`/admin/athletes/${s.athlete.id}`}>
                 <UserCircle className="h-4 w-4" />
@@ -253,6 +251,7 @@ export function ScadenzaRow({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {waive.dialog}
       </div>
     </li>
   )

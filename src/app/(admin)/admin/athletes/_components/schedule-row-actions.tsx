@@ -15,7 +15,7 @@ import type { FeeType, ScheduleStatus } from "@prisma/client"
 import type { ScheduleDisplayStatus } from "@/lib/utils/schedule-status"
 import { ScheduleAmountDialog } from "./schedule-amount-dialog"
 import { useOpenScheduleSettle } from "./schedule-settle-provider"
-import { UnwaiveScheduleButton, WaiveScheduleButton } from "./schedule-waive-buttons"
+import { UnwaiveScheduleButton, useWaiveScheduleMenuItem } from "./schedule-waive-actions"
 
 interface ScheduleRowActionsProps {
   schedule: {
@@ -36,11 +36,13 @@ interface ScheduleRowActionsProps {
   }
 }
 
-// In vista quello che si fa sempre: Incassa e Non dovuta sulle rate aperte,
-// Rimetti come dovuta su quelle non dovute. Nel menu «…» il resto (importo).
+// In vista quello che si fa sempre: Incassa sulle rate aperte, Rimetti come
+// dovuta su quelle non dovute. Nel menu «…» il resto: importo e «Segna come
+// non dovuta».
 export function ScheduleRowActions({ schedule }: ScheduleRowActionsProps) {
   const openSettle = useOpenScheduleSettle()
   const [amountOpen, setAmountOpen] = useState(false)
+  const waive = useWaiveScheduleMenuItem(schedule)
 
   const canSettle =
     schedule.status === "DUE" || schedule.displayStatus === "OVERDUE"
@@ -69,10 +71,9 @@ export function ScheduleRowActions({ schedule }: ScheduleRowActionsProps) {
           Incassa
         </Button>
       )}
-      <WaiveScheduleButton schedule={schedule} />
       <UnwaiveScheduleButton schedule={schedule} />
 
-      {canEditAmount && (
+      {(canEditAmount || waive.item) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -84,14 +85,18 @@ export function ScheduleRowActions({ schedule }: ScheduleRowActionsProps) {
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setAmountOpen(true)}>
-              <PencilLine className="h-4 w-4" />
-              Modifica importo
-            </DropdownMenuItem>
+          <DropdownMenuContent align="end" className="min-w-56">
+            {canEditAmount && (
+              <DropdownMenuItem onClick={() => setAmountOpen(true)}>
+                <PencilLine className="h-4 w-4" />
+                Modifica importo
+              </DropdownMenuItem>
+            )}
+            {waive.item}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+      {waive.dialog}
 
       {canEditAmount && (
         <ScheduleAmountDialog

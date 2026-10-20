@@ -17,7 +17,7 @@ import { SendReminderDialog } from "@/app/(admin)/admin/scadenze/_components/sen
 import type { AthleteRecentPayment } from "@/app/(admin)/admin/athletes/queries"
 import type { OpenScheduleOption } from "@/app/(admin)/admin/payments/queries"
 import { receiptPdfHref } from "@/lib/receipts/types"
-import { WaiveScheduleButton } from "@/app/(admin)/admin/athletes/_components/schedule-waive-buttons"
+import { WaiveScheduleMenu } from "@/app/(admin)/admin/athletes/_components/schedule-waive-actions"
 import { dueLabel } from "@/lib/scadenze/due-label"
 import { TONE_TEXT } from "@/lib/status/tone"
 import { formatDateShort, formatEuro } from "@/lib/utils/format"
@@ -158,16 +158,6 @@ export function AthleteOverview({
                           >
                             Incassa
                           </Button>
-                          {/* Le rate di qui sono tutte aperte (DUE) */}
-                          <WaiveScheduleButton
-                            schedule={{
-                              id: s.id,
-                              status: "DUE",
-                              courseName: s.description,
-                              dueDate: s.dueDate,
-                              amountCents: s.amountCents,
-                            }}
-                          />
                           <Button
                             size="sm"
                             variant="outline"
@@ -177,6 +167,17 @@ export function AthleteOverview({
                             <MessageCircle className="h-4 w-4" />
                             Sollecita
                           </Button>
+                          {/* «Segna come non dovuta» nel menu «…». Le rate di
+                              qui sono tutte aperte (DUE) */}
+                          <WaiveScheduleMenu
+                            schedule={{
+                              id: s.id,
+                              status: "DUE",
+                              courseName: s.description,
+                              dueDate: s.dueDate,
+                              amountCents: s.amountCents,
+                            }}
+                          />
                         </div>
                       </li>
                     )
