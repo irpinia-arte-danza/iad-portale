@@ -27,6 +27,8 @@ import {
   ensureAssociationFeeSchedule,
 } from "@/lib/fees/association-fee"
 import { toDateOnly } from "@/lib/utils/date-only"
+import { formatEuro } from "@/lib/utils/format"
+import type { FirstMonthChoice } from "@/lib/fees/first-month"
 
 import { generateMonthlySchedulesForEnrollment } from "./schedule-generator"
 import { logError } from "@/lib/logging/log-error"
@@ -77,7 +79,7 @@ export async function createEnrollment(
 
   const course = await prisma.course.findFirst({
     where: { id: parsed.data.courseId, deletedAt: null },
-    select: { id: true, name: true, isActive: true },
+    select: { id: true, name: true, isActive: true, monthlyFeeCents: true },
   })
   if (!course) {
     return { ok: false, error: "Corso non trovato" }
@@ -85,6 +87,23 @@ export async function createEnrollment(
   if (!course.isActive) {
     return { ok: false, error: "Corso non attivo" }
   }
+
+  // Rata del mese di iscrizione (iscrizione dopo il 15). Il generatore la
+  // applica solo se la regola lo prevede: una scelta arrivata per una data
+  // entro il 15 non cambia niente.
+  const { firstMonth, firstMonthAmountCents } = parsed.data
+  if (firstMonth === "REDUCED" && (firstMonthAmountCents ?? 0) >= course.monthlyFeeCents) {
+    return {
+      ok: false,
+      error: `L'importo ridotto deve essere minore del contributo del corso (${formatEuro(course.monthlyFeeCents)})`,
+    }
+  }
+  const firstMonthChoice: FirstMonthChoice | null =
+    firstMonth === "WAIVED"
+      ? { kind: "WAIVED" }
+      : firstMonth === "REDUCED" && firstMonthAmountCents
+        ? { kind: "REDUCED", amountCents: firstMonthAmountCents }
+        : null
 
   const athlete = await prisma.athlete.findUnique({
     where: { id: athleteIdParsed.data, deletedAt: null },
@@ -130,7 +149,36 @@ export async function createEnrollment(
         tx,
         enrollment.id,
         adminUserId,
+        firstMonthChoice,
       )
+
+      // Rata del primo mese ridotta o non dovuta: resta scritto chi e perché,
+      // come per «Non dovuta» dalla scheda
+      if (firstMonthChoice) {
+        const first = await tx.paymentSchedule.findFirst({
+          where: { courseEnrollmentId: enrollment.id },
+          orderBy: { dueDate: "asc" },
+          select: { id: true, dueDate: true, amountCents: true, status: true, waiverReason: true },
+        })
+        if (first && (first.status === "WAIVED" || first.amountCents !== course.monthlyFeeCents)) {
+          await tx.auditLog.create({
+            data: {
+              userId: adminUserId,
+              action: AuditAction.UPDATE,
+              entityType: "PaymentSchedule",
+              entityId: first.id,
+              changes: {
+                change: first.status === "WAIVED" ? "WAIVE_FIRST_MONTH" : "REDUCE_FIRST_MONTH",
+                course: course.name,
+                dueDate: first.dueDate.toISOString().slice(0, 10),
+                amountCents: first.amountCents,
+                fullAmountCents: course.monthlyFeeCents,
+                waiverReason: first.waiverReason,
+              },
+            },
+          })
+        }
+      }
 
       // Una quota associativa per allieva per anno: al secondo corso non si
       // ripete. Importo non impostato → errore e iscrizione annullata.

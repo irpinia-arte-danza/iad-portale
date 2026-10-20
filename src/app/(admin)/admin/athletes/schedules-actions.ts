@@ -114,6 +114,8 @@ export async function waiveSchedule(
     const athleteId = athleteIdOfSchedule(existing)
     if (athleteId) revalidatePath(athletePath(athleteId))
     revalidatePath("/admin/scadenze")
+    // I riquadri della dashboard contano con lo stesso scadenzeWhere()
+    revalidatePath("/admin/dashboard")
     return { ok: true }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }
@@ -171,6 +173,8 @@ export async function unwaiveSchedule(
     const athleteId = athleteIdOfSchedule(existing)
     if (athleteId) revalidatePath(athletePath(athleteId))
     revalidatePath("/admin/scadenze")
+    // I riquadri della dashboard contano con lo stesso scadenzeWhere()
+    revalidatePath("/admin/dashboard")
     return { ok: true }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }

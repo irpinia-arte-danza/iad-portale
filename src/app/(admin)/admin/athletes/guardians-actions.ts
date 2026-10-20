@@ -1,10 +1,12 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+
 import { Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { changedFields } from "@/lib/audit/changed-fields"
 import type { ActionResult } from "@/lib/schemas/common"
 import { uuidSchema } from "@/lib/schemas/common"
 import {
@@ -251,15 +253,28 @@ export async function updateGuardianRelation(
     }
   }
 
+  let changed: string[] = []
+  let parentId: string | null = null
   try {
     const athleteId = await prisma.$transaction(async (tx) => {
       const existing = await tx.athleteParent.findUnique({
         where: { id: idParsed.data },
-        select: { athleteId: true },
+        select: {
+          athleteId: true,
+          parentId: true,
+          relationship: true,
+          isPrimaryContact: true,
+          isPrimaryPayer: true,
+          isPickupAuthorized: true,
+          hasParentalAuthority: true,
+        },
       })
       if (!existing) {
         return null
       }
+      // Nell'audit solo i campi cambiati davvero (#53), non tutto il modulo
+      changed = changedFields(existing, parsed.data)
+      parentId = existing.parentId
 
       await clearPrimaryFlagsBeforeWrite(
         tx,
@@ -283,9 +298,11 @@ export async function updateGuardianRelation(
       action: "GUARDIAN_LINK",
       entityType: "AthleteParent",
       entityId: idParsed.data,
-      changes: { athleteId, update: true, fields: Object.keys(parsed.data) },
+      changes: { athleteId, update: true, fields: changed },
     })
     revalidatePath(`${ATHLETES_PATH}/${athleteId}`)
+    // Il dialog si apre anche dalla scheda genitore
+    if (parentId) revalidatePath(`/admin/parents/${parentId}`)
     return { ok: true }
   } catch (error) {
     return { ok: false, error: mapPrismaError(error) }

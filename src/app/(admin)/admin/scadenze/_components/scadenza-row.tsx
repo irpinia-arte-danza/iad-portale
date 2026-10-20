@@ -27,6 +27,7 @@ import { TONE_BADGE } from "@/lib/status/tone"
 import { reminderSummaryLabel } from "@/lib/scadenze/reminder-trace"
 import { formatDateShort, formatEuro } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
+import { WaiveScheduleButton } from "@/app/(admin)/admin/athletes/_components/schedule-waive-buttons"
 
 import type { ScadenzaWithDetails } from "../queries"
 
@@ -38,8 +39,8 @@ import type { ScadenzaWithDetails } from "../queries"
 // Incassa e Sollecita stavano nel menu ⋯ dell'ultima colonna, cioè fuori.
 // Qui le aree sono fisse e si ridispongono: una riga da 1024 in su, due righe
 // su tablet, una card sul telefono. Da 768 le due azioni si vedono sempre;
-// sul telefono, come nelle altre liste, c'è un tasto solo (Incassa) e il
-// resto, Sollecita compreso, sta nel menu «…» da 44 px: con i tre tasti
+// sul telefono restano fuori Incassa e Non dovuta, e il resto, Sollecita
+// compreso, sta nel menu «…» da 44 px: con i tre tasti
 // impilati 58 scadenze erano 18.000 px di pagina.
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -186,6 +187,17 @@ export function ScadenzaRow({
           <Wallet className="h-4 w-4" />
           Incassa
         </Button>
+        {/* Fuori dal menu: nel «…» della scheda allieva non la trovava
+            nessuno. Dopo la conferma la rata esce da qui e dai riquadri */}
+        <WaiveScheduleButton
+          schedule={{
+            id: s.id,
+            status: s.status,
+            courseName: causale,
+            dueDate: s.dueDate,
+            amountCents: s.amountCents,
+          }}
+        />
         <Button
           size="sm"
           variant="outline"

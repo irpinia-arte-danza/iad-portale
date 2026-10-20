@@ -61,7 +61,7 @@ export function ScheduleUnwaiveDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Ripristinare la scadenza come dovuta?</AlertDialogTitle>
+          <AlertDialogTitle>Rimettere la scadenza come dovuta?</AlertDialogTitle>
           <AlertDialogDescription>
             {schedule.courseName} — scadenza {formatDate(schedule.dueDate)}. La
             scadenza tornerà da pagare e il motivo verrà cancellato (resta
@@ -77,7 +77,7 @@ export function ScheduleUnwaiveDialog({
                 Ripristino…
               </>
             ) : (
-              "Ripristina come dovuta"
+              "Rimetti come dovuta"
             )}
           </Button>
         </AlertDialogFooter>

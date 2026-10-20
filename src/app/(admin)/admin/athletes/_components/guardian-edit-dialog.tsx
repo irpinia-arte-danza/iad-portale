@@ -20,15 +20,35 @@ import {
   guardianRelationSchema,
   type GuardianRelationValues,
 } from "@/lib/schemas/guardian"
-import type { AthleteParentRelation } from "../queries"
+import type { ParentRelationship } from "@prisma/client"
 import { updateGuardianRelation } from "../guardians-actions"
 import { GuardianRelationFields } from "./guardian-relation-fields"
+
+// Solo quello che il dialog usa: lo aprono la scheda allieva (un genitore
+// fra quelli della figlia) e la scheda genitore (una figlia fra le sue)
+export type GuardianEditRelation = {
+  id: string
+  relationship: ParentRelationship
+  isPrimaryContact: boolean
+  isPrimaryPayer: boolean
+  isPickupAuthorized: boolean
+  hasParentalAuthority: boolean
+  parent: { firstName: string; lastName: string }
+}
+
+// Gli altri genitori della stessa allieva: decidono quali flag esclusivi
+// (contatto, pagante) sono già presi
+export type GuardianOtherRelation = {
+  isPrimaryContact: boolean
+  isPrimaryPayer: boolean
+  parent: { firstName: string; lastName: string }
+}
 
 interface GuardianEditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  athleteParent: AthleteParentRelation
-  otherRelations: AthleteParentRelation[]
+  athleteParent: GuardianEditRelation
+  otherRelations: GuardianOtherRelation[]
   onSuccess?: () => void
 }
 
@@ -81,7 +101,7 @@ export function GuardianEditDialog({
         <DialogHeader>
           <DialogTitle>Modifica relazione</DialogTitle>
           <DialogDescription>
-            Aggiorna la relazione e i permessi di{" "}
+            Grado di parentela e permessi di{" "}
             {athleteParent.parent.firstName} {athleteParent.parent.lastName}.
           </DialogDescription>
         </DialogHeader>
