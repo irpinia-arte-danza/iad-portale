@@ -1,22 +1,29 @@
 "use client"
 
-import { useState } from "react"
-import { CalendarX, Undo2 } from "lucide-react"
+import { useState, type ReactNode } from "react"
+import { CalendarX, MoreHorizontal, Undo2 } from "lucide-react"
 import type { ScheduleStatus } from "@prisma/client"
 
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
 import { ScheduleUnwaiveDialog } from "./schedule-unwaive-dialog"
 import { ScheduleWaiveDialog } from "./schedule-waive-dialog"
 
 // ─────────────────────────────────────────────────────────────────────────
-// «Non dovuta» e «Rimetti come dovuta» come tasti, non voci di menu.
+// «Segna come non dovuta» e «Rimetti come dovuta».
 //
-// Stavano solo nel menu «…» della rata in scheda allieva › Contributi e
-// nessuno li trovava; i ritardi Giuseppina li gestisce da Scadenze. Stesso
-// tasto, accanto a Incassa, in Scadenze, Contributi e Panoramica. I dialog
-// (conferma e motivo) sono quelli di prima.
+// Non dovuta è una voce del menu «…» della riga (Scadenze, Contributi,
+// Panoramica): come tasto accanto a Incassa (#63) faceva concorrenza
+// all'azione che si usa davvero. Rimetti come dovuta resta un tasto, sulle
+// rate non dovute in Contributi. I dialog (conferma e motivo) sono quelli
+// di sempre.
 // ─────────────────────────────────────────────────────────────────────────
 
 type WaivableSchedule = {
@@ -35,27 +42,24 @@ export function canWaiveSchedule(status: ScheduleStatus): boolean {
 
 const BUTTON_CLASS = "h-11 md:h-9"
 
-export function WaiveScheduleButton({
-  schedule,
-  className,
-}: {
-  schedule: WaivableSchedule
-  className?: string
-}) {
+// La voce di menu e il suo dialog. Il dialog sta fuori dal menu: quando si
+// sceglie la voce il menu si chiude e il dialog deve restare aperto.
+// item è null dove la rata non si può segnare (pagata, già non dovuta).
+export function useWaiveScheduleMenuItem(schedule: WaivableSchedule): {
+  item: ReactNode
+  dialog: ReactNode
+} {
   const [open, setOpen] = useState(false)
-  if (!canWaiveSchedule(schedule.status)) return null
+  if (!canWaiveSchedule(schedule.status)) return { item: null, dialog: null }
 
-  return (
-    <>
-      <Button
-        size="sm"
-        variant="outline"
-        className={cn(BUTTON_CLASS, className)}
-        onClick={() => setOpen(true)}
-      >
+  return {
+    item: (
+      <DropdownMenuItem onSelect={() => setOpen(true)}>
         <CalendarX className="h-4 w-4" />
-        Non dovuta
-      </Button>
+        Segna come non dovuta
+      </DropdownMenuItem>
+    ),
+    dialog: (
       <ScheduleWaiveDialog
         open={open}
         onOpenChange={setOpen}
@@ -66,6 +70,32 @@ export function WaiveScheduleButton({
           amountCents: schedule.amountCents,
         }}
       />
+    ),
+  }
+}
+
+// Il menu «…» con la sola voce, per le righe che un menu non l'avevano
+// (Panoramica). Niente menu vuoto sulle rate che non si possono segnare.
+export function WaiveScheduleMenu({ schedule }: { schedule: WaivableSchedule }) {
+  const { item, dialog } = useWaiveScheduleMenuItem(schedule)
+  if (!item) return null
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Altre azioni"
+            className="max-md:size-11 max-md:shrink-0"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-56">{item}</DropdownMenuContent>
+      </DropdownMenu>
+      {dialog}
     </>
   )
 }
