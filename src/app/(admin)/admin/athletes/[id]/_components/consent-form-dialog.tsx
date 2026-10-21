@@ -7,6 +7,8 @@ import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { UploadError } from "@/components/uploads/upload-error"
+import { callUploadAction } from "@/lib/uploads/upload-call"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -70,6 +72,7 @@ export function ConsentFormDialog({
   signers,
 }: Props) {
   const [busy, setBusy] = React.useState(false)
+  const [submitError, setSubmitError] = React.useState<string | null>(null)
   const picker = useConsentFilePicker(busy)
   // Sotto 1024 il modulo sale dal basso: è il gesto di iPad e telefono
   const belowLg = useIsBelowLg()
@@ -98,12 +101,16 @@ export function ConsentFormDialog({
   // Alla chiusura il file scelto si dimentica: alla prossima apertura il
   // dialog riparte vuoto
   function handleOpenChange(next: boolean) {
-    if (!next) picker.reset()
+    if (!next) {
+      picker.reset()
+      setSubmitError(null)
+    }
     onOpenChange(next)
   }
 
   async function onSubmit(values: ConsentValues) {
     setBusy(true)
+    setSubmitError(null)
     const fd = new FormData()
     for (const k of values.kinds) fd.append("kinds", k)
     // Niente alsoFor: ogni sorella ha il proprio modulo, e si registra dalla
@@ -113,7 +120,8 @@ export function ConsentFormDialog({
     if (values.notes) fd.append("notes", values.notes)
     if (picker.file) fd.append("file", picker.file)
 
-    const result = await registerConsents(athleteId, fd)
+    // Sempre un esito, anche se la action si rompe o non risponde
+    const result = await callUploadAction(() => registerConsents(athleteId, fd))
     if (result.ok) {
       const n = result.data?.created ?? 1
       toast.success(
@@ -121,6 +129,7 @@ export function ConsentFormDialog({
       )
       handleOpenChange(false)
     } else {
+      setSubmitError(result.error)
       toast.error(result.error)
     }
     setBusy(false)
@@ -251,6 +260,8 @@ export function ConsentFormDialog({
           )}
         />
 
+        <UploadError message={submitError} />
+
         <DialogFooter>
           <Button
             type="button"
@@ -263,7 +274,12 @@ export function ConsentFormDialog({
           <Button
             type="submit"
             className="h-11"
-            disabled={busy || picker.preparing || signers.length === 0}
+            disabled={
+              busy ||
+              picker.preparing ||
+              picker.fileError !== null ||
+              signers.length === 0
+            }
           >
             {busy ? (
               <>

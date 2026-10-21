@@ -2,7 +2,9 @@
 // (controllo vincolante lato server) e form di creazione allieva (controllo
 // immediato nel browser).
 
-export const MEDICAL_CERT_MAX_BYTES = 3 * 1024 * 1024 // 3 MB
+import { UPLOAD_MAX_BYTES, uploadSizeError } from "@/lib/uploads/upload-limits"
+
+export const MEDICAL_CERT_MAX_BYTES = UPLOAD_MAX_BYTES
 
 export const MEDICAL_CERT_ALLOWED_MIME = [
   "application/pdf",
@@ -16,7 +18,8 @@ export function medicalCertFileError(file: {
   size: number
   type: string
 }): string | null {
-  if (file.size > MEDICAL_CERT_MAX_BYTES) return "File troppo grande (max 3 MB)"
+  const sizeError = uploadSizeError(file, MEDICAL_CERT_MAX_BYTES)
+  if (sizeError) return sizeError
   if (!(MEDICAL_CERT_ALLOWED_MIME as readonly string[]).includes(file.type)) {
     return "Formato non supportato (PDF, JPEG, PNG)"
   }

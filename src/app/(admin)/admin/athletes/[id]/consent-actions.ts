@@ -25,6 +25,7 @@ import {
 import { isMinorAt } from "@/lib/utils/age"
 import { toDateOnly } from "@/lib/utils/date-only"
 import { validateFileSignature } from "@/lib/utils/file-signature"
+import { uploadSizeError } from "@/lib/uploads/upload-limits"
 import { logError } from "@/lib/logging/log-error"
 import { GENERIC_ERROR_MESSAGE, UserFacingError } from "@/lib/errors"
 
@@ -86,7 +87,8 @@ function fileFromForm(formData: FormData): File | null {
 }
 
 async function validateFile(file: File): Promise<string | null> {
-  if (file.size > CONSENT_FILE_MAX_BYTES) return "File troppo grande (max 3 MB)"
+  const sizeError = uploadSizeError(file, CONSENT_FILE_MAX_BYTES)
+  if (sizeError) return sizeError
   if (!(CONSENT_FILE_ALLOWED_MIME as readonly string[]).includes(file.type)) {
     return `Formato non supportato (${file.type}). Ammessi: PDF, JPEG, PNG.`
   }

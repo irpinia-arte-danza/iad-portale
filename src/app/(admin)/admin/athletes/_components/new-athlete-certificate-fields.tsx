@@ -15,6 +15,7 @@ import {
   MEDICAL_CERT_FILE_ACCEPT,
   medicalCertFileError,
 } from "@/lib/medical-certificates/file-rules"
+import { prepareCertificateFile } from "@/lib/medical-certificates/photo-resize"
 import {
   DEFAULT_EXPIRY_HINT,
   defaultExpiryFromIssue,
@@ -42,6 +43,7 @@ export function NewAthleteCertificateFields({
   disabled,
 }: Props) {
   const [fileError, setFileError] = React.useState<string | null>(null)
+  const [preparing, setPreparing] = React.useState(false)
   const id = React.useId()
 
   // La scadenza mostrata è ancora quella calcolata? Serve alla riga di
@@ -58,19 +60,28 @@ export function NewAthleteCertificateFields({
     onChange({ ...value, issueDate, expiryDate })
   }
 
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null
+  // Come nel dialog della scheda allieva: la foto si riduce sul dispositivo
+  // (lato lungo 2000 px, JPEG), il PDF passa intatto, e il limite si
+  // controlla dopo, prima di spedire
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target
+    const picked = input.files?.[0] ?? null
     setFileError(null)
-    if (file) {
-      const problem = medicalCertFileError(file)
-      if (problem) {
-        setFileError(problem)
-        e.target.value = ""
-        onChange({ ...value, file: null })
-        return
-      }
+    if (!picked) {
+      onChange({ ...value, file: null })
+      return
     }
-    onChange({ ...value, file })
+    setPreparing(true)
+    const prepared = await prepareCertificateFile(picked)
+    setPreparing(false)
+    const problem = prepared.ok ? medicalCertFileError(prepared.file) : prepared.error
+    if (!prepared.ok || problem) {
+      setFileError(problem)
+      input.value = ""
+      onChange({ ...value, file: null })
+      return
+    }
+    onChange({ ...value, file: prepared.file })
   }
 
   return (
@@ -128,13 +139,16 @@ export function NewAthleteCertificateFields({
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor={`${id}-file`}>File (PDF, JPEG, PNG, max 3 MB)</Label>
+        <Label htmlFor={`${id}-file`}>File (PDF o foto, max 4 MB)</Label>
         <Input
           id={`${id}-file`}
           type="file"
           accept={MEDICAL_CERT_FILE_ACCEPT}
           onChange={onFileChange}
         />
+        {preparing ? (
+          <p className="text-xs text-muted-foreground">Preparo la foto…</p>
+        ) : null}
         {fileError ? (
           <p className="text-xs text-destructive">{fileError}</p>
         ) : null}

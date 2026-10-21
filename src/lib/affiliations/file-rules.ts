@@ -5,7 +5,9 @@
 // Solo PDF: la tessera arriva dal portale dell'ente ed è testo vero, non una
 // scansione. Una foto della tessera non si può leggere e non si può abbinare.
 
-export const CARD_MAX_BYTES = 3 * 1024 * 1024 // 3 MB
+import { UPLOAD_MAX_BYTES, uploadSizeError } from "@/lib/uploads/upload-limits"
+
+export const CARD_MAX_BYTES = UPLOAD_MAX_BYTES
 
 export const CARD_ALLOWED_MIME = ["application/pdf"] as const
 
@@ -20,7 +22,8 @@ export function cardFileError(file: {
   name: string
 }): string | null {
   if (file.size === 0) return "File vuoto"
-  if (file.size > CARD_MAX_BYTES) return "File troppo grande (max 3 MB)"
+  const sizeError = uploadSizeError(file, CARD_MAX_BYTES)
+  if (sizeError) return sizeError
   const looksPdf =
     (CARD_ALLOWED_MIME as readonly string[]).includes(file.type) ||
     file.name.toLowerCase().endsWith(".pdf")

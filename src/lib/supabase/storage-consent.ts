@@ -11,6 +11,7 @@ import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 import { createAdminClient } from "./admin-client"
 import { SIGNED_URL_TTL_SECONDS } from "./signed-url"
 import { UserFacingError } from "@/lib/errors"
+import { tooLargeMessage } from "@/lib/uploads/upload-limits"
 
 // Moduli firmati dei consensi. Path: {uuid}.{ext}, senza l'id dell'allieva:
 // lo stesso modulo può valere per più consensi e più sorelle, e il legame
@@ -69,7 +70,7 @@ export async function uploadConsentFile(file: File): Promise<string> {
     throw new UserFacingError("Formato non supportato. Ammessi: PDF, JPEG, PNG")
   }
   if (file.size > CONSENT_FILE_MAX_BYTES) {
-    throw new UserFacingError("File troppo grande (max 3 MB)")
+    throw new UserFacingError(tooLargeMessage(file.size, CONSENT_FILE_MAX_BYTES))
   }
   const bytes = await file.arrayBuffer()
   const signatureMime = detectMimeFromSignature(bytes)

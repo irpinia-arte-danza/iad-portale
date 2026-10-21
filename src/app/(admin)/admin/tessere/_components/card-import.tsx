@@ -44,12 +44,18 @@ import type { CardEntity } from "@/lib/affiliations/parsers"
 import { cn } from "@/lib/utils"
 import { formatDateShort } from "@/lib/utils/format"
 
+import { chunkFilesByBytes } from "@/lib/uploads/chunk-files"
+import { callUploadAction } from "@/lib/uploads/upload-call"
+import { UPLOAD_MAX_BYTES } from "@/lib/uploads/upload-limits"
+
 import { importCardFile, previewCardImport, type ParsedFile } from "../actions"
 import { logError } from "@/lib/logging/log-error"
 
-// Quanti file per chiamata: i PDF viaggiano interi, meglio non fare un unico
-// corpo enorme. Le righe restano numerate come i file scelti.
-const READ_CHUNK = 8
+// I file letti in una chiamata: i PDF viaggiano interi, e il corpo della
+// server action ha un tetto (5 MB in next.config, 4,5 su Vercel). Gruppi da
+// al massimo 8 file e 4 MB in tutto; un file da solo ci sta sempre. Le righe
+// restano numerate come i file scelti.
+const READ_CHUNK_FILES = 8
 
 type Props = {
   entity: CardEntity
@@ -116,7 +122,7 @@ export function CardImport({ entity }: Props) {
       toast.error(
         rejected.length === 1
           ? rejected[0]
-          : `${rejected.length} file scartati (solo PDF, max 3 MB)`,
+          : `${rejected.length} file scartati (solo PDF, max 4 MB)`,
       )
     }
     if (accepted.length === 0) return
@@ -146,14 +152,17 @@ export function CardImport({ entity }: Props) {
     setSaved({})
     try {
       const collected: ParsedFile[] = []
-      for (let start = 0; start < files.length; start += READ_CHUNK) {
-        const chunk = files.slice(start, start + READ_CHUNK)
+      const chunks = chunkFilesByBytes(files, {
+        maxFiles: READ_CHUNK_FILES,
+        maxBytes: UPLOAD_MAX_BYTES,
+      })
+      for (const { start, files: chunk } of chunks) {
         const formData = new FormData()
         formData.set("entity", entity)
         formData.set("offset", String(start))
         for (const file of chunk) formData.append("files", file)
 
-        const result = await previewCardImport(formData)
+        const result = await callUploadAction(() => previewCardImport(formData))
         if (!result.ok) {
           toast.error(result.error)
           return
@@ -189,7 +198,9 @@ export function CardImport({ entity }: Props) {
       formData.set("file", file)
       formData.set("athleteId", row.outcome.athleteId)
 
-      const result = await importCardFile(formData)
+      // Un fallimento (rete, timeout) diventa il motivo della riga: il ciclo
+      // va avanti e «Salvataggio» non resta acceso
+      const result = await callUploadAction(() => importCardFile(formData))
       outcomes[row.index] = result.ok
         ? { ok: true, message: "Salvata" }
         : { ok: false, message: result.error }
@@ -251,7 +262,7 @@ export function CardImport({ entity }: Props) {
             Scegli i PDF delle tessere
           </Button>
           <p className="text-xs text-muted-foreground">
-            Solo PDF, max 3 MB l&apos;uno, fino a {CARD_MAX_FILES_PER_BATCH}{" "}
+            Solo PDF, max 4 MB l&apos;uno, fino a {CARD_MAX_FILES_PER_BATCH}{" "}
             per volta
           </p>
         </div>

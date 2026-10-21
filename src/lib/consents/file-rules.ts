@@ -3,7 +3,9 @@
 // browser). Le stesse dei certificati medici: un foglio fotografato o
 // scansionato.
 
-export const CONSENT_FILE_MAX_BYTES = 3 * 1024 * 1024 // 3 MB
+import { UPLOAD_MAX_BYTES } from "@/lib/uploads/upload-limits"
+
+export const CONSENT_FILE_MAX_BYTES = UPLOAD_MAX_BYTES
 
 export const CONSENT_FILE_ALLOWED_MIME = [
   "application/pdf",

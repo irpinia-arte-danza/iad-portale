@@ -30,6 +30,7 @@ import {
   compareCurrentFirst,
 } from "@/lib/affiliations/card-status"
 import { CARD_FILE_ACCEPT, cardFileError } from "@/lib/affiliations/file-rules"
+import { callUploadAction } from "@/lib/uploads/upload-call"
 import { formatDateShort } from "@/lib/utils/format"
 
 import {
@@ -90,7 +91,8 @@ export function EndasCardSection({ athleteId, entity, cards }: Props) {
       formData.set("entity", entity)
       formData.set("file", file)
       formData.set("athleteId", athleteId)
-      const result = await importCardFile(formData)
+      // Sempre un esito, anche se la action si rompe o non risponde
+      const result = await callUploadAction(() => importCardFile(formData))
       if (result.ok) {
         toast.success(`Tessera n. ${result.data?.cardNumber} caricata`)
         router.refresh()

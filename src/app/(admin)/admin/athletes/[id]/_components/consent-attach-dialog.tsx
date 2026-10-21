@@ -21,7 +21,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { UploadError } from "@/components/uploads/upload-error"
 import { useIsBelowLg } from "@/hooks/use-is-below-lg"
+import { callUploadAction } from "@/lib/uploads/upload-call"
 
 import { attachConsentFile } from "../consent-actions"
 import { useConsentFilePicker } from "./consent-file-picker"
@@ -56,10 +58,11 @@ export function ConsentAttachDialog(props: Props) {
 function AttachDialogBody({ consentId, onClose, athleteId, candidates }: Props) {
   const open = consentId !== null
   const [busy, setBusy] = React.useState(false)
+  const [submitError, setSubmitError] = React.useState<string | null>(null)
   const [selected, setSelected] = React.useState<string[]>(
     consentId ? [consentId] : [],
   )
-  const picker = useConsentFilePicker(busy, "Modulo firmato")
+  const picker = useConsentFilePicker(busy, "Modulo firmato", false)
   const belowLg = useIsBelowLg()
 
   function handleOpenChange(next: boolean) {
@@ -70,10 +73,12 @@ function AttachDialogBody({ consentId, onClose, athleteId, candidates }: Props) 
     e.preventDefault()
     if (!picker.file || selected.length === 0) return
     setBusy(true)
+    setSubmitError(null)
     const fd = new FormData()
     for (const id of selected) fd.append("consentIds", id)
     fd.append("file", picker.file)
-    const result = await attachConsentFile(athleteId, fd)
+    // Sempre un esito, anche se la action si rompe o non risponde
+    const result = await callUploadAction(() => attachConsentFile(athleteId, fd))
     if (result.ok) {
       const n = result.data?.attached ?? 1
       toast.success(
@@ -81,6 +86,7 @@ function AttachDialogBody({ consentId, onClose, athleteId, candidates }: Props) 
       )
       onClose()
     } else {
+      setSubmitError(result.error)
       toast.error(result.error)
     }
     setBusy(false)
@@ -116,6 +122,8 @@ function AttachDialogBody({ consentId, onClose, athleteId, candidates }: Props) 
           })}
         </div>
       </div>
+
+      <UploadError message={submitError} />
 
       <DialogFooter>
         <Button
