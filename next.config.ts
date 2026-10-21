@@ -48,6 +48,17 @@ const PRISMA_UNUSED_RUNTIMES = [
 ];
 
 const nextConfig: NextConfig = {
+  // Certificati, moduli dei consensi e tessere viaggiano dentro una server
+  // action. Il default di Next è 1 MB: una foto da iPad lo superava e la
+  // action rispondeva 500 «Body exceeded 1 MB limit» (ottobre 2026). Le foto
+  // ora si riducono nel browser; questo resta come rete di sicurezza sopra il
+  // limite dei file, 4 MB (src/lib/uploads/upload-limits.ts). Oltre i 4,5 MB
+  // il corpo lo rifiuta comunque Vercel.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "5mb",
+    },
+  },
   // "**/*" copre tutte le route dell'app (pagine e route handler).
   //
   // Il proxy no, e non è una svista: la sua traccia (`middleware.js.nft.json`)

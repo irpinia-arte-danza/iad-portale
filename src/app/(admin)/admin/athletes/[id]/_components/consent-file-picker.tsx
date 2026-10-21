@@ -6,6 +6,7 @@ import { Camera, FileUp, Loader2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CONSENT_FILE_MAX_BYTES } from "@/lib/consents/file-rules"
 import { prepareCertificateFile } from "@/lib/medical-certificates/photo-resize"
+import { uploadSizeError } from "@/lib/uploads/upload-limits"
 
 // "Scatta una foto": fotocamera posteriore. "Scegli un file": galleria o
 // file, PDF compresi. Come per il certificato medico.
@@ -16,7 +17,13 @@ const ACCEPT_FILE = "image/*,application/pdf"
 // La scelta del modulo firmato, una sola: la usano il dialog che registra
 // un consenso e quello che allega il modulo a consensi già registrati.
 // ─────────────────────────────────────────────────────────────────────────
-export function useConsentFilePicker(busy: boolean, label?: string) {
+// `optional`: il file si può anche non dare (registrazione del consenso).
+// In «Allega modulo» il file è il motivo del dialog: niente «senza file».
+export function useConsentFilePicker(
+  busy: boolean,
+  label?: string,
+  optional: boolean = true,
+) {
   const [file, setFile] = React.useState<File | null>(null)
   const [fileError, setFileError] = React.useState<string | null>(null)
   const [preparing, setPreparing] = React.useState(false)
@@ -48,13 +55,11 @@ export function useConsentFilePicker(busy: boolean, label?: string) {
       setFileError(prepared.error)
       return
     }
-    if (prepared.file.size > CONSENT_FILE_MAX_BYTES) {
+    // Dopo la riduzione: blocca qui, prima di spedire
+    const sizeError = uploadSizeError(prepared.file, CONSENT_FILE_MAX_BYTES)
+    if (sizeError) {
       setFile(null)
-      setFileError(
-        prepared.file.type === "application/pdf"
-          ? "Il PDF supera i 3 MB: scegline uno più leggero o scatta una foto."
-          : "La foto è ancora troppo pesante: riprova più da vicino o scegli un PDF.",
-      )
+      setFileError(sizeError)
       return
     }
     setFile(prepared.file)
@@ -129,11 +134,26 @@ export function useConsentFilePicker(busy: boolean, label?: string) {
           </button>
         </p>
       ) : null}
+      {/* Con un file rifiutato il dialog non salva (guarda fileError): si
+          sceglie un altro file o si va avanti senza, dicendolo */}
       {fileError ? (
-        <p className="text-xs text-destructive">{fileError}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-destructive">{fileError}</p>
+          {optional ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-11"
+              onClick={() => setFileError(null)}
+            >
+              Continua senza file
+            </Button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   )
 
-  return { file, preparing, reset, element }
+  return { file, fileError, preparing, reset, element }
 }

@@ -2,10 +2,13 @@
 // La foto del certificato, ridotta prima di caricarla.
 //
 // Il genitore porta il foglio in sala e il gesto naturale su iPad è
-// fotografarlo. Una foto da 12 megapixel pesa 4-6 MB: più del limite del
-// portale (3 MB), e comunque troppo per un foglio A4 che deve solo essere
-// leggibile. Qui si riduce sul dispositivo — lato lungo 2000 px, JPEG a
-// qualità 0,8 — così parte un file da qualche centinaio di KB.
+// fotografarlo. Una foto da 12 megapixel pesa 4-8 MB: più del limite del
+// portale (4 MB, src/lib/uploads/upload-limits.ts), e comunque troppo per un
+// foglio A4 che deve solo essere leggibile. Qui si riduce sul dispositivo —
+// lato lungo 2000 px, JPEG a qualità 0,8 — così parte un file da qualche
+// centinaio di KB. Se a 0,8 resta sopra 1 MB (foto piena di dettagli o di
+// grana) si riscrive a qualità più bassa, fino a 0,5: il foglio resta
+// leggibile e il file non sfiora il limite.
 //
 // Un PDF non si tocca: è già il documento.
 //
@@ -19,6 +22,9 @@
 
 export const PHOTO_MAX_SIDE = 2000
 export const PHOTO_JPEG_QUALITY = 0.8
+// Sopra questo peso si prova una qualità più bassa
+export const PHOTO_TARGET_BYTES = 1024 * 1024
+export const PHOTO_FALLBACK_QUALITIES = [0.7, 0.6, 0.5] as const
 
 export type Size = { width: number; height: number }
 
@@ -78,6 +84,25 @@ export const UNSUPPORTED_ERROR =
 export const UNREADABLE_ERROR =
   "Non riesco a leggere questa immagine. Scatta la foto dal portale o scegli un JPG."
 
+/**
+ * Il JPEG alla prima qualità che sta sotto `targetBytes`, partendo da 0,8.
+ * Se nessuna ci sta, l'ultimo tentativo (il più leggero): il limite vero lo
+ * controlla chi carica. null se il browser non sa scrivere il JPEG.
+ */
+export async function encodeWithinTarget(
+  encode: (quality: number) => Promise<Blob | null>,
+  targetBytes: number = PHOTO_TARGET_BYTES,
+): Promise<Blob | null> {
+  let last: Blob | null = null
+  for (const quality of [PHOTO_JPEG_QUALITY, ...PHOTO_FALLBACK_QUALITIES]) {
+    const blob = await encode(quality)
+    if (!blob) return last
+    last = blob
+    if (blob.size <= targetBytes) return blob
+  }
+  return last
+}
+
 export type PreparedFile =
   | { ok: true; file: File; resized: boolean }
   | { ok: false; error: string }
@@ -111,8 +136,11 @@ export async function prepareCertificateFile(file: File): Promise<PreparedFile> 
     context.fillRect(0, 0, target.width, target.height)
     context.drawImage(bitmap, 0, 0, target.width, target.height)
 
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", PHOTO_JPEG_QUALITY),
+    const blob = await encodeWithinTarget(
+      (quality) =>
+        new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", quality),
+        ),
     )
     if (!blob) {
       return { ok: false, error: isHeic(file) ? HEIC_ERROR : UNREADABLE_ERROR }

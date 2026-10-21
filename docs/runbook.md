@@ -628,6 +628,39 @@ USING (
 
 ---
 
+## Limite dei file caricati (4 MB)
+
+Certificati medici, moduli dei consensi e tessere hanno **un solo limite:
+4 MB a file** (`UPLOAD_MAX_BYTES` in `src/lib/uploads/upload-limits.ts`). Il
+portale lo controlla nel browser, prima di spedire («File troppo grande
+(6,2 MB), massimo 4 MB»), e di nuovo sul server.
+
+- **Le foto si riducono sul dispositivo** prima dell'invio: lato lungo
+  2000 px, JPEG qualità 0,8 (più bassa, fino a 0,5, se resta sopra 1 MB). Una
+  foto di un foglio A4 parte a 300–600 KB. I PDF passano così come sono.
+- **Il file viaggia dentro una server action.** Il corpo è limitato a 5 MB da
+  `serverActions.bodySizeLimit` in `next.config.ts` (il default di Next, 1 MB,
+  faceva fallire le foto da iPad con un 500 «Body exceeded 1 MB limit») e a
+  4,5 MB da Vercel, non modificabile. Un file da 4 MB più i campi ci sta.
+- **Ogni caricamento finisce**: errore della action, rete caduta o nessuna
+  risposta entro 30 secondi diventano un messaggio nel modulo
+  (`callUploadAction` in `src/lib/uploads/upload-call.ts`). Dopo un timeout il
+  file potrebbe essere stato salvato lo stesso: il messaggio dice di
+  ricaricare la pagina prima di riprovare.
+- **I bucket di Supabase hanno un loro limite per file, da tenere uguale.**
+  `consents` e `affiliation-cards` sono nati dal codice con 3 MB;
+  `medical-certificates` è stato creato a mano. In Supabase Dashboard →
+  Storage → (bucket) → Edit bucket → *Restrict file size*: **4 MB** per
+  `medical-certificates`, `consents`, `affiliation-cards`. Se resta più basso,
+  un PDF tra il limite del bucket e 4 MB viene rifiutato da Supabase e il
+  modulo lo dice («Upload fallito…»); le foto ridotte non ci arrivano.
+- Il logo (`brand`, pubblico) resta a 2 MB.
+
+Se si cambia il limite: `UPLOAD_MAX_BYTES`, i tre bucket, e
+`bodySizeLimit` che deve restare sopra (e Vercel non va oltre 4,5 MB).
+
+---
+
 ## Ricevute — PDF archiviati
 
 Il PDF di una ricevuta è il documento consegnato: si genera **una volta** e poi
@@ -873,7 +906,7 @@ nell'uso ordinario, fino alla loro rotazione.
 
 ### Bucket `consents` (moduli firmati)
 
-Privato, PDF/JPEG/PNG, massimo 3 MB. **Non va creato a mano**: nasce al primo
+Privato, PDF/JPEG/PNG, massimo 4 MB (vedi «Limite dei file caricati»: il bucket già creato con 3 MB va alzato a mano). **Non va creato a mano**: nasce al primo
 modulo allegato (`src/lib/supabase/storage-consent.ts`), come `receipts` e
 `affiliation-cards`; se esiste ma è pubblico, il caricamento si ferma. Nessuna
 policy RLS: si legge e si scrive solo lato server con la service role. Percorso

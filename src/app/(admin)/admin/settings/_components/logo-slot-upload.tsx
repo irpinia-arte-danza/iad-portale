@@ -18,6 +18,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
+import { callUploadAction } from "@/lib/uploads/upload-call"
+import { BRAND_LOGO_MAX_BYTES, uploadSizeError } from "@/lib/uploads/upload-limits"
 
 import { deleteLogo, uploadLogo } from "../actions"
 
@@ -52,12 +54,19 @@ export function LogoSlotUpload({
     const file = e.target.files?.[0]
     e.target.value = "" // reset input so same file re-triggers
     if (!file) return
+    const sizeError = uploadSizeError(file, BRAND_LOGO_MAX_BYTES)
+    if (sizeError) {
+      toast.error(sizeError)
+      return
+    }
 
     const formData = new FormData()
     formData.set("file", file)
 
     startTransition(async () => {
-      const res = await uploadLogo(slot, formData)
+      // Un errore lanciato dentro la transizione finirebbe nella pagina di
+      // errore: qui diventa un toast
+      const res = await callUploadAction(() => uploadLogo(slot, formData))
       if (res.ok) {
         setUrl(res.data?.publicUrl ?? null)
         toast.success("Logo caricato")

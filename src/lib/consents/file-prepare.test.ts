@@ -3,6 +3,7 @@ import path from "node:path"
 
 import { describe, expect, it } from "vitest"
 
+import { MEDICAL_CERT_MAX_BYTES } from "@/lib/medical-certificates/file-rules"
 import { planForFile } from "@/lib/medical-certificates/photo-resize"
 
 import { CONSENT_FILE_ALLOWED_MIME, CONSENT_FILE_MAX_BYTES } from "./file-rules"
@@ -33,12 +34,13 @@ describe("file del consenso", () => {
     expect(dialog).toContain("await prepareCertificateFile(picked)")
   })
 
-  it("stesse regole dei certificati: PDF, JPEG, PNG fino a 3 MB", () => {
+  it("stesse regole dei certificati: PDF, JPEG, PNG fino a 4 MB", () => {
     expect([...CONSENT_FILE_ALLOWED_MIME]).toEqual([
       "application/pdf",
       "image/jpeg",
       "image/png",
     ])
-    expect(CONSENT_FILE_MAX_BYTES).toBe(3 * 1024 * 1024)
+    expect(CONSENT_FILE_MAX_BYTES).toBe(4 * 1024 * 1024)
+    expect(CONSENT_FILE_MAX_BYTES).toBe(MEDICAL_CERT_MAX_BYTES)
   })
 })

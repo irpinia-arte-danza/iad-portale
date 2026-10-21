@@ -12,6 +12,8 @@ import {
   medicalCertSchema,
   type MedicalCertValues,
 } from "@/lib/schemas/medical-certificate"
+import { MEDICAL_CERT_MAX_BYTES } from "@/lib/medical-certificates/file-rules"
+import { uploadSizeError } from "@/lib/uploads/upload-limits"
 import {
   ALLOWED_MIME,
   deleteMedicalCertFile,
@@ -22,8 +24,6 @@ import { toDateOnly } from "@/lib/utils/date-only"
 import { validateFileSignature } from "@/lib/utils/file-signature"
 import { logError } from "@/lib/logging/log-error"
 import { GENERIC_ERROR_MESSAGE, userFacingMessage } from "@/lib/errors"
-
-const MAX_BYTES = 3 * 1024 * 1024
 
 function mapPrismaError(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -76,7 +76,8 @@ function fileFromForm(formData: FormData): File | null {
 }
 
 async function validateFile(file: File): Promise<string | null> {
-  if (file.size > MAX_BYTES) return "File troppo grande (max 3 MB)"
+  const sizeError = uploadSizeError(file, MEDICAL_CERT_MAX_BYTES)
+  if (sizeError) return sizeError
   if (!(ALLOWED_MIME as readonly string[]).includes(file.type)) {
     return `Formato non supportato (${file.type}). Ammessi: PDF, JPEG, PNG.`
   }

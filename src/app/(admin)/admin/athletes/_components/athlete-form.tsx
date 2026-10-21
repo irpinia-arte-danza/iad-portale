@@ -40,6 +40,7 @@ import {
   genderOptions,
   type AthleteCreateValues,
 } from "@/lib/schemas/athlete"
+import { callUploadAction } from "@/lib/uploads/upload-call"
 
 import { createMedicalCertificate } from "../[id]/medical-cert-actions"
 import { createAthlete, updateAthlete } from "../actions"
@@ -129,9 +130,12 @@ export function AthleteForm({
       const newAthleteId = result.data?.id
       let certificateFailure: string | null = null
       if (withCertificate && newAthleteId) {
-        const saved = await createMedicalCertificate(
-          newAthleteId,
-          newAthleteCertificateFormData(certificate),
+        // Sempre un esito, anche se la action si rompe o non risponde
+        const saved = await callUploadAction(() =>
+          createMedicalCertificate(
+            newAthleteId,
+            newAthleteCertificateFormData(certificate),
+          ),
         )
         if (!saved.ok) certificateFailure = saved.error
       }

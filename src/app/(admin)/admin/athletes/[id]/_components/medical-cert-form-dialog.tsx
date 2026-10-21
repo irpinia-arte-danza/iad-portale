@@ -33,6 +33,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
+import { UploadError } from "@/components/uploads/upload-error"
 import {
   MEDICAL_CERT_TYPE_LABELS,
   MEDICAL_CERT_TYPES,
@@ -47,6 +48,9 @@ import {
 } from "@/lib/medical-certificates/default-expiry"
 import { useIsBelowLg } from "@/hooks/use-is-below-lg"
 import { prepareCertificateFile } from "@/lib/medical-certificates/photo-resize"
+import { MEDICAL_CERT_MAX_BYTES } from "@/lib/medical-certificates/file-rules"
+import { callUploadAction } from "@/lib/uploads/upload-call"
+import { uploadSizeError } from "@/lib/uploads/upload-limits"
 import { toDateInputValue } from "@/lib/utils/format"
 
 import {
@@ -56,7 +60,6 @@ import {
 
 type Mode = "create" | "edit"
 
-const MAX_BYTES = 3 * 1024 * 1024
 // "Scatta una foto": su iPad e telefono apre direttamente la fotocamera
 // posteriore. "Scegli un file": la galleria o i file, PDF compresi.
 const ACCEPT_PHOTO = "image/*"
@@ -102,6 +105,7 @@ export function MedicalCertFormDialog({
   const [fileError, setFileError] = React.useState<string | null>(null)
   const [preparing, setPreparing] = React.useState(false)
   const [resized, setResized] = React.useState(false)
+  const [submitError, setSubmitError] = React.useState<string | null>(null)
   // Sotto 1024 il modulo sale dal basso: è il gesto di iPad e telefono
   const belowLg = useIsBelowLg()
   const photoInput = React.useRef<HTMLInputElement>(null)
@@ -134,6 +138,7 @@ export function MedicalCertFormDialog({
       setFile(null)
       setFileError(null)
       setResized(false)
+      setSubmitError(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, certId])
@@ -146,6 +151,7 @@ export function MedicalCertFormDialog({
     // Lo stesso file si deve poter riscegliere dopo un errore
     e.target.value = ""
     setFileError(null)
+    setSubmitError(null)
     if (!picked) return
 
     setPreparing(true)
@@ -157,13 +163,11 @@ export function MedicalCertFormDialog({
       setFileError(prepared.error)
       return
     }
-    if (prepared.file.size > MAX_BYTES) {
+    // Dopo la riduzione: blocca qui, prima di spedire
+    const sizeError = uploadSizeError(prepared.file, MEDICAL_CERT_MAX_BYTES)
+    if (sizeError) {
       setFile(null)
-      setFileError(
-        prepared.file.type === "application/pdf"
-          ? "Il PDF supera i 3 MB: scegline uno più leggero o scatta una foto."
-          : "La foto è ancora troppo pesante: riprova più da vicino o scegli un PDF.",
-      )
+      setFileError(sizeError)
       return
     }
     setFile(prepared.file)
@@ -172,6 +176,7 @@ export function MedicalCertFormDialog({
 
   async function onSubmit(values: MedicalCertValues) {
     setBusy(true)
+    setSubmitError(null)
     const fd = new FormData()
     fd.append("type", values.type)
     fd.append("issueDate", values.issueDate.toISOString())
@@ -180,10 +185,13 @@ export function MedicalCertFormDialog({
     if (values.notes) fd.append("notes", values.notes)
     if (file) fd.append("file", file)
 
-    const result =
+    // Sempre un esito, anche se la action si rompe o non risponde: mai la
+    // rotella che gira per sempre
+    const result = await callUploadAction<unknown>(() =>
       mode === "create"
-        ? await createMedicalCertificate(athleteId, fd)
-        : await updateMedicalCertificate(certId!, fd)
+        ? createMedicalCertificate(athleteId, fd)
+        : updateMedicalCertificate(certId!, fd),
+    )
 
     if (result.ok) {
       toast.success(
@@ -193,6 +201,7 @@ export function MedicalCertFormDialog({
       )
       onOpenChange(false)
     } else {
+      setSubmitError(result.error)
       toast.error(result.error)
     }
     setBusy(false)
@@ -279,8 +288,22 @@ export function MedicalCertFormDialog({
               C&apos;è già un file: se non ne scegli un altro resta quello.
             </p>
           ) : null}
+          {/* Con un file rifiutato non si salva: si sceglie un altro file o
+              si dice esplicitamente di andare avanti senza, così un
+              «Certificato aggiunto» non fa credere che la foto sia salita */}
           {fileError ? (
-            <p className="text-xs text-destructive">{fileError}</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-destructive">{fileError}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-11"
+                onClick={() => setFileError(null)}
+              >
+                Continua senza file
+              </Button>
+            </div>
           ) : null}
         </div>
 
@@ -441,6 +464,8 @@ export function MedicalCertFormDialog({
           )}
         />
 
+        <UploadError message={submitError} />
+
         <DialogFooter>
           <Button
             type="button"
@@ -450,7 +475,11 @@ export function MedicalCertFormDialog({
           >
             Annulla
           </Button>
-          <Button type="submit" className="h-11" disabled={busy || preparing}>
+          <Button
+            type="submit"
+            className="h-11"
+            disabled={busy || preparing || fileError !== null}
+          >
             {busy ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

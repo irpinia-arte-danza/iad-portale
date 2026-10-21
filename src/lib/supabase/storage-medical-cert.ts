@@ -8,6 +8,7 @@ import {
 } from "@/lib/medical-certificates/file-rules"
 import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 import { UserFacingError } from "@/lib/errors"
+import { tooLargeMessage } from "@/lib/uploads/upload-limits"
 
 export const MEDICAL_CERT_BUCKET = "medical-certificates"
 
@@ -42,7 +43,7 @@ export async function uploadMedicalCertFile(
     )
   }
   if (file.size > MAX_BYTES) {
-    throw new UserFacingError("File troppo grande (max 3 MB)")
+    throw new UserFacingError(tooLargeMessage(file.size, MAX_BYTES))
   }
 
   const supabase = createAdminClient()

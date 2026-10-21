@@ -3,6 +3,7 @@ import "server-only"
 import { createAdminClient } from "./admin-client"
 import { detectMimeFromSignature } from "@/lib/utils/file-signature"
 import { UserFacingError } from "@/lib/errors"
+import { BRAND_LOGO_MAX_BYTES, tooLargeMessage } from "@/lib/uploads/upload-limits"
 
 export const BRAND_BUCKET = "brand"
 
@@ -15,7 +16,7 @@ const SLOT_CONTENT_TYPE: Record<BrandLogoSlot, readonly string[]> = {
   "logo-svg": [],
 }
 
-const MAX_BYTES = 2 * 1024 * 1024 // 2 MB
+const MAX_BYTES = BRAND_LOGO_MAX_BYTES
 
 export async function ensureBrandBucket(): Promise<void> {
   const supabase = createAdminClient()
@@ -57,7 +58,7 @@ export async function uploadBrandAsset(
     )
   }
   if (file.size > MAX_BYTES) {
-    throw new UserFacingError("File troppo grande (max 2 MB)")
+    throw new UserFacingError(tooLargeMessage(file.size, MAX_BYTES))
   }
 
   await ensureBrandBucket()
